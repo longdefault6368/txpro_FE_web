@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, MapPin, Navigation, Phone, ShieldAlert, Truck } from "lucide-react";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
@@ -283,14 +283,14 @@ function getStatusText(status: string) {
     case "searching_driver":
     case "waiting_driver":
     case "waiting_driver_acceptance":
-      return "Đang tìm xe";
+      return "Chờ nhận đơn";
     case "accepted":
-      return "Tài xế đã nhận đơn";
+      return "Đã nhận đơn";
     case "in_progress":
     case "delivered":
       return "Đang vận chuyển";
     case "completed":
-      return "Hoàn tất";
+      return "Đã hoàn thành";
     case "cancelled":
       return "Đã hủy";
     default:
@@ -299,6 +299,7 @@ function getStatusText(status: string) {
 }
 
 function RouteTrackingContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const code = searchParams.get("code") || "";
   const avatarUrl = useMemo(() => getServerMediaUrl(null), []);
@@ -641,12 +642,13 @@ function RouteTrackingContent() {
       <div id={mapContainerId} className="z-10 min-h-[calc(100vh-80px)] w-full flex-1" />
 
       <div className="absolute left-6 top-24 z-20">
-        <Link
-          href={`/tracking?code=${encodeURIComponent(code)}`}
-          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-4 py-3 text-sm font-bold text-slate-800 shadow-xl backdrop-blur transition hover:bg-white"
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-4 py-3 text-sm font-bold text-slate-800 shadow-xl backdrop-blur transition hover:bg-white cursor-pointer"
         >
-          <ArrowLeft className="h-4 w-4" /> Quay lại thông tin vận đơn
-        </Link>
+          <ArrowLeft className="h-4 w-4" /> Quay lại
+        </button>
       </div>
 
       {data && (
@@ -728,9 +730,13 @@ function RouteTrackingContent() {
           </div>
           <h3 className="mb-2 text-lg font-bold">Định vị thất bại</h3>
           <p className="mb-6 max-w-sm text-sm text-slate-300">{error}</p>
-          <Link href="/tracking" className="rounded-lg bg-primary-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-700">
-            Quay lại tra cứu
-          </Link>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="rounded-lg bg-primary-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-700 cursor-pointer"
+          >
+            Quay lại trang trước
+          </button>
         </div>
       )}
 

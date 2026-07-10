@@ -105,7 +105,7 @@ export default function ChatWidget() {
     }
   };
 
-  const getAIResponse = async (chatHistory: Message[]) => {
+  const getAIResponse = async (chatHistory: Message[], onChunk: (text: string) => void) => {
     setIsTyping(true);
     try {
       const response = await fetch("/api/chat", {
@@ -120,12 +120,29 @@ export default function ChatWidget() {
         throw new Error("API call failed");
       }
 
-      const data = await response.json();
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("No reader in response body");
+      }
+
+      const decoder = new TextDecoder("utf-8");
+      let done = false;
+      let accumulated = "";
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          const chunk = decoder.decode(value, { stream: !done });
+          accumulated += chunk;
+          onChunk(accumulated);
+        }
+      }
 
       // Play received message sound
       playNotificationSound();
 
-      return data.reply;
+      return accumulated;
     } catch (error) {
       console.error("AI fetch error:", error);
       return "Xin lỗi, hiện tại hệ thống AI đang quá tải hoặc gặp sự cố mạng. Vui lòng gửi lại câu hỏi sau!";
@@ -142,8 +159,21 @@ export default function ChatWidget() {
     setMessages(newMessages);
     setInputVal("");
 
-    const aiReply = await getAIResponse(newMessages);
-    setMessages((prev) => [...prev, { role: "assistant", content: aiReply }]);
+    // Create an empty assistant message which we will fill by streaming!
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+    const updateLastMessage = (content: string) => {
+      setMessages((prev) => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1] = { role: "assistant", content };
+        }
+        return updated;
+      });
+    };
+
+    const finalReply = await getAIResponse(newMessages, updateLastMessage);
+    updateLastMessage(finalReply);
   };
 
   const handleQuickReply = async (text: string) => {
@@ -152,8 +182,21 @@ export default function ChatWidget() {
     const newMessages = [...messages, { role: "user", content: text } as Message];
     setMessages(newMessages);
 
-    const aiReply = await getAIResponse(newMessages);
-    setMessages((prev) => [...prev, { role: "assistant", content: aiReply }]);
+    // Create an empty assistant message which we will fill by streaming!
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+    const updateLastMessage = (content: string) => {
+      setMessages((prev) => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1] = { role: "assistant", content };
+        }
+        return updated;
+      });
+    };
+
+    const finalReply = await getAIResponse(newMessages, updateLastMessage);
+    updateLastMessage(finalReply);
   };
 
   return (
@@ -201,24 +244,18 @@ export default function ChatWidget() {
                 className={`${msg.role === "user" ? "bg-primary-600 text-white" : "bg-white text-slate-700"
                   } p-3 rounded-2xl shadow-sm max-w-[80%] leading-relaxed`}
               >
-                {formatMessageContent(msg.content)}
+                {msg.role === "assistant" && msg.content === "" ? (
+                  <div className="flex items-center gap-1.5 min-w-[40px] py-1">
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                  </div>
+                ) : (
+                  formatMessageContent(msg.content)
+                )}
               </div>
             </div>
           ))}
-
-          {/* Typing Indicator */}
-          {isTyping && (
-            <div className="flex gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-bold flex-shrink-0">
-                TX
-              </div>
-              <div className="bg-white text-slate-400 p-3 rounded-2xl shadow-sm max-w-[80%] flex items-center gap-1">
-                <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
-              </div>
-            </div>
-          )}
           <div ref={messagesEndRef} />
         </div>
 

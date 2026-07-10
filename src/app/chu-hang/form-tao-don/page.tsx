@@ -933,7 +933,7 @@ export default function ShipperCreateOrderPage() {
               <BorderBeam size={250} duration={15} delay={8} colorFrom="#136DEC" colorTo="#bfdbfe" />
             </div>
             <h4 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
-              🗺️ Bản đồ xem trước lộ trình
+              Bản đồ xem trước lộ trình
             </h4>
             <div className="w-full h-[220px] rounded-2xl bg-slate-100 overflow-hidden relative  border border-slate-200/60">
               <div id="order-form-map" className="w-full h-full z-10" />
@@ -966,7 +966,7 @@ export default function ShipperCreateOrderPage() {
             </div>
 
             <h4 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
-              💰 Ước tính chi phí cước xe
+              Ước tính chi phí cước xe
             </h4>
 
             {distance ? (

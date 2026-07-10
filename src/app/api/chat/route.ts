@@ -1,25 +1,24 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 const API_KEY = "sk-sp-D.IDDM.oDxW.MEYCIQDhPtvvznvTTwQCcGvDBMFiox0JyQ21xmT642lyscggOwIhAOw03L0/wOehMvWyLIrcdJ/XK395O1WEhlpjEj4gGAiI";
-// Use the dedicated Responses Base URL for agent tools
 const BASE_URL = "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1";
-const MODEL = "qwen3.6-plus";
+const MODEL = "deepseek-v4-flash";
 
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    // Map system instructions and standard chat messages to the input array expected by /responses
     const input = [
       {
         role: "system",
-        content: "Bạn là trợ lý AI thông minh của hệ thống vận tải thông minh TXEPRO. Hãy hỗ trợ trả lời các thắc mắc của chủ hàng và tài xế về việc tìm xe rỗng, đăng chuyến xe rỗng, gửi hàng, và các tính năng công nghệ (như OTP xác thực, Live GPS tracking, Radar quét, Vòng xoay giá thương lượng) của ứng dụng TXEPRO. Vì bạn được tích hợp tính năng Tìm Kiếm Web Thời Gian Thực (Web Search), hãy cung cấp thông tin chính xác, cập nhật mới nhất về các thông tin thời sự vận tải nếu được hỏi. Trả lời bằng tiếng Việt lịch sự, thân thiện, ngắn gọn và hữu ích. Hãy nêu bật tính năng miễn phí 0đ và 0% chiết khấu của TXEPRO để thu hút người dùng."
+        content: "Bạn là trợ lý AI thông minh của hệ thống vận tải thông minh TXEPRO. Hãy hỗ trợ trả lời các thắc mắc của chủ hàng và tài xế về việc tìm xe rỗng, đăng chuyến xe rỗng, gửi hàng, và các tính năng công nghệ (như OTP xác thực, Live GPS tracking, Radar quét, Vòng xoay giá thương lượng) của ứng dụng TXEPRO. Trả lời bằng tiếng Việt lịch sự, thân thiện, ngắn gọn và hữu ích. Hãy nêu bật tính năng miễn phí 0đ và 0% chiết khấu của TXEPRO để thu hút người dùng."
       },
       ...messages
     ];
 
-    // Call the MaaS Responses API to utilize built-in Web Search natively
-    const response = await fetch(`${BASE_URL}/responses`, {
+    const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -27,30 +26,74 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         model: MODEL,
-        input: input,
-        tools: [
-          { type: "web_search" }
-        ],
+        messages: input,
         temperature: 0.7,
+        stream: true
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("Alibaba Responses API error response:", errText);
-      return NextResponse.json({ reply: "Xin lỗi, hiện tại hệ thống tìm kiếm thông tin đang bận. Quý khách vui lòng thử lại sau!" }, { status: response.status });
+      console.error("Alibaba API error:", errText);
+      return NextResponse.json({ error: "Lỗi kết nối AI" }, { status: response.status });
     }
 
-    const data = await response.json();
-    
-    // Safely extract the final text output from the Responses API schema
-    const messageOutput = data.output?.find((o: any) => o.type === "message");
-    const textContent = messageOutput?.content?.find((c: any) => c.type === "output_text");
-    const reply = textContent?.text || "Xin lỗi, hiện tại tôi không tìm thấy kết quả. Vui lòng gửi lại câu hỏi!";
-    
-    return NextResponse.json({ reply });
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = response.body?.getReader();
+        if (!reader) {
+          controller.close();
+          return;
+        }
+
+        const decoder = new TextDecoder("utf-8");
+        let done = false;
+        let parserBuffer = "";
+
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+          if (value) {
+            const chunk = decoder.decode(value);
+            parserBuffer += chunk;
+            
+            const lines = parserBuffer.split("\n");
+            parserBuffer = lines.pop() || "";
+
+            for (const line of lines) {
+              const cleanedLine = line.trim();
+              if (cleanedLine === "data: [DONE]") {
+                continue;
+              }
+              if (cleanedLine.startsWith("data: ")) {
+                try {
+                  const jsonStr = cleanedLine.slice(6);
+                  const parsed = JSON.parse(jsonStr);
+                  const content = parsed.choices?.[0]?.delta?.content || "";
+                  if (content) {
+                    controller.enqueue(new TextEncoder().encode(content));
+                  }
+                } catch (e) {
+                  // ignore parse error
+                }
+              }
+            }
+          }
+        }
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive"
+      }
+    });
+
   } catch (error) {
-    console.error("Search Chat API route error:", error);
-    return NextResponse.json({ reply: "Đã xảy ra lỗi kết nối mạng. Vui lòng kiểm tra lại đường truyền!" }, { status: 500 });
+    console.error("Chat API route error:", error);
+    return NextResponse.json({ error: "Lỗi hệ thống" }, { status: 500 });
   }
 }
