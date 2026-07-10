@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Mail, ShieldCheck, ArrowRight, AlertCircle, Smartphone, KeyRound, Check } from "lucide-react";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
+import { API_BASE } from "@/utils/api";
 
 // Helper to retrieve or generate deviceId consistent with backend validator
 const getDeviceId = () => {
@@ -82,7 +83,7 @@ export default function LoginPage() {
     };
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/v1/auth/login", {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -143,7 +144,7 @@ export default function LoginPage() {
     };
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/v1/auth/verify-device", {
+      const res = await fetch(`${API_BASE}/auth/verify-device`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

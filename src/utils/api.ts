@@ -1,3 +1,7 @@
+
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:5000";
+export const API_BASE = `${API_BASE_URL}/api/v1`;
+
 /**
  * Wrapper around standard fetch to automatically handle token expiry (401 Unauthorized)
  * by silently calling the refresh token API and retrying the failed request.
@@ -20,7 +24,7 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
     if (refreshToken) {
       try {
         console.log("Access token expired, attempting silent refresh...");
-        const refreshRes = await fetch("http://127.0.0.1:5000/api/v1/auth/refresh", {
+        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"

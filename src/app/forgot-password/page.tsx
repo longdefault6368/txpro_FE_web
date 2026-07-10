@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Phone, ShieldCheck, ArrowRight, KeyRound, AlertCircle } from "lucide-react";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
+import { API_BASE } from "@/utils/api";
 
 interface ValidationErrors {
   phone?: string;
@@ -103,7 +104,7 @@ export default function ForgotPasswordPage() {
     const normalizedPhone = phone.trim().replace(/\s+/g, "");
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/v1/auth/forgot-password-otp", {
+      const res = await fetch(`${API_BASE}/auth/forgot-password-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -144,7 +145,7 @@ export default function ForgotPasswordPage() {
     const normalizedPhone = phone.trim().replace(/\s+/g, "");
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/v1/auth/reset-password-otp", {
+      const res = await fetch(`${API_BASE}/auth/reset-password-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -186,7 +187,7 @@ export default function ForgotPasswordPage() {
     const normalizedPhone = phone.trim().replace(/\s+/g, "");
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/v1/auth/resend-otp", {
+      const res = await fetch(`${API_BASE}/auth/resend-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

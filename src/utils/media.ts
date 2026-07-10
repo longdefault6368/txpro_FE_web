@@ -1,4 +1,5 @@
-const LOCAL_MEDIA_ORIGIN = "http://localhost:5000";
+import { API_BASE_URL } from "./api";
+const LOCAL_MEDIA_ORIGIN = API_BASE_URL;
 const API_MEDIA_ORIGIN = "http://api.txepro.vn";
 const SECURE_API_MEDIA_ORIGIN = "https://api.txepro.vn";
 const ACTIVE_MEDIA_ORIGIN = LOCAL_MEDIA_ORIGIN;
@@ -17,12 +18,12 @@ export const getServerMediaUrl = (path?: string | null) => {
   }
 
   const localOrigin = trimTrailingSlash(ACTIVE_MEDIA_ORIGIN);
-  if (value.startsWith("http://127.0.0.1:5000")) {
-    return value.replace("http://127.0.0.1:5000", localOrigin);
+  if (value.startsWith(API_BASE_URL)) {
+    return value.replace(API_BASE_URL, localOrigin);
   }
 
-  if (value.startsWith("http://localhost:5000")) {
-    return value.replace("http://localhost:5000", localOrigin);
+  if (value.startsWith(API_BASE_URL)) {
+    return value.replace(API_BASE_URL, localOrigin);
   }
 
   if (value.startsWith(API_MEDIA_ORIGIN)) {

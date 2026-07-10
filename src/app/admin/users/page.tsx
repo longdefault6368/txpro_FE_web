@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
-import { fetchWithAuth } from "@/utils/api";
+import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { 
   Search, UserPlus, Filter, Trash2, Edit3, ShieldAlert, Check, 
   X, Lock, ToggleLeft, ToggleRight, RotateCcw, AlertTriangle, ChevronLeft, ChevronRight 
@@ -158,7 +158,7 @@ function AdminUsersContent() {
     let errorResponseMsg = "";
 
     try {
-      const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users?${queryParams.toString()}`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users?${queryParams.toString()}`);
 
       if (res.ok) {
         const data = await res.json();
@@ -261,7 +261,7 @@ function AdminUsersContent() {
         fetchUsers();
       } else {
         // Backend live call
-        const res = await fetchWithAuth("http://127.0.0.1:5000/api/v1/admin/users", {
+        const res = await fetchWithAuth(`${API_BASE}/admin/users`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -303,7 +303,7 @@ function AdminUsersContent() {
         setShowEditModal(false);
         fetchUsers();
       } else {
-        const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/${currentUser._id}`, {
+        const res = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json"
@@ -340,7 +340,7 @@ function AdminUsersContent() {
         showToast(true, `Đã cập nhật trạng thái hoạt động (Offline Mode)`);
         fetchUsers();
       } else {
-        const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/${user._id}/status`, {
+        const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/status`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json"
@@ -373,7 +373,7 @@ function AdminUsersContent() {
         showToast(true, `Đã đổi quyền sang ${newRole} (Offline Mode)`);
         fetchUsers();
       } else {
-        const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/${user._id}/role`, {
+        const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/role`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json"
@@ -407,7 +407,7 @@ function AdminUsersContent() {
         showToast(true, "Đã xóa tài khoản thành công (Offline Mode)");
         fetchUsers();
       } else {
-        const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/${id}`, {
+        const res = await fetchWithAuth(`${API_BASE}/admin/users/${id}`, {
           method: "DELETE"
         });
 
@@ -438,7 +438,7 @@ function AdminUsersContent() {
         setShowPasswordModal(false);
         setNewPassword("");
       } else {
-        const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/${currentUser._id}/password`, {
+        const res = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}/password`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json"

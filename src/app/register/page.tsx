@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Mail, Phone, ShieldCheck, User, ArrowRight, KeyRound, AlertCircle } from "lucide-react";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
+import { API_BASE } from "@/utils/api";
 
 interface ValidationErrors {
   fullName?: string;
@@ -109,7 +110,7 @@ export default function RegisterPage() {
     };
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/v1/auth/register-otp", {
+      const res = await fetch(`${API_BASE}/auth/register-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -163,7 +164,7 @@ export default function RegisterPage() {
     };
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/v1/auth/verify-otp", {
+      const res = await fetch(`${API_BASE}/auth/verify-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -215,7 +216,7 @@ export default function RegisterPage() {
     setLoading(true);
     setGeneralError(null);
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/v1/auth/resend-otp", {
+      const res = await fetch(`${API_BASE}/auth/resend-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

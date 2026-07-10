@@ -14,7 +14,7 @@ import {
   TicketCheck,
   UserRound,
 } from "lucide-react";
-import { fetchWithAuth } from "@/utils/api";
+import { fetchWithAuth, API_BASE } from "@/utils/api";
 
 type SupportTab = "tickets" | "chats";
 
@@ -171,7 +171,7 @@ export default function AdminSupportPage() {
       ...(statusFilter ? { status: statusFilter } : {}),
     });
     try {
-      const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/support/tickets?${query.toString()}`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets?${query.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch support tickets");
       const data = await res.json();
       const nextTickets = data.data.tickets || [];
@@ -203,7 +203,7 @@ export default function AdminSupportPage() {
       ...(search ? { search } : {}),
     });
     try {
-      const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/support/chats?${query.toString()}`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/chats?${query.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch support chats");
       const data = await res.json();
       const nextChats = data.data.chats || [];
@@ -232,7 +232,7 @@ export default function AdminSupportPage() {
   const openTicket = async (ticketId: string) => {
     setDetailLoading(true);
     try {
-      const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/support/tickets/${ticketId}`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets/${ticketId}`);
       if (!res.ok) throw new Error("Failed to fetch ticket detail");
       const data = await res.json();
       setSelectedTicket(data.data.ticket);
@@ -248,7 +248,7 @@ export default function AdminSupportPage() {
   const openChat = async (chatId: string, showLoading = true) => {
     if (showLoading) setDetailLoading(true);
     try {
-      const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/support/chats/${chatId}`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/chats/${chatId}`);
       if (!res.ok) throw new Error("Failed to fetch chat detail");
       const data = await res.json();
       setSelectedChat({ chat: data.data.chat, messages: data.data.messages || [] });
@@ -266,7 +266,7 @@ export default function AdminSupportPage() {
     if (!selectedTicket || !replyMessage.trim()) return;
     setSendingReply(true);
     try {
-      const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/support/tickets/${selectedTicket._id}/reply`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets/${selectedTicket._id}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: replyMessage.trim(), status: "in_progress" }),

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, CalendarClock, Car, CircleDollarSign, MapPin, Phone, UserRound } from "lucide-react";
-import { fetchWithAuth } from "@/utils/api";
+import { fetchWithAuth, API_BASE } from "@/utils/api";
 
 interface UserInfo {
   name?: string;
@@ -119,7 +119,7 @@ export default function AdminDriverPostDetailPage() {
     const fetchPost = async () => {
       setLoading(true);
       try {
-        const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/driver-posts/${params.id}`);
+        const res = await fetchWithAuth(`${API_BASE}/admin/users/driver-posts/${params.id}`);
         if (!res.ok) throw new Error("Failed to fetch driver post detail");
         const data = await res.json();
         setPost(data.data.post);

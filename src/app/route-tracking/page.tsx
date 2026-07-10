@@ -7,6 +7,7 @@ import { ArrowLeft, MapPin, Navigation, Phone, ShieldAlert, Truck } from "lucide
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
 import { getServerMediaUrl } from "@/utils/media";
+import { API_BASE } from "@/utils/api";
 
 interface OrderData {
   order: {
@@ -180,7 +181,7 @@ const MOCK_TRACKING_DETAILS: Record<string, OrderData> = {
 const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
 const GOOGLE_MAPS_SCRIPT_SRC =
   "https://maps.googleapis.com/maps/api/js?key=AIzaSyDAom_mi4uBknVObU46tCt6l3RsgPEzzPE&libraries=places,geometry";
-const API_BASE = "http://127.0.0.1:5000/api/v1";
+
 
 function decodePolyline(encoded: string): LatLng[] {
   if (!encoded) return [];

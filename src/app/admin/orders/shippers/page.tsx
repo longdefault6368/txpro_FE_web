@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Clock, Eye, Filter, Loader, PackageOpen, Search, SlidersHorizontal, Truck, XCircle } from "lucide-react";
-import { fetchWithAuth } from "@/utils/api";
+import { fetchWithAuth, API_BASE } from "@/utils/api";
 
 interface UserInfo {
   name?: string;
@@ -119,7 +119,7 @@ export default function AdminShipperOrdersPage() {
     });
 
     try {
-      const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/orders?${queryParams.toString()}`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch shipper orders");
       const data = await res.json();
       setOrders(data.data.orders);

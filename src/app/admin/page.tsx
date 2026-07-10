@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { fetchWithAuth } from "@/utils/api";
+import { fetchWithAuth, API_BASE } from "@/utils/api";
 import {
   Users, Truck, Package, ShoppingCart, TrendingUp, AlertCircle,
   ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, Loader
@@ -70,7 +70,7 @@ function AdminDashboardContent() {
       setLoading(true);
 
       try {
-        const res = await fetchWithAuth("http://127.0.0.1:5000/api/v1/admin/users/overview");
+        const res = await fetchWithAuth(`${API_BASE}/admin/users/overview`);
 
         if (res.ok) {
           const data = await res.json();

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Lock, ShieldCheck, Mail, ArrowRight, UserCheck } from "lucide-react";
+import { API_BASE } from "@/utils/api";
 
 // Helper to retrieve or generate deviceId consistent with backend validator
 const getDeviceId = () => {
@@ -64,7 +65,7 @@ export default function AdminLoginPage() {
     };
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/v1/auth/login", {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
-import { fetchWithAuth } from "@/utils/api";
+import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { getServerMediaUrl } from "@/utils/media";
 
 type UserRole = "admin" | "tai-xe" | "chu-hang";
@@ -108,7 +108,7 @@ interface OrderSummary {
   updatedAt?: string;
 }
 
-const API_BASE = "http://127.0.0.1:5000/api/v1";
+
 
 const roleLabels: Record<string, string> = {
   "tai-xe": "Tài xế",

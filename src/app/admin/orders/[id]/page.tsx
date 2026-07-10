@@ -4,7 +4,7 @@ import { use } from "react";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fetchWithAuth } from "@/utils/api";
+import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { 
   ArrowLeft, MapPin, Phone, Mail, Clock, CheckCircle, 
   AlertTriangle, Truck, Info, Shield, User, Loader, DollarSign, Calendar, Star
@@ -157,7 +157,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           return;
         }
 
-        const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/orders/${id}`);
+        const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}`);
         if (res.ok) {
           const data = await res.json();
           if (data.data.order) {

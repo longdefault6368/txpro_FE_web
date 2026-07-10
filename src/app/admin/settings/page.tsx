@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchWithAuth } from "@/utils/api";
+import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { Settings, ShieldCheck, Database, Server, Cpu, Check, AlertCircle, Save, RotateCcw } from "lucide-react";
 
 export default function AdminSettingsPage() {
@@ -26,7 +26,7 @@ export default function AdminSettingsPage() {
     const token = localStorage.getItem("txpro_token");
 
     try {
-      const res = await fetchWithAuth("http://127.0.0.1:5000/api/v1/admin/settings/sms-otp-template");
+      const res = await fetchWithAuth(`${API_BASE}/admin/settings/sms-otp-template`);
 
       if (res.ok) {
         const data = await res.json();
@@ -68,7 +68,7 @@ export default function AdminSettingsPage() {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
       } else {
-        const res = await fetchWithAuth("http://127.0.0.1:5000/api/v1/admin/settings/sms-otp-template", {
+        const res = await fetchWithAuth(`${API_BASE}/admin/settings/sms-otp-template`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json"

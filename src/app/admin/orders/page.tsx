@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
-import { fetchWithAuth } from "@/utils/api";
+import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { 
   Search, Filter, Truck, CheckCircle, Clock, XCircle, 
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, AlertTriangle, Eye, Loader, SlidersHorizontal 
@@ -148,7 +148,7 @@ function AdminOrdersContent() {
     });
 
     try {
-      const res = await fetchWithAuth(`http://127.0.0.1:5000/api/v1/admin/users/orders?${queryParams.toString()}`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders?${queryParams.toString()}`);
 
       if (res.ok) {
         const data = await res.json();
