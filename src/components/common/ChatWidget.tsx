@@ -45,7 +45,7 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Xin chào! Tôi là trợ lý AI thông minh của TXEPRO. Tôi có thể giúp gì cho quý khách hoặc tài xế hôm nay?",
+      content: "Xin chào! Tôi là trợ lý AI thông minh của Txe PRO. Tôi có thể giúp gì cho quý khách hoặc tài xế hôm nay?",
     },
   ]);
   const [inputVal, setInputVal] = useState("");
@@ -121,7 +121,7 @@ export default function ChatWidget() {
       }
 
       const data = await response.json();
-      
+
       // Play received message sound
       playNotificationSound();
 
@@ -148,7 +148,7 @@ export default function ChatWidget() {
 
   const handleQuickReply = async (text: string) => {
     if (isTyping) return;
-    
+
     const newMessages = [...messages, { role: "user", content: text } as Message];
     setMessages(newMessages);
 
@@ -161,11 +161,10 @@ export default function ChatWidget() {
       {/* Chat Window */}
       <div
         id="chatWindow"
-        className={`absolute bottom-16 right-0 w-[calc(100vw-2.5rem)] sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden transition-all duration-300 ${
-          isOpen
+        className={`absolute bottom-16 right-0 w-[calc(100vw-2.5rem)] sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden transition-all duration-300 ${isOpen
             ? "opacity-100 translate-y-0 pointer-events-auto"
             : "opacity-0 translate-y-10 pointer-events-none"
-        }`}
+          }`}
       >
         {/* Header */}
         <div className="bg-primary-600 text-white p-4 flex items-center justify-between">
@@ -199,15 +198,14 @@ export default function ChatWidget() {
                 </div>
               )}
               <div
-                className={`${
-                  msg.role === "user" ? "bg-primary-600 text-white" : "bg-white text-slate-700"
-                } p-3 rounded-2xl shadow-sm max-w-[80%] leading-relaxed`}
+                className={`${msg.role === "user" ? "bg-primary-600 text-white" : "bg-white text-slate-700"
+                  } p-3 rounded-2xl shadow-sm max-w-[80%] leading-relaxed`}
               >
                 {formatMessageContent(msg.content)}
               </div>
             </div>
           ))}
-          
+
           {/* Typing Indicator */}
           {isTyping && (
             <div className="flex gap-2">
