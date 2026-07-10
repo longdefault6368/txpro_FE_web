@@ -1,0 +1,111 @@
+name: Deploy TXE Pro Web
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: txepro-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Test SSH connection
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -p "$SERVER_PORT" \
+            "$SERVER_USER@$SERVER_HOST" \
+            "echo 'SSH connection successful'"
+
+      - name: Backup current source
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_PATH: ${{ secrets.SERVER_PATH }}
+        run: |
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -p "$SERVER_PORT" \
+            "$SERVER_USER@$SERVER_HOST" \
+            "mkdir -p /var/www/backups && \
+            if [ -d '$SERVER_PATH' ] && [ \"\$(ls -A '$SERVER_PATH' 2>/dev/null)\" ]; then
+              tar \
+                --exclude=node_modules \
+                --exclude=.next \
+                -czf /var/www/backups/txepro-web-\$(date +%Y%m%d-%H%M%S).tar.gz \
+                -C '$SERVER_PATH' .
+            fi"
+
+      - name: Upload source
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_PATH: ${{ secrets.SERVER_PATH }}
+        run: |
+          rsync -az \
+            --exclude=".git/" \
+            --exclude=".github/" \
+            --exclude=".next/" \
+            --exclude="node_modules/" \
+            --exclude=".env" \
+            --exclude=".env.local" \
+            --exclude=".env.production" \
+            -e "ssh -i ~/.ssh/deploy_key -p $SERVER_PORT" \
+            ./ \
+            "$SERVER_USER@$SERVER_HOST:$SERVER_PATH/"
+
+      - name: Install and build application
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_PATH: ${{ secrets.SERVER_PATH }}
+        run: |
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -p "$SERVER_PORT" \
+            "$SERVER_USER@$SERVER_HOST" << EOF
+              set -e
+
+              cd "$SERVER_PATH"
+
+              npm ci
+              npm run build
+
+              if pm2 describe txepro-web > /dev/null 2>&1; then
+                pm2 restart txepro-web --update-env
+              else
+                pm2 start npm --name txepro-web -- start
+              fi
+
+              pm2 save
+          EOF
