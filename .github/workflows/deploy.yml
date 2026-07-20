@@ -93,14 +93,32 @@ jobs:
           ssh \
             -i ~/.ssh/deploy_key \
             -p "$SERVER_PORT" \
-            "$SERVER_USER@$SERVER_HOST" << EOF
+            "$SERVER_USER@$SERVER_HOST" << 'EOF'
               set -e
+
+              # Cài đặt NVM tĩnh vào user profile nếu chưa có
+              if [ ! -d "$HOME/.nvm" ]; then
+                curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+              fi
+              
+              # Load NVM vào session hiện tại
+              export NVM_DIR="$HOME/.nvm"
+              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+              # Cài đặt và sử dụng Node.js 20 (bắt buộc cho Next.js 14+)
+              nvm install 20
+              nvm use 20
+
+              # Cài đặt pm2 cho phiên bản Node 20 này (nếu chưa có)
+              npm install -g pm2
 
               cd "$SERVER_PATH"
 
+              # Cài dependencies và build
               npm ci
               npm run build
 
+              # Quản lý tiến trình bằng PM2 của Node 20
               if pm2 describe txepro-web > /dev/null 2>&1; then
                 pm2 restart txepro-web --update-env
               else
