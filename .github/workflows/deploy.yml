@@ -106,11 +106,11 @@ jobs:
               # Vẫn cần cài thư viện vì node_modules không được rsync lên
               npm install
 
-              # Khởi chạy dev server bằng PM2 thay vì build & start
-              if pm2 describe txepro-web-dev > /dev/null 2>&1; then
-                pm2 restart txepro-web-dev --update-env
+              # Khởi chạy dev server bằng PM2
+              if pm2 describe txepro-web > /dev/null 2>&1; then
+                pm2 restart txepro-web --update-env
               else
-                pm2 start npm --name txepro-web-dev -- run dev
+                pm2 start npm --name txepro-web -- run dev
               fi
 
               pm2 save
