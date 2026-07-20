@@ -99,7 +99,7 @@ jobs:
               # Load NVM đã có sẵn trên server
               export NVM_DIR="$HOME/.nvm"
               [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-              nvm use 20
+              nvm use 24
 
               cd "$SERVER_PATH"
 
