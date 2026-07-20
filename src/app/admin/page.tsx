@@ -241,7 +241,7 @@ function AdminDashboardContent() {
         {/* Recent Orders */}
         <div className="xl:col-span-2 bg-white rounded-2xl border border-slate-200/50 shadow-sm overflow-hidden">
           <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-sm font-extrabold text-slate-800">Đơn Hàng Gần Đây</h3>
+            <h3 className="text-sm font-extrabold text-slate-800 ">Đơn Hàng Gần Đây </h3>
             <Link href="/admin/orders" className="text-primary-600 hover:text-primary-700 text-xs font-bold transition-colors flex items-center gap-1">
               Xem tất cả <ArrowUpRight className="w-3 h-3" />
             </Link>
