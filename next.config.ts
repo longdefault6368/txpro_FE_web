@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: [
+    "txepro.vn",
+    "www.txepro.vn",
+  ],
+
   images: {
     remotePatterns: [
       {

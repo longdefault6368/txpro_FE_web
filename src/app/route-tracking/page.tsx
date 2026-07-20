@@ -35,7 +35,7 @@ interface OrderData {
     heading: number | null;
     createdAt: string;
   } | null;
-  historyLocations: { lat: number; lng: number }[];
+  historyLocations: { lat: number; lng: number; speed?: number | null; heading?: number | null; createdAt?: string }[];
 }
 
 type LatLng = { lat: number; lng: number };
@@ -181,6 +181,7 @@ const MOCK_TRACKING_DETAILS: Record<string, OrderData> = {
 const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
 const GOOGLE_MAPS_SCRIPT_SRC =
   "https://maps.googleapis.com/maps/api/js?key=AIzaSyDAom_mi4uBknVObU46tCt6l3RsgPEzzPE&libraries=places,geometry";
+const TRACKING_REFRESH_MS = 3 * 60 * 1000;
 
 
 function decodePolyline(encoded: string): LatLng[] {
@@ -296,6 +297,13 @@ function getStatusText(status: string) {
     default:
       return "Đang cập nhật";
   }
+}
+
+function formatTrackingTime(value?: string | null) {
+  if (!value) return "Chưa có";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Chưa có";
+  return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
 }
 
 function RouteTrackingContent() {
@@ -617,7 +625,7 @@ function RouteTrackingContent() {
     hasUserInteractedRef.current = false;
     lastFitKeyRef.current = null;
     fetchTracking(true);
-    const interval = setInterval(() => fetchTracking(false), 5000);
+    const interval = setInterval(() => fetchTracking(false), TRACKING_REFRESH_MS);
     return () => clearInterval(interval);
   }, [code]);
 
@@ -678,9 +686,9 @@ function RouteTrackingContent() {
             {data.latestLocation ? (
               <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs font-bold text-indigo-700">
                 <span className="flex items-center gap-1.5">
-                  <Navigation className="h-4 w-4 text-indigo-600" /> GPS live
+                  <Navigation className="h-4 w-4 text-indigo-600" /> GPS tài xế
                 </span>
-                <span>Tốc độ: {Math.round(data.latestLocation.speed || 0)} km/h</span>
+                <span>{formatTrackingTime(data.latestLocation.createdAt)} · {Math.round(data.latestLocation.speed || 0)} km/h</span>
               </div>
             ) : (
               <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 text-center text-xs font-semibold text-slate-500">

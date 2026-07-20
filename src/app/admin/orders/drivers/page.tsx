@@ -49,38 +49,6 @@ interface DriverPost {
   createdAt: string;
 }
 
-const MOCK_DRIVER_POSTS: DriverPost[] = [
-  {
-    _id: "dp-mock-1",
-    driverId: { name: "Nguyễn Văn Tuấn", phone: "0987654321", email: "tuan.driver@gmail.com" },
-    vehicleId: { type: "truck", vehicleTypeChild: "Xe tải 5 tấn", plateNumber: "51C-123.45", brand: "Isuzu", model: "NQR", capacity: 5000, status: "active" },
-    route: { from: "TP.HCM", to: "Bình Dương", pickupRadiusMeters: 3000, dropoffRadiusMeters: 5000 },
-    pricing: { type: "fixed", minPrice: 1800000, maxPrice: 2200000 },
-    pricingMode: "freight",
-    price: 2000000,
-    scheduleType: "active",
-    status: "active",
-    note: "Nhận hàng trong ngày, ưu tiên hàng pallet.",
-    createdAt: "2026-07-09T08:30:00Z",
-  },
-  {
-    _id: "dp-mock-2",
-    driverId: { name: "Vũ Quốc Khánh", phone: "0966777888", email: "khanh.vu@gmail.com" },
-    vehicleId: { type: "car", vehicleTypeChild: "Xe 7 chỗ", plateNumber: "30A-888.99", brand: "Toyota", model: "Innova", seats: 7, status: "active" },
-    route: { from: "Hà Nội", to: "Hải Phòng", pickupRadiusMeters: 4000, dropoffRadiusMeters: 3000 },
-    pricing: { type: "negotiable", minPrice: 900000, maxPrice: 1300000 },
-    pricingMode: "shared_seat",
-    availableSeats: 4,
-    vehicleSeats: 7,
-    scheduleType: "scheduled",
-    availableFrom: "2026-07-11T01:00:00Z",
-    availableTo: "2026-07-11T12:00:00Z",
-    status: "scheduled",
-    note: "Có nhận ghép khách và hàng nhỏ.",
-    createdAt: "2026-07-08T10:15:00Z",
-  },
-];
-
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   draft: { label: "Bản nháp", color: "text-slate-600 bg-slate-50 border-slate-200" },
   active: { label: "Đang mở", color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
@@ -110,7 +78,7 @@ export default function AdminDriverPostsPage() {
   const [posts, setPosts] = useState<DriverPost[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
   const [loading, setLoading] = useState(true);
-  const [isOffline, setIsOffline] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [limit, setLimit] = useState(10);
@@ -129,29 +97,14 @@ export default function AdminDriverPostsPage() {
       const res = await fetchWithAuth(`${API_BASE}/admin/users/driver-posts?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch driver posts");
       const data = await res.json();
-      setPosts(data.data.posts);
-      setPagination(data.data.pagination);
-      setIsOffline(false);
+      setPosts(data.data?.posts || []);
+      setPagination(data.data?.pagination || { page: currentPage, limit, total: 0, pages: 0 });
+      setErrorMessage("");
     } catch (err) {
-      console.warn("Driver posts API offline, using mock data", err);
-      setIsOffline(true);
-      const query = search.toLowerCase();
-      let filtered = [...MOCK_DRIVER_POSTS];
-      if (query) {
-        filtered = filtered.filter((post) =>
-          post.driverId?.name?.toLowerCase().includes(query) ||
-          post.driverId?.phone?.includes(query) ||
-          post.vehicleId?.plateNumber?.toLowerCase().includes(query) ||
-          post.route?.from?.toLowerCase().includes(query) ||
-          post.route?.to?.toLowerCase().includes(query)
-        );
-      }
-      if (statusFilter) filtered = filtered.filter((post) => post.status === statusFilter);
-      const total = filtered.length;
-      const pages = Math.ceil(total / limit) || 1;
-      const paginated = filtered.slice((currentPage - 1) * limit, currentPage * limit);
-      setPosts(paginated);
-      setPagination({ page: currentPage, limit, total, pages });
+      console.warn("Driver posts API failed", err);
+      setPosts([]);
+      setPagination({ page: currentPage, limit, total: 0, pages: 0 });
+      setErrorMessage("Không thể tải danh sách tài xế từ hệ thống. Vui lòng kiểm tra đăng nhập admin hoặc backend.");
     } finally {
       setLoading(false);
     }
@@ -163,15 +116,15 @@ export default function AdminDriverPostsPage() {
 
   return (
     <div className="space-y-6">
-      {isOffline && (
+      {errorMessage && (
         <div className="bg-amber-50 border border-amber-100 text-amber-700 p-3 rounded-2xl flex items-center gap-2 text-xs font-semibold">
-          <AlertTriangle className="w-4 h-4" /> Backend đang offline, dữ liệu bên dưới là dữ liệu mẫu.
+          <AlertTriangle className="w-4 h-4" /> {errorMessage}
         </div>
       )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Danh Sách Tài Xế Đăng</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Danh Sách Tài Xế Đăng</h1>
           <p className="text-slate-400 text-xs mt-1">Theo dõi các tuyến xe, lịch trống, giá đăng và thông tin phương tiện do tài xế tạo.</p>
         </div>
       </div>
@@ -274,7 +227,7 @@ export default function AdminDriverPostsPage() {
                       <td className="py-4.5 px-6 min-w-56">
                         <p className="font-bold text-slate-800">{vehicle?.vehicleTypeChild || vehicle?.type || "---"}</p>
                         <p className="text-xs font-semibold text-slate-500">{[vehicle?.brand, vehicle?.model].filter(Boolean).join(" ") || "---"}</p>
-                        <p className="text-xs font-black text-primary-600 mt-1">{vehicle?.plateNumber || "---"}</p>
+                        <p className="text-xs font-bold text-primary-600 mt-1">{vehicle?.plateNumber || "---"}</p>
                       </td>
                       <td className="py-4.5 px-6 min-w-64">
                         <div className="space-y-1 text-xs">
@@ -313,7 +266,7 @@ export default function AdminDriverPostsPage() {
                         <span className={`inline-flex px-3 py-1.5 rounded-xl text-xs font-bold border ${statusInfo.color}`}>{statusInfo.label}</span>
                       </td>
                       <td className="py-4.5 px-6 text-xs font-semibold text-slate-400 min-w-32">
-                        {new Date(post.createdAt).toLocaleDateString("vi-VN")}
+                        {formatDateTime(post.createdAt)}
                       </td>
                     </tr>
                   );

@@ -17,6 +17,7 @@ import {
   BarChart3,
   Headset,
   Circle,
+  TerminalSquare,
   type LucideIcon
 } from "lucide-react";
 
@@ -48,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: "/admin/analytics", icon: BarChart3, label: "Phân Tích" },
   { href: "/admin/support", icon: Headset, label: "Hỗ trợ" },
+  { href: "/admin/logs", icon: TerminalSquare, label: "Log hệ thống" },
   { href: "/admin/settings", icon: Settings, label: "Cài Đặt" },
 ];
 
@@ -271,7 +273,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <span className="text-xs font-bold text-slate-700 truncate max-w-[120px]">
                 {session?.name || "Admin"}
               </span>
-              <span className="text-[9px] bg-purple-600 text-white px-1.5 py-0.5 rounded font-black uppercase">
+              <span className="text-[9px] bg-purple-600 text-white px-1.5 py-0.5 rounded font-bold uppercase">
                 Admin
               </span>
             </div>

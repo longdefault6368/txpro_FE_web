@@ -262,7 +262,7 @@ export default function AdminAnalyticsPage() {
       {/* Top Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/80 backdrop-blur-xl border border-slate-200/50 p-6 rounded-3xl shadow-sm">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <BarChart3 className="w-6 h-6 text-primary-600" /> Hệ Thống Phân Tích & Giám Sát
           </h1>
           <p className="text-slate-500 text-xs mt-1">Phân tích mật độ xe, tăng trưởng đơn hàng và định vị trực tuyến bằng Google Maps</p>
@@ -310,7 +310,7 @@ export default function AdminAnalyticsPage() {
         
         {/* Real-time Map Container */}
         <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200/50 p-6 shadow-xl relative overflow-hidden flex flex-col min-h-[450px]">
-          <h2 className="text-sm font-black text-slate-900 mb-4 flex items-center gap-2 uppercase tracking-wide">
+          <h2 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2 uppercase tracking-wide">
             📍 Bản Đồ Phân Phối Trực Tuyến (Google Maps Live)
           </h2>
           
@@ -335,7 +335,7 @@ export default function AdminAnalyticsPage() {
         {/* Region density / High-low vehicle concentration lists */}
         <div className="bg-white rounded-3xl border border-slate-200/50 p-6 shadow-xl flex flex-col justify-between">
           <div>
-            <h2 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-wide">
+            <h2 className="text-sm font-bold text-slate-900 mb-4 uppercase tracking-wide">
               📊 Phân tích mật độ xe theo khu vực
             </h2>
             <p className="text-xs text-slate-400 mb-6">Mật độ tập trung xe và mức độ khan hiếm xe theo tỉnh thành lớn</p>
@@ -393,7 +393,7 @@ export default function AdminAnalyticsPage() {
         {/* Growth Bar Chart */}
         <div className="bg-white rounded-3xl border border-slate-200/50 p-6 shadow-xl md:col-span-2">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
               📈 Tăng Trưởng Khối Lượng Đơn Vận Chuyển ({timeframe === "day" ? "Theo Ngày" : timeframe === "week" ? "Theo Tuần" : timeframe === "month" ? "Theo Tháng" : "Theo Năm"})
             </h3>
             <span className="text-xs text-slate-400 font-bold flex items-center gap-1">
@@ -422,13 +422,13 @@ export default function AdminAnalyticsPage() {
                     }`}
                     style={{ height: `${point.heightPercent}%` }}
                   >
-                    <span className={`absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-black opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap ${
+                    <span className={`absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap ${
                       isLast ? "text-primary-600" : "text-slate-400"
                     }`}>
                       {point.value}
                     </span>
                   </div>
-                  <span className={`absolute bottom-0 text-[10px] font-bold ${isLast ? "text-primary-600 font-black" : "text-slate-400"}`}>
+                  <span className={`absolute bottom-0 text-[10px] font-bold ${isLast ? "text-primary-600 font-bold" : "text-slate-400"}`}>
                     {point.label}
                   </span>
                 </div>
@@ -443,8 +443,8 @@ export default function AdminAnalyticsPage() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary-600/10 rounded-full blur-2xl"></div>
 
           <div>
-            <span className="text-[9px] bg-white/10 text-white px-2.5 py-1 rounded-md font-black uppercase tracking-wider">Hiệu suất vận hành</span>
-            <h3 className="text-2xl font-black mt-4">{activeData.metrics.efficiency}</h3>
+            <span className="text-[9px] bg-white/10 text-white px-2.5 py-1 rounded-md font-bold uppercase tracking-wider">Hiệu suất vận hành</span>
+            <h3 className="text-2xl font-bold mt-4">{activeData.metrics.efficiency}</h3>
             <p className="text-slate-400 text-xs mt-1">Tỉ lệ hoàn thành chuyến xe thành công</p>
           </div>
 

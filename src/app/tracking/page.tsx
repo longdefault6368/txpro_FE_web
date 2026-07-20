@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Search, ArrowLeft, Package, MapPin, Phone, User, DollarSign } from "lucide-react";
@@ -19,6 +19,12 @@ interface OrderData {
     route: { distanceMeters: number | null; durationSeconds: number | null; polyline: string | null };
     offerPrice: number;
     createdAt: string;
+    cancellationReason?: string | null;
+    rejectionReason?: string | null;
+    cancelledByRole?: string | null;
+    cancelledByName?: string | null;
+    cancelledAt?: string | null;
+    timeoutAt?: string | null;
   };
   driver: {
     fullName: string;
@@ -34,6 +40,314 @@ interface OrderData {
     heading: number | null;
     createdAt: string;
   } | null;
+}
+
+type LatLng = { lat: number; lng: number };
+
+const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
+const GOOGLE_MAPS_SCRIPT_SRC =
+  "https://maps.googleapis.com/maps/api/js?key=AIzaSyDAom_mi4uBknVObU46tCt6l3RsgPEzzPE&libraries=places,geometry";
+
+function hasValidPoint(point?: { lat?: number | null; lng?: number | null } | null): point is LatLng {
+  return Boolean(point && Number.isFinite(point.lat) && Number.isFinite(point.lng));
+}
+
+function loadGoogleMaps() {
+  if (typeof window === "undefined") return Promise.resolve();
+  if ((window as any).google?.maps) return Promise.resolve();
+
+  return new Promise<void>((resolve, reject) => {
+    const existingScript = (
+      document.getElementById(GOOGLE_MAPS_SCRIPT_ID) ||
+      document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')
+    ) as HTMLScriptElement | null;
+    if (existingScript) {
+      if ((window as any).google?.maps) {
+        resolve();
+        return;
+      }
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Không thể tải Google Maps")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = GOOGLE_MAPS_SCRIPT_ID;
+    script.src = GOOGLE_MAPS_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Không thể tải Google Maps"));
+    document.body.appendChild(script);
+  });
+}
+
+function escapeHtml(value?: string | number | null) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function getCancelledByLabel(role?: string | null) {
+  if (role === "driver") return "Tài xế";
+  if (role === "shipper") return "Chủ hàng";
+  if (role === "system") return "Hệ thống";
+  return "Chưa xác định";
+}
+
+function getCancelledByDisplay(order: OrderData["order"]) {
+  const roleLabel = getCancelledByLabel(order.cancelledByRole);
+  if (order.cancelledByName && roleLabel !== "Chưa xác định") {
+    return `${roleLabel} - ${order.cancelledByName}`;
+  }
+  return order.cancelledByName || roleLabel;
+}
+
+function getCancelReasonText(order: OrderData["order"]) {
+  const reason = order.cancellationReason || order.rejectionReason;
+  if (!reason && order.timeoutAt) return "Quá thời gian xác nhận đơn.";
+  if (!reason) return "Không có lý do hủy được ghi nhận.";
+
+  const labels: Record<string, string> = {
+    accident: "Xe hư hỏng / tai nạn.",
+    dispute: "Tranh chấp cước.",
+    blocked: "Đoạn đường không đi được.",
+    no_need: "Không còn nhu cầu vận chuyển.",
+    change_driver: "Muốn chọn tài xế khác.",
+    edit_order: "Thông tin đơn hàng cần chỉnh sửa.",
+    wait_too_long: "Thời gian chờ tài xế quá lâu.",
+    driver_rejected: "Tài xế từ chối nhận đơn.",
+    driver_timeout: "Tài xế không phản hồi trong thời gian quy định.",
+    changed_mind: "Người gửi thay đổi nhu cầu vận chuyển.",
+    wrong_info: "Thông tin đơn hàng chưa chính xác.",
+    found_other_driver: "Chủ hàng đã tìm được phương án vận chuyển khác.",
+    driver_unavailable: "Tài xế không thể tiếp tục thực hiện chuyến.",
+    vehicle_issue: "Phương tiện gặp sự cố.",
+    price_not_agreed: "Hai bên chưa thống nhất được giá cước.",
+    no_contact: "Không liên hệ được với bên còn lại.",
+    cannot_contact: "Không liên hệ được với bên còn lại.",
+    no_show: "Không có mặt tại điểm hẹn.",
+    weather: "Thời tiết không đảm bảo an toàn.",
+    emergency: "Có việc khẩn cấp.",
+    other: "Lý do khác.",
+    timeout: "Quá thời gian xác nhận đơn.",
+  };
+
+  const normalizedReason = reason.trim().toLowerCase();
+  const translatedReason = labels[normalizedReason] || reason;
+  const note = order.cancellationReason && order.rejectionReason && order.rejectionReason !== order.cancellationReason
+    ? order.rejectionReason.trim()
+    : "";
+
+  return note ? `${translatedReason} Ghi chú: ${note}` : translatedReason;
+}
+
+function getVehicleIconSvg(vehicleText?: string | null) {
+  const text = (vehicleText || "").toLowerCase();
+  const isMotorbike = text.includes("máy") || text.includes("moto") || text.includes("motor");
+  const isContainer = text.includes("container");
+  const fill = isMotorbike ? "#0f766e" : isContainer ? "#7c3aed" : "#4f46e5";
+  const body = isMotorbike
+    ? `<path d="M16 35h15l7-11h8l5 11h8" fill="none" stroke="${fill}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="38" r="7" fill="#fff" stroke="${fill}" stroke-width="4"/><circle cx="58" cy="38" r="7" fill="#fff" stroke="${fill}" stroke-width="4"/><path d="M38 24l-6-9h10l8 9" fill="none" stroke="${fill}" stroke-width="4" stroke-linecap="round"/>`
+    : `<path d="M9 19c0-3 2-5 5-5h27v24H9V19Z" fill="${fill}"/><path d="M41 22h12l8 9v7H41V22Z" fill="${fill}"/><path d="M47 26h5l4 5h-9v-5Z" fill="#dbeafe"/><circle cx="22" cy="41" r="7" fill="#fff" stroke="#0f172a" stroke-width="3"/><circle cx="52" cy="41" r="7" fill="#fff" stroke="#0f172a" stroke-width="3"/><path d="M9 38h55" stroke="#0f172a" stroke-width="3" stroke-linecap="round"/>`;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56">
+      <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity="0.25"/>
+      </filter>
+      <g filter="url(#s)">${body}</g>
+    </svg>
+  `)}`;
+}
+
+function TrackingMapPreview({ data }: { data: OrderData }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const layersRef = useRef<any[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const drawMap = async () => {
+      await loadGoogleMaps();
+      if (cancelled || !containerRef.current) return;
+
+      const google = (window as any).google;
+      const pickup = data.order.pickup;
+      const dropoff = data.order.dropoff;
+      const driver = data.latestLocation;
+
+      if (!mapRef.current) {
+        mapRef.current = new google.maps.Map(containerRef.current, {
+          center: { lat: 16.054407, lng: 108.202164 },
+          zoom: 6,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: true,
+          zoomControl: true,
+          clickableIcons: false,
+          gestureHandling: "greedy",
+        });
+      }
+
+      const map = mapRef.current;
+      layersRef.current.forEach((layer) => layer.setMap?.(null));
+      layersRef.current = [];
+      const infoWindow = new google.maps.InfoWindow();
+
+      const bounds = new google.maps.LatLngBounds();
+      const addMarker = (position: LatLng, label: string, color: string, title: string, content: string) => {
+        bounds.extend(position);
+        const marker = new google.maps.Marker({
+          position,
+          map,
+          title,
+          label: { text: label, color: "#ffffff", fontWeight: "900" },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 15,
+            fillColor: color,
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 3,
+          },
+        });
+        marker.addListener("click", () => {
+          infoWindow.setContent(content);
+          infoWindow.open({ anchor: marker, map });
+        });
+        layersRef.current.push(marker);
+      };
+
+      if (hasValidPoint(pickup)) {
+        addMarker(
+          { lat: pickup.lat, lng: pickup.lng },
+          "A",
+          "#2563eb",
+          pickup.address,
+          `<div style="min-width:220px"><strong>Điểm nhận hàng</strong><p style="margin:6px 0 0">${escapeHtml(pickup.address)}</p></div>`,
+        );
+      }
+      if (hasValidPoint(dropoff)) {
+        addMarker(
+          { lat: dropoff.lat, lng: dropoff.lng },
+          "B",
+          "#ef4444",
+          dropoff.address,
+          `<div style="min-width:220px"><strong>Điểm trả hàng</strong><p style="margin:6px 0 0">${escapeHtml(dropoff.address)}</p></div>`,
+        );
+      }
+      if (hasValidPoint(driver)) {
+        bounds.extend({ lat: driver.lat, lng: driver.lng });
+        const marker = new google.maps.Marker({
+          position: { lat: driver.lat, lng: driver.lng },
+          map,
+          title: "Vị trí tài xế",
+          icon: {
+            url: getVehicleIconSvg(data.driver?.vehicleText),
+            scaledSize: new google.maps.Size(54, 42),
+            anchor: new google.maps.Point(27, 21),
+          },
+          zIndex: 10,
+        });
+        marker.addListener("click", () => {
+          infoWindow.setContent(`
+            <div style="min-width:240px">
+              <strong>Thông tin tài xế</strong>
+              <p style="margin:6px 0 0"><b>Họ tên:</b> ${escapeHtml(data.driver?.fullName || "Chưa có")}</p>
+              <p style="margin:4px 0 0"><b>SĐT:</b> ${escapeHtml(data.driver?.phone || "Chưa có")}</p>
+              <p style="margin:4px 0 0"><b>Phương tiện:</b> ${escapeHtml(data.driver?.vehicleText || "Chưa cập nhật")}</p>
+              <p style="margin:4px 0 0"><b>Biển số:</b> ${escapeHtml(data.driver?.plateNumber || "Chưa cập nhật")}</p>
+              <p style="margin:4px 0 0"><b>Tốc độ:</b> ${Math.round(driver.speed || 0)} km/h</p>
+            </div>
+          `);
+          infoWindow.open({ anchor: marker, map });
+        });
+        layersRef.current.push(marker);
+      }
+
+      if (hasValidPoint(pickup) && hasValidPoint(dropoff)) {
+        const directionsService = new google.maps.DirectionsService();
+        const directionsRenderer = new google.maps.DirectionsRenderer({
+          map,
+          suppressMarkers: true,
+          polylineOptions: { strokeColor: "#4f46e5", strokeOpacity: 0.88, strokeWeight: 5 },
+        });
+        layersRef.current.push(directionsRenderer);
+        directionsService.route(
+          {
+            origin: { lat: pickup.lat, lng: pickup.lng },
+            destination: { lat: dropoff.lat, lng: dropoff.lng },
+            travelMode: google.maps.TravelMode.DRIVING,
+          },
+          (result: any, status: any) => {
+            if (status !== google.maps.DirectionsStatus.OK || !result) return;
+
+            directionsRenderer.setDirections(result);
+
+            const routePath = result.routes?.[0]?.overview_path || [];
+            if (!hasValidPoint(driver) || routePath.length < 2) return;
+
+            const driverLatLng = new google.maps.LatLng(driver.lat, driver.lng);
+            let nearestIndex = 0;
+            let nearestDistance = Number.POSITIVE_INFINITY;
+
+            routePath.forEach((point: any, index: number) => {
+              const distance = google.maps.geometry.spherical.computeDistanceBetween(point, driverLatLng);
+              if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestIndex = index;
+              }
+            });
+
+            const travelledPath = routePath.slice(0, nearestIndex + 1);
+            if (travelledPath.length < 2) return;
+
+            const progressPolyline = new google.maps.Polyline({
+              path: travelledPath,
+              geodesic: true,
+              strokeColor: "#16a34a",
+              strokeOpacity: 0.96,
+              strokeWeight: 7,
+              map,
+              zIndex: 20,
+            });
+            layersRef.current.push(progressPolyline);
+          },
+        );
+      }
+
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, { top: 72, right: 72, bottom: 72, left: 72 });
+        google.maps.event.addListenerOnce(map, "idle", () => {
+          const zoom = map.getZoom();
+          if (zoom && zoom > 15) map.setZoom(15);
+        });
+      }
+    };
+
+    drawMap().catch(() => null);
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
+
+  return (
+    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+      <div ref={containerRef} className="h-[360px] w-full bg-slate-100 sm:h-[460px]" />
+    </div>
+  );
 }
 
 function TrackingContent() {
@@ -183,12 +497,12 @@ function TrackingContent() {
         <div className="space-y-8 animate-fade-in">
           {/* Card 1: Status & Timeline */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-100">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 border-b border-slate-100 pb-6">
+            <div className="mb-8 flex flex-col gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Mã Vận Đơn</span>
-                <h2 className="text-2xl font-bold text-slate-900 font-mono tracking-tight">{data.order.orderCode}</h2>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Mã Vận Đơn</span>
+                <h2 className="mt-1 font-mono text-2xl font-bold tracking-tight text-slate-900">{data.order.orderCode}</h2>
               </div>
-              <div className={`px-4 py-2 rounded-full border text-sm font-bold ${getStatusColor(data.order.status)}`}>
+              <div className={`inline-flex w-fit rounded-full border px-4 py-2 text-sm font-bold ${getStatusColor(data.order.status)}`}>
                 {getStatusText(data.order.status)}
               </div>
             </div>
@@ -201,7 +515,7 @@ function TrackingContent() {
                 {[
                   { step: 1, label: "Đã nhận đơn", desc: "Hệ thống ghi nhận đơn" },
                   { step: 2, label: "Tài xế xác nhận", desc: "Tài xế đã nhận chuyến" },
-                  { step: 3, label: "Đang vận chuyển", desc: "Hàng hóa đang trên xe" },
+                  { step: 3, label: "Đang vận chuyển", desc: "Đang đi đến điểm trả" },
                   { step: 4, label: "Giao thành công", desc: "Đã ký xác nhận giao hàng" },
                 ].map((stepItem) => {
                   const activeStep = getActiveStep(data.order.status);
@@ -267,28 +581,35 @@ function TrackingContent() {
                 })}
               </div>
             ) : (
-              <div className="bg-red-50 border border-red-100 text-red-700 p-4 rounded-2xl flex items-center gap-3">
-                <Package className="w-5 h-5 flex-shrink-0" />
-                <p className="text-sm font-medium">Đơn hàng này đã bị hủy bỏ trên hệ thống.</p>
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-5 text-red-800">
+                <div className="flex items-start gap-3">
+                  <Package className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold">Đơn hàng đã bị hủy</p>
+                    <p className="mt-1 text-sm font-medium leading-6 text-red-700">
+                      {getCancelReasonText(data.order)}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 text-xs font-bold text-red-700 sm:grid-cols-2">
+                  <div className="rounded-xl bg-white/70 p-3">
+                    <p className="uppercase tracking-wide text-red-400">Bên hủy</p>
+                    <p className="mt-1 text-red-800">
+                      {getCancelledByDisplay(data.order)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-white/70 p-3">
+                    <p className="uppercase tracking-wide text-red-400">Thời gian hủy</p>
+                    <p className="mt-1 text-red-800">
+                      {formatDateTime(data.order.cancelledAt) || "Chưa ghi nhận"}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Card 2: Action Button for Route Map */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
-              <div className="space-y-1 text-center md:text-left">
-                <h3 className="font-bold text-lg">Theo dõi vị trí tài xế thời gian thực</h3>
-                <p className="text-xs text-blue-100">
-                  Hệ thống đang thu thập tín hiệu GPS trực tiếp từ điện thoại của tài xế.
-                </p>
-              </div>
-              <Link
-                href={`/route-tracking?code=${encodeURIComponent(data.order.orderCode)}`}
-                className="bg-white text-blue-600 hover:bg-blue-50 font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-lg hover:scale-105 inline-flex items-center gap-2"
-              >
-                <MapPin className="w-4 h-4 animate-bounce" /> Xem Bản Đồ Live GPS
-              </Link>
-            </div>
+          <TrackingMapPreview data={data} />
 
           {/* Card 3: Route Details */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-100 grid md:grid-cols-2 gap-8">
@@ -297,14 +618,20 @@ function TrackingContent() {
               <h3 className="text-md font-bold text-slate-800 mb-4 pb-2 border-b border-slate-50 flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-primary-600" /> Thông tin giao nhận
               </h3>
-              <div className="space-y-6 relative pl-4 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Điểm lấy hàng</span>
-                  <p className="text-sm font-bold text-slate-800 leading-snug">{data.order.pickup.address}</p>
+              <div className="space-y-5">
+                <div className="flex gap-3">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-sm">A</span>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Điểm nhận</span>
+                    <p className="text-sm font-bold text-slate-800 leading-snug">{data.order.pickup.address}</p>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Điểm giao hàng</span>
-                  <p className="text-sm font-bold text-slate-800 leading-snug">{data.order.dropoff.address}</p>
+                <div className="flex gap-3">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-sm">B</span>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Điểm trả</span>
+                    <p className="text-sm font-bold text-slate-800 leading-snug">{data.order.dropoff.address}</p>
+                  </div>
                 </div>
               </div>
               {data.order.route.distanceMeters && (

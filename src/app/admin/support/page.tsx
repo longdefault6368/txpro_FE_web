@@ -318,21 +318,21 @@ export default function AdminSupportPage() {
 
       <div className="flex flex-col lg:flex-row justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Trung Tâm Hỗ Trợ</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Trung Tâm Hỗ Trợ</h1>
           <p className="text-slate-400 text-xs mt-1">Theo dõi live chat và ticket/request người dùng gửi cho TXEPRO.</p>
         </div>
         <div className="grid grid-cols-3 gap-3 min-w-full lg:min-w-[420px]">
           <div className="bg-white rounded-2xl border border-slate-200/50 p-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase">Chờ xử lý</p>
-            <p className="text-xl font-black text-amber-600">{supportStats.pending}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">Chờ xử lý</p>
+            <p className="text-xl font-bold text-amber-600">{supportStats.pending}</p>
           </div>
           <div className="bg-white rounded-2xl border border-slate-200/50 p-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase">Đang xử lý</p>
-            <p className="text-xl font-black text-primary-600">{supportStats.inProgress}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">Đang xử lý</p>
+            <p className="text-xl font-bold text-primary-600">{supportStats.inProgress}</p>
           </div>
           <div className="bg-white rounded-2xl border border-slate-200/50 p-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase">Đã xử lý</p>
-            <p className="text-xl font-black text-emerald-600">{supportStats.resolved}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">Đã xử lý</p>
+            <p className="text-xl font-bold text-emerald-600">{supportStats.resolved}</p>
           </div>
         </div>
       </div>
@@ -341,13 +341,13 @@ export default function AdminSupportPage() {
         <div className="flex bg-slate-100 p-1 rounded-2xl">
           <button
             onClick={() => setTab("tickets")}
-            className={`flex-1 lg:flex-none px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${tab === "tickets" ? "bg-white text-primary-600 shadow-sm" : "text-slate-500"}`}
+            className={`flex-1 lg:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${tab === "tickets" ? "bg-white text-primary-600 shadow-sm" : "text-slate-500"}`}
           >
             <TicketCheck className="w-4 h-4" /> Ticket
           </button>
           <button
             onClick={() => setTab("chats")}
-            className={`flex-1 lg:flex-none px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${tab === "chats" ? "bg-white text-primary-600 shadow-sm" : "text-slate-500"}`}
+            className={`flex-1 lg:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${tab === "chats" ? "bg-white text-primary-600 shadow-sm" : "text-slate-500"}`}
           >
             <MessagesSquare className="w-4 h-4" /> Live chat
           </button>
@@ -389,7 +389,7 @@ export default function AdminSupportPage() {
         <div className="bg-white rounded-3xl border border-slate-200/50 shadow-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
             {tab === "tickets" ? <TicketCheck className="w-4 h-4 text-primary-600" /> : <MessageCircle className="w-4 h-4 text-primary-600" />}
-            <h2 className="text-sm font-black text-slate-900">{tab === "tickets" ? "Ticket / Request" : "Live chat người dùng"}</h2>
+            <h2 className="text-sm font-bold text-slate-900">{tab === "tickets" ? "Ticket / Request" : "Live chat người dùng"}</h2>
           </div>
 
           {loading ? (
@@ -414,7 +414,7 @@ export default function AdminSupportPage() {
                         <p className="font-black text-sm text-slate-900 truncate">{ticket.title}</p>
                         <p className="text-xs font-semibold text-slate-500 mt-1 truncate">{ticket.userId?.name || "Người dùng"} · {CATEGORY_LABEL[ticket.category] || ticket.category}</p>
                       </div>
-                      <span className={`shrink-0 border rounded-lg px-2 py-1 text-[10px] font-black ${statusInfo.className}`}>{statusInfo.label}</span>
+                      <span className={`shrink-0 border rounded-lg px-2 py-1 text-[10px] font-bold ${statusInfo.className}`}>{statusInfo.label}</span>
                     </div>
                     <p className="text-xs text-slate-400 mt-2 line-clamp-2">{ticket.description}</p>
                     <p className="text-[10px] font-bold text-slate-400 mt-2 flex items-center gap-1"><Clock className="w-3 h-3" /> {formatDateTime(ticket.updatedAt)}</p>
@@ -438,7 +438,7 @@ export default function AdminSupportPage() {
                       <p className="text-xs font-semibold text-slate-500 mt-1 truncate">{row.chat.participants?.map((user) => user.name || user.phone).join(" ↔ ") || "---"}</p>
                     </div>
                     {row.chat.orderId?._id && (
-                      <Link href={`/admin/orders/${row.chat.orderId._id}`} className="text-[10px] font-black text-primary-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                      <Link href={`/admin/orders/${row.chat.orderId._id}`} className="text-[10px] font-bold text-primary-600 hover:underline" onClick={(e) => e.stopPropagation()}>
                         Đơn
                       </Link>
                     )}
@@ -458,12 +458,12 @@ export default function AdminSupportPage() {
                 <Headset className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-sm font-black text-slate-900">{tab === "tickets" ? selectedTicket?.title || "Chi tiết ticket" : selectedChat?.chat.orderId?.orderCode || "Chi tiết live chat"}</h2>
+                <h2 className="text-sm font-bold text-slate-900">{tab === "tickets" ? selectedTicket?.title || "Chi tiết ticket" : selectedChat?.chat.orderId?.orderCode || "Chi tiết live chat"}</h2>
                 <p className="text-xs font-semibold text-slate-400">{detailLoading ? "Đang tải chi tiết..." : tab === "tickets" ? selectedTicket?.userId?.name || "---" : selectedChat?.chat.participants?.map((user) => ROLE_LABEL[user.role || ""] || user.role || "Người dùng").join(" & ") || "---"}</p>
               </div>
             </div>
             {tab === "tickets" && selectedTicket && (
-              <span className={`border rounded-xl px-3 py-1.5 text-xs font-black ${(STATUS_LABEL[selectedTicket.status] || STATUS_LABEL.pending).className}`}>
+              <span className={`border rounded-xl px-3 py-1.5 text-xs font-bold ${(STATUS_LABEL[selectedTicket.status] || STATUS_LABEL.pending).className}`}>
                 {(STATUS_LABEL[selectedTicket.status] || STATUS_LABEL.pending).label}
               </span>
             )}
@@ -487,7 +487,7 @@ export default function AdminSupportPage() {
                     return (
                       <div key={message._id || index} className={`flex ${fromAdmin ? "justify-end" : "justify-start"}`}>
                         <div className={`max-w-[78%] rounded-2xl px-4 py-3 border ${fromAdmin ? "bg-primary-600 text-white border-primary-600" : "bg-white text-slate-700 border-slate-100"}`}>
-                          <p className={`text-[10px] font-black uppercase mb-1 ${fromAdmin ? "text-primary-100" : "text-slate-400"}`}>{message.senderName} · {ROLE_LABEL[message.senderRole] || message.senderRole}</p>
+                          <p className={`text-[10px] font-bold uppercase mb-1 ${fromAdmin ? "text-primary-100" : "text-slate-400"}`}>{message.senderName} · {ROLE_LABEL[message.senderRole] || message.senderRole}</p>
                           <p className="text-sm font-semibold leading-relaxed">{message.message}</p>
                           <p className={`text-[10px] font-bold mt-2 ${fromAdmin ? "text-primary-100" : "text-slate-400"}`}>{formatDateTime(message.createdAt)}</p>
                         </div>
@@ -531,7 +531,7 @@ export default function AdminSupportPage() {
                 ) : selectedChat.messages.map((message) => (
                   <div key={message._id} className="flex justify-start">
                     <div className="max-w-[78%] rounded-2xl px-4 py-3 border bg-white text-slate-700 border-slate-100">
-                      <p className="text-[10px] font-black uppercase mb-1 text-slate-400">{message.senderId?.name || message.senderId?.phone || "Người dùng"} · {ROLE_LABEL[message.senderId?.role || ""] || message.senderId?.role || "---"}</p>
+                      <p className="text-[10px] font-bold uppercase mb-1 text-slate-400">{message.senderId?.name || message.senderId?.phone || "Người dùng"} · {ROLE_LABEL[message.senderId?.role || ""] || message.senderId?.role || "---"}</p>
                       <p className="text-sm font-semibold leading-relaxed">{message.content}</p>
                       <p className="text-[10px] font-bold mt-2 text-slate-400">{formatDateTime(message.createdAt)}</p>
                     </div>
@@ -554,7 +554,7 @@ function EmptyDetail() {
       <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-300 flex items-center justify-center mb-4">
         <UserRound className="w-7 h-7" />
       </div>
-      <p className="text-sm font-black text-slate-700">Chọn một hội thoại để xem chi tiết</p>
+      <p className="text-sm font-bold text-slate-700">Chọn một hội thoại để xem chi tiết</p>
       <p className="text-xs text-slate-400 mt-1">Ticket và live chat sẽ hiển thị nội dung ở khu vực này.</p>
     </div>
   );

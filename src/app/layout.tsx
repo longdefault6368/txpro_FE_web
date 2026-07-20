@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import NextTopLoader from "nextjs-toploader";
 import FirstLoadProgressBar from "@/components/common/FirstLoadProgressBar";
+import GlobalChatWidget from "@/components/common/GlobalChatWidget";
+import ScrollToTop from "@/components/common/ScrollToTop";
 import { LanguageProvider } from "@/context/LanguageContext";
 import "./globals.css";
 
@@ -41,6 +43,8 @@ export default function RootLayout({
             shadow="0 0 10px #2563eb,0 0 5px #2563eb"
           />
           {children}
+          <ScrollToTop />
+          <GlobalChatWidget />
         </LanguageProvider>
       </body>
     </html>

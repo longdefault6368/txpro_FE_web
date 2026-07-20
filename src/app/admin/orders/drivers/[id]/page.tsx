@@ -33,6 +33,10 @@ interface DriverPost {
   route?: {
     from?: string | null;
     to?: string | null;
+    pickupLat?: number | null;
+    pickupLng?: number | null;
+    dropoffLat?: number | null;
+    dropoffLng?: number | null;
     pickupRadiusMeters?: number | null;
     dropoffRadiusMeters?: number | null;
     radiusMeters?: number | null;
@@ -69,29 +73,6 @@ const PRICING_MODE_LABEL: Record<string, string> = {
   shared_seat: "Ghép ghế",
 };
 
-const MOCK_POST: DriverPost = {
-  _id: "dp-mock-1",
-  driverId: { name: "Nguyễn Văn Tuấn", phone: "0987654321", email: "tuan.driver@gmail.com" },
-  vehicleId: {
-    type: "truck",
-    vehicleTypeChild: "Xe tải 5 tấn",
-    plateNumber: "51C-123.45",
-    brand: "Isuzu",
-    model: "NQR",
-    capacity: 5000,
-    status: "active",
-    ownerName: "Nguyễn Văn Tuấn",
-  },
-  route: { from: "TP.HCM", to: "Bình Dương", pickupRadiusMeters: 3000, dropoffRadiusMeters: 5000 },
-  pricing: { type: "fixed", minPrice: 1800000, maxPrice: 2200000 },
-  pricingMode: "freight",
-  price: 2000000,
-  scheduleType: "active",
-  status: "active",
-  note: "Nhận hàng trong ngày, ưu tiên hàng pallet.",
-  createdAt: "2026-07-09T08:30:00Z",
-};
-
 const formatMoney = (value?: number | null) => (value ? `${value.toLocaleString("vi-VN")} ₫` : "---");
 const formatDateTime = (value?: string | null) => (value ? new Date(value).toLocaleString("vi-VN") : "---");
 const formatRadius = (meters?: number | null) => {
@@ -103,7 +84,7 @@ const formatRadius = (meters?: number | null) => {
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-slate-100 py-3 text-sm">
-      <span className="text-xs font-black uppercase tracking-wider text-slate-400">{label}</span>
+      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</span>
       <span className="text-right font-bold text-slate-800">{value || "---"}</span>
     </div>
   );
@@ -113,7 +94,7 @@ export default function AdminDriverPostDetailPage() {
   const params = useParams<{ id: string }>();
   const [post, setPost] = useState<DriverPost | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isOffline, setIsOffline] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -122,12 +103,12 @@ export default function AdminDriverPostDetailPage() {
         const res = await fetchWithAuth(`${API_BASE}/admin/users/driver-posts/${params.id}`);
         if (!res.ok) throw new Error("Failed to fetch driver post detail");
         const data = await res.json();
-        setPost(data.data.post);
-        setIsOffline(false);
+        setPost(data.data?.post || null);
+        setErrorMessage("");
       } catch (err) {
-        console.warn("Driver post detail API offline, using mock data", err);
-        setPost({ ...MOCK_POST, _id: params.id });
-        setIsOffline(true);
+        console.warn("Driver post detail API failed", err);
+        setPost(null);
+        setErrorMessage("Không thể tải chi tiết tin đăng tài xế từ hệ thống.");
       } finally {
         setLoading(false);
       }
@@ -168,6 +149,8 @@ export default function AdminDriverPostDetailPage() {
         streetViewControl: false,
         fullscreenControl: true,
         zoomControl: true,
+        scrollwheel: true,
+        gestureHandling: "greedy",
       });
 
       const geocodeAddress = (address?: string | null) =>
@@ -183,9 +166,16 @@ export default function AdminDriverPostDetailPage() {
           });
         });
 
+      const pointFromRoute = (lat?: number | null, lng?: number | null) => {
+        const nextLat = Number(lat);
+        const nextLng = Number(lng);
+        if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) return null;
+        return new google.maps.LatLng(nextLat, nextLng);
+      };
+
       Promise.all([
-        geocodeAddress(post.route?.from),
-        geocodeAddress(post.route?.to),
+        Promise.resolve(pointFromRoute(post.route?.pickupLat, post.route?.pickupLng)).then((point) => point || geocodeAddress(post.route?.from)),
+        Promise.resolve(pointFromRoute(post.route?.dropoffLat, post.route?.dropoffLng)).then((point) => point || geocodeAddress(post.route?.to)),
       ]).then(([pickupLocation, dropoffLocation]) => {
         const bounds = new google.maps.LatLngBounds();
         const points: any[] = [];
@@ -206,10 +196,11 @@ export default function AdminDriverPostDetailPage() {
               center: pickupLocation,
               radius: pickupRadius,
               strokeColor: "#2563eb",
-              strokeOpacity: 0.85,
-              strokeWeight: 2,
+              strokeOpacity: 0.95,
+              strokeWeight: 3,
               fillColor: "#2563eb",
-              fillOpacity: 0.14,
+              fillOpacity: 0.18,
+              zIndex: 2,
             });
             pickupCircle.getBounds() && bounds.union(pickupCircle.getBounds());
           }
@@ -231,27 +222,57 @@ export default function AdminDriverPostDetailPage() {
               center: dropoffLocation,
               radius: dropoffRadius,
               strokeColor: "#059669",
-              strokeOpacity: 0.85,
-              strokeWeight: 2,
+              strokeOpacity: 0.95,
+              strokeWeight: 3,
               fillColor: "#10b981",
-              fillOpacity: 0.14,
+              fillOpacity: 0.18,
+              zIndex: 2,
             });
             dropoffCircle.getBounds() && bounds.union(dropoffCircle.getBounds());
           }
         }
 
         if (points.length === 2) {
-          new google.maps.Polyline({
+          const drawFallbackLine = () => {
+            new google.maps.Polyline({
+              map,
+              path: points,
+              strokeColor: "#0f172a",
+              strokeOpacity: 0.55,
+              strokeWeight: 4,
+              icons: [{
+                icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW },
+                offset: "50%",
+              }],
+            });
+          };
+
+          const directionsRenderer = new google.maps.DirectionsRenderer({
             map,
-            path: points,
-            strokeColor: "#0f172a",
-            strokeOpacity: 0.55,
-            strokeWeight: 4,
-            icons: [{
-              icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW },
-              offset: "50%",
-            }],
+            suppressMarkers: true,
+            preserveViewport: true,
+            polylineOptions: {
+              strokeColor: "#2563eb",
+              strokeOpacity: 0.9,
+              strokeWeight: 5,
+            },
           });
+          const directionsService = new google.maps.DirectionsService();
+          directionsService.route(
+            {
+              origin: points[0],
+              destination: points[1],
+              travelMode: google.maps.TravelMode.DRIVING,
+            },
+            (result: any, status: string) => {
+              if (status === google.maps.DirectionsStatus.OK && result) {
+                directionsRenderer.setDirections(result);
+              } else {
+                console.warn("Driver post directions failed", status);
+                drawFallbackLine();
+              }
+            }
+          );
         }
 
         if (!bounds.isEmpty()) {
@@ -272,7 +293,7 @@ export default function AdminDriverPostDetailPage() {
   if (!post) {
     return (
       <div className="bg-white rounded-3xl p-10 border border-slate-200 shadow text-center space-y-4 max-w-md mx-auto mt-10">
-        <h2 className="text-xl font-black text-slate-900">Không tìm thấy tin đăng</h2>
+        <h2 className="text-xl font-bold text-slate-900">Không tìm thấy tin đăng</h2>
         <Link href="/admin/orders/drivers" className="btn-primary inline-flex px-5 py-3 rounded-xl text-xs font-bold">Quay lại</Link>
       </div>
     );
@@ -288,9 +309,9 @@ export default function AdminDriverPostDetailPage() {
 
   return (
     <div className="space-y-6">
-      {isOffline && (
+      {errorMessage && (
         <div className="bg-amber-50 border border-amber-100 text-amber-700 p-3 rounded-2xl text-xs font-semibold">
-          Backend đang offline, dữ liệu bên dưới là dữ liệu mẫu.
+          {errorMessage}
         </div>
       )}
 
@@ -300,11 +321,11 @@ export default function AdminDriverPostDetailPage() {
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Chi Tiết Tin Đăng Tài Xế</h1>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Chi Tiết Tin Đăng Tài Xế</h1>
             <p className="text-slate-400 text-xs mt-1">Mã tin: <span className="font-bold text-primary-600">{post._id}</span></p>
           </div>
         </div>
-        <span className="inline-flex px-4 py-2 rounded-2xl bg-primary-50 text-primary-700 border border-primary-100 text-xs font-black uppercase tracking-wider">
+        <span className="inline-flex px-4 py-2 rounded-2xl bg-primary-50 text-primary-700 border border-primary-100 text-xs font-bold uppercase tracking-wider">
           {STATUS_LABEL[post.status] || post.status}
         </span>
       </div>
@@ -312,25 +333,25 @@ export default function AdminDriverPostDetailPage() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-6">
           <section className="bg-white rounded-3xl border border-slate-200/50 p-6 shadow-sm">
-            <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider pb-4 border-b border-slate-100 flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider pb-4 border-b border-slate-100 flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary-600" /> Tuyến Đăng Và Bán Kính
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
               <div className="rounded-2xl bg-slate-50 border border-slate-100 p-5">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Điểm đi</p>
-                <p className="text-base font-black text-slate-900 mt-2">{post.route?.from || "---"}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Điểm đi</p>
+                <p className="text-base font-bold text-slate-900 mt-2">{post.route?.from || "---"}</p>
                 <p className="text-xs font-bold text-primary-600 mt-3">Bán kính nhận hàng: {formatRadius(pickupRadius)}</p>
               </div>
               <div className="rounded-2xl bg-slate-50 border border-slate-100 p-5">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Điểm đến</p>
-                <p className="text-base font-black text-slate-900 mt-2">{post.route?.to || "---"}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Điểm đến</p>
+                <p className="text-base font-bold text-slate-900 mt-2">{post.route?.to || "---"}</p>
                 <p className="text-xs font-bold text-primary-600 mt-3">Bán kính trả hàng: {formatRadius(dropoffRadius)}</p>
               </div>
             </div>
             <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
               <div id="driver-post-radius-map" className="h-[360px] w-full" />
             </div>
-            <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+            <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-600"></span> Vòng nhận hàng</span>
               <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span> Vòng trả hàng</span>
             </div>
@@ -340,7 +361,7 @@ export default function AdminDriverPostDetailPage() {
           </section>
 
           <section className="bg-white rounded-3xl border border-slate-200/50 p-6 shadow-sm">
-            <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider pb-4 border-b border-slate-100 flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider pb-4 border-b border-slate-100 flex items-center gap-2">
               <Car className="w-4 h-4 text-primary-600" /> Phương Tiện
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 mt-2">
@@ -361,18 +382,18 @@ export default function AdminDriverPostDetailPage() {
 
         <div className="space-y-6">
           <section className="bg-white rounded-3xl border border-slate-200/50 p-6 shadow-sm">
-            <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider pb-4 border-b border-slate-100 flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider pb-4 border-b border-slate-100 flex items-center gap-2">
               <UserRound className="w-4 h-4 text-primary-600" /> Tài Xế
             </h2>
             <div className="mt-4 space-y-3">
-              <p className="text-lg font-black text-slate-900">{post.driverId?.name || "---"}</p>
+              <p className="text-lg font-bold text-slate-900">{post.driverId?.name || "---"}</p>
               <p className="text-xs font-bold text-slate-500 flex items-center gap-2"><Phone className="w-3.5 h-3.5" /> {post.driverId?.phone || "---"}</p>
               <p className="text-xs text-slate-400">{post.driverId?.email || "---"}</p>
             </div>
           </section>
 
           <section className="bg-white rounded-3xl border border-slate-200/50 p-6 shadow-sm">
-            <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider pb-4 border-b border-slate-100 flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider pb-4 border-b border-slate-100 flex items-center gap-2">
               <CircleDollarSign className="w-4 h-4 text-primary-600" /> Giá Và Loại Chuyến
             </h2>
             <div className="mt-2">
@@ -385,7 +406,7 @@ export default function AdminDriverPostDetailPage() {
           </section>
 
           <section className="bg-white rounded-3xl border border-slate-200/50 p-6 shadow-sm">
-            <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider pb-4 border-b border-slate-100 flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider pb-4 border-b border-slate-100 flex items-center gap-2">
               <CalendarClock className="w-4 h-4 text-primary-600" /> Lịch Khả Dụng
             </h2>
             <div className="mt-2">

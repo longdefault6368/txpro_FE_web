@@ -7,8 +7,6 @@ import "aos/dist/aos.css";
 // Common Components
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
-import ScrollToTop from "@/components/common/ScrollToTop";
-import ChatWidget from "@/components/common/ChatWidget";
 
 // Section Components
 import Hero from "@/components/sections/Hero";
@@ -48,9 +46,6 @@ export default function Home() {
       </main>
       <Footer />
 
-      {/* Interactive Floating Utilities */}
-      <ScrollToTop />
-      <ChatWidget />
     </>
   );
 }

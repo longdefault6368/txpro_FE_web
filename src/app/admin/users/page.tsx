@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { getServerMediaUrl } from "@/utils/media";
 import { 
   Search, UserPlus, Filter, Trash2, Edit3, ShieldAlert, Check, 
   X, Lock, ToggleLeft, ToggleRight, RotateCcw, AlertTriangle, ChevronLeft, ChevronRight 
@@ -13,6 +14,8 @@ interface User {
   name: string;
   phone?: string;
   email?: string;
+  avatar?: string | null;
+  portraitImage?: string | null;
   role: "admin" | "tai-xe" | "chu-hang";
   isActive: boolean;
   kycStatus: "draft" | "pending" | "pending_review" | "verified" | "rejected";
@@ -21,6 +24,31 @@ interface User {
 }
 
 type ManagedUserRole = "tai-xe" | "chu-hang";
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "---";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "---";
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const getUserAvatarUrl = (user: User) => getServerMediaUrl(user.avatar || user.portraitImage);
+
+const getUserInitials = (user: User) => {
+  const source = user.name || user.phone || user.email || "User";
+  return source
+    .trim()
+    .split(/\s+/)
+    .pop()
+    ?.substring(0, 2)
+    .toUpperCase() || "US";
+};
 
 // Initial Mock data for offline fallback
 const INITIAL_MOCK_USERS: User[] = [
@@ -478,7 +506,7 @@ function AdminUsersContent() {
         {/* Dashboard Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
               Danh Sách Thành Viên
               {isOffline && (
                 <span className="text-[10px] bg-amber-500 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
@@ -597,13 +625,19 @@ function AdminUsersContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
-                    {users.map((user) => (
+                    {users.map((user) => {
+                      const avatarUrl = getUserAvatarUrl(user);
+                      return (
                       <tr key={user._id} className="hover:bg-slate-50/50 transition-colors">
                         {/* Name */}
                         <td className="py-4.5 px-6">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-primary-50 text-primary-600 rounded-full font-bold flex items-center justify-center text-xs shadow-inner">
-                              {(user.name || "User").split(" ").pop()?.substring(0, 2).toUpperCase() || "US"}
+                            <div className="w-9 h-9 bg-primary-50 text-primary-600 rounded-full font-bold flex items-center justify-center text-xs shadow-inner overflow-hidden ring-1 ring-slate-100">
+                              {avatarUrl ? (
+                                <img src={avatarUrl} alt={user.name || user.phone || "Người dùng"} className="h-full w-full object-cover" />
+                              ) : (
+                                getUserInitials(user)
+                              )}
                             </div>
                             <span className="font-bold text-slate-800">{user.name || "Người dùng TXEPRO"}</span>
                           </div>
@@ -656,11 +690,7 @@ function AdminUsersContent() {
 
                         {/* Created At */}
                         <td className="py-4.5 px-6 text-xs font-semibold text-slate-400">
-                          {new Date(user.createdAt).toLocaleDateString("vi-VN", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric"
-                          })}
+                          {formatDateTime(user.createdAt)}
                         </td>
 
                         {/* Status Switch Toggle */}
@@ -728,7 +758,8 @@ function AdminUsersContent() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -28,6 +28,19 @@ interface RecentOrder {
   createdAt: string;
 }
 
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "---";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "---";
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const STATUS_MAP: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   searching_driver: { label: "Tìm tài xế", color: "text-blue-600 bg-blue-50", icon: Loader },
   waiting_driver: { label: "Đang chờ tài xế", color: "text-amber-600 bg-amber-50", icon: Clock },
@@ -174,7 +187,7 @@ function AdminDashboardContent() {
                 {card.trend}
               </div>
             </div>
-            <p className="text-3xl font-black text-slate-900 tracking-tight">{card.value.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-slate-900 tracking-tight">{card.value.toLocaleString()}</p>
             <p className="text-xs font-semibold text-slate-400 mt-1">{card.label}</p>
           </div>
         ))}
@@ -195,7 +208,7 @@ function AdminDashboardContent() {
             >
               <div className="absolute inset-3 bg-white rounded-full flex items-center justify-center">
                 <div className="text-center">
-                  <p className="text-2xl font-black text-slate-900">{total}</p>
+                  <p className="text-2xl font-bold text-slate-900">{total}</p>
                   <p className="text-[9px] text-slate-400 font-bold uppercase">Thành viên</p>
                 </div>
               </div>
@@ -266,7 +279,7 @@ function AdminDashboardContent() {
                         {((order.offerPrice || order.budget || 0) / 1000).toFixed(0)}K ₫
                       </td>
                       <td className="py-3.5 px-6 text-xs text-slate-400 font-semibold">
-                        {new Date(order.createdAt).toLocaleDateString("vi-VN", { month: "short", day: "numeric" })}
+                        {formatDateTime(order.createdAt)}
                       </td>
                     </tr>
                   );
@@ -287,7 +300,7 @@ function AdminDashboardContent() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-400">Tài Xế Đang Hoạt Động</p>
-            <p className="text-xl font-black text-slate-900">{metrics?.activeDrivers || 0}</p>
+            <p className="text-xl font-bold text-slate-900">{metrics?.activeDrivers || 0}</p>
           </div>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200/50 p-5 shadow-sm flex items-center gap-4">
@@ -296,7 +309,7 @@ function AdminDashboardContent() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-400">KYC Chờ Duyệt</p>
-            <p className="text-xl font-black text-slate-900">{metrics?.pendingKyc || 0}</p>
+            <p className="text-xl font-bold text-slate-900">{metrics?.pendingKyc || 0}</p>
           </div>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200/50 p-5 shadow-sm flex items-center gap-4">
@@ -305,7 +318,7 @@ function AdminDashboardContent() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-400">Vi Phạm Hệ Thống</p>
-            <p className="text-xl font-black text-slate-900">{metrics?.totalViolations || 0}</p>
+            <p className="text-xl font-bold text-slate-900">{metrics?.totalViolations || 0}</p>
           </div>
         </div>
       </div>

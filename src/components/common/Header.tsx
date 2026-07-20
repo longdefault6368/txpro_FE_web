@@ -139,7 +139,7 @@ export default function Header() {
                     <span className="text-xs font-bold truncate max-w-[120px]">
                       {session.name}
                     </span>
-                    <span className="text-[9px] bg-primary-600 text-white px-1.5 py-0.5 rounded font-black uppercase">
+                    <span className="text-[9px] bg-primary-600 text-white px-1.5 py-0.5 rounded font-bold uppercase">
                       {session.role}
                     </span>
                   </Link>
@@ -276,7 +276,7 @@ export default function Header() {
                 <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
                   <User className="w-4 h-4 text-primary-600" /> {session.name}
                 </span>
-                <span className="text-[10px] bg-primary-600 text-white px-2 py-0.5 rounded font-black uppercase">
+                <span className="text-[10px] bg-primary-600 text-white px-2 py-0.5 rounded font-bold uppercase">
                   {session.role}
                 </span>
               </Link>

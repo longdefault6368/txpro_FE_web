@@ -38,6 +38,19 @@ interface Order {
   createdAt: string;
 }
 
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "---";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "---";
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const MOCK_SHIPPER_ORDERS: Order[] = [
   {
     _id: "so-mock-1",
@@ -164,7 +177,7 @@ export default function AdminShipperOrdersPage() {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Danh Sách Chủ Hàng Đăng</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Danh Sách Chủ Hàng Đăng</h1>
           <p className="text-slate-400 text-xs mt-1">Theo dõi đầy đủ vận đơn do chủ hàng tạo, thông tin hàng hóa, tuyến, chi phí và tài xế nhận đơn.</p>
         </div>
       </div>
@@ -280,7 +293,7 @@ export default function AdminShipperOrdersPage() {
                         <p className="font-bold text-slate-700">{order.pickupTimeType === "scheduled" ? "Đặt lịch" : "Lấy ngay"}</p>
                         <p className="text-slate-500">{order.pickupTime ? new Date(order.pickupTime).toLocaleString("vi-VN") : "---"}</p>
                         <p className="text-slate-400 mt-1">{order.paymentMethod === "wallet" ? "Ví TXEPRO" : "Tiền mặt"}</p>
-                        <p className="text-slate-400">Tạo: {new Date(order.createdAt).toLocaleDateString("vi-VN")}</p>
+                        <p className="text-slate-400">Tạo: {formatDateTime(order.createdAt)}</p>
                       </td>
                       <td className="py-4.5 px-6">
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${statusInfo.color}`}>

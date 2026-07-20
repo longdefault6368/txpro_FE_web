@@ -43,6 +43,7 @@ import { getServerMediaUrl } from "@/utils/media";
 type UserRole = "admin" | "tai-xe" | "chu-hang";
 type WorkspaceTab = "waiting" | "in_progress" | "history";
 type MainTab = "overview" | "orders" | "profile";
+type OrdersPanelTab = "orders" | "pending_posts";
 
 interface KycSummary {
   verificationEligibility?: string;
@@ -61,6 +62,7 @@ interface ProfileData {
   fullName?: string;
   phone?: string;
   email?: string;
+  isEmailVerified?: boolean;
   role: UserRole | string;
   language?: string;
   avatar?: string;
@@ -92,6 +94,7 @@ interface LocationInfo {
   address?: string;
   lat?: number;
   lng?: number;
+  radiusMeters?: number;
 }
 
 interface OrderSummary {
@@ -105,6 +108,13 @@ interface OrderSummary {
   budget?: { min?: number; max?: number } | number;
   pickup?: LocationInfo;
   dropoff?: LocationInfo;
+  pickupRadiusMeters?: number | null;
+  dropoffRadiusMeters?: number | null;
+  route?: {
+    pickupRadiusMeters?: number | null;
+    dropoffRadiusMeters?: number | null;
+    radiusMeters?: number | null;
+  };
   cargoType?: string;
   weight?: number;
   volume?: number;
@@ -112,6 +122,33 @@ interface OrderSummary {
   distanceKm?: number;
   createdAt?: string;
   updatedAt?: string;
+}
+
+interface DriverPostSummary {
+  _id?: string;
+  id?: string;
+  route?: {
+    from?: string;
+    to?: string;
+    pickupRadiusMeters?: number | null;
+    dropoffRadiusMeters?: number | null;
+    radiusMeters?: number | null;
+  };
+  note?: string | null;
+  pricingMode?: string;
+  price?: number | null;
+  pricing?: {
+    minPrice?: number | null;
+    maxPrice?: number | null;
+    pricePerSeat?: number | null;
+  };
+  vehicleSeats?: number | null;
+  availableSeats?: number | null;
+  scheduleType?: string;
+  availableFrom?: string | null;
+  availableTo?: string | null;
+  status?: string;
+  createdAt?: string;
 }
 
 
@@ -130,7 +167,8 @@ const getStatusLabel = (status: string, role: string) => {
     case "searching_driver":
     case "pending":
     case "waiting_driver":
-      return isDriver ? "Có thể nhận" : "Chờ tài xế";
+    case "waiting_driver_acceptance":
+      return isDriver ? "Đang chờ" : "Chờ tài xế";
     case "accepted":
     case "in_progress":
     case "in_transit":
@@ -175,6 +213,30 @@ const formatDate = (value?: string) => {
   return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 };
 
+const formatDateTime = (value?: string) => {
+  if (!value) return "Chưa có";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Chưa có";
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatRadius = (value?: number | null) => {
+  const radius = Number(value);
+  if (!Number.isFinite(radius) || radius <= 0) return null;
+  if (radius >= 1000) {
+    const kilometers = radius / 1000;
+    const decimals = radius % 1000 === 0 ? 0 : 1;
+    return `${Number(kilometers.toFixed(decimals)).toLocaleString("vi-VN")} km`;
+  }
+  return `${Math.round(radius).toLocaleString("vi-VN")} m`;
+};
+
 const formatCurrency = (value?: any, allowZeroOrEmpty = false) => {
   const num = Number(value);
   if (allowZeroOrEmpty) {
@@ -195,6 +257,60 @@ const getOrderPrice = (order: any) => {
   if (order.budget?.max) return order.budget.max;
   if (order.budget?.min) return order.budget.min;
   return 0;
+};
+
+const getOrderRadiusInfo = (order: OrderSummary) => {
+  const sharedRadius = order.route?.radiusMeters ?? null;
+  const pickupRadius = formatRadius(
+    order.pickupRadiusMeters ??
+      order.pickup?.radiusMeters ??
+      order.route?.pickupRadiusMeters ??
+      sharedRadius
+  );
+  const dropoffRadius = formatRadius(
+    order.dropoffRadiusMeters ??
+      order.dropoff?.radiusMeters ??
+      order.route?.dropoffRadiusMeters ??
+      sharedRadius
+  );
+
+  return { pickupRadius, dropoffRadius };
+};
+
+const getDriverPostPrice = (post: DriverPostSummary) =>
+  post.price ??
+  post.pricing?.maxPrice ??
+  post.pricing?.minPrice ??
+  post.pricing?.pricePerSeat ??
+  0;
+
+const getDriverPostStatusLabel = (status?: string) => {
+  switch (status) {
+    case "active":
+      return "Đang chờ";
+    case "scheduled":
+      return "Đã lên lịch";
+    case "paused":
+      return "Tạm dừng";
+    case "matched":
+      return "Đã ghép";
+    case "in_progress":
+      return "Đang chạy";
+    case "completed":
+      return "Hoàn thành";
+    case "cancelled":
+      return "Đã hủy";
+    default:
+      return "Đang cập nhật";
+  }
+};
+
+const getDriverPostRadiusInfo = (post: DriverPostSummary) => {
+  const sharedRadius = post.route?.radiusMeters ?? null;
+  return {
+    pickupRadius: formatRadius(post.route?.pickupRadiusMeters ?? sharedRadius),
+    dropoffRadius: formatRadius(post.route?.dropoffRadiusMeters ?? sharedRadius),
+  };
 };
 
 const getStatusStyles = (status: string) => {
@@ -252,13 +368,16 @@ function UserProfileContent() {
   const [isOffline, setIsOffline] = useState(false);
   const [activeTab, setActiveTab] = useState<MainTab>("overview");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [language, setLanguage] = useState("vi");
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [summaryData, setSummaryData] = useState<Record<string, number>>({});
   const [ordersList, setOrdersList] = useState<OrderSummary[]>([]);
   const [allOrdersList, setAllOrdersList] = useState<OrderSummary[]>([]);
+  const [driverPostsList, setDriverPostsList] = useState<DriverPostSummary[]>([]);
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("waiting");
+  const [ordersPanelTab, setOrdersPanelTab] = useState<OrdersPanelTab>("orders");
   const [tabLoading, setTabLoading] = useState(false);
 
   const handleTabChange = (tab: MainTab) => {
@@ -450,6 +569,12 @@ function UserProfileContent() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showKycWarningModal, setShowKycWarningModal] = useState(false);
+  const [showEmailOtpModal, setShowEmailOtpModal] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailOtpLoading, setEmailOtpLoading] = useState(false);
+  const [emailOtpError, setEmailOtpError] = useState("");
+  const [emailOtpDevHint, setEmailOtpDevHint] = useState("");
   const [orderTitle, setOrderTitle] = useState("");
   const [orderCargoType, setOrderCargoType] = useState("Hàng tiêu dùng");
   const [orderPickupAddress, setOrderPickupAddress] = useState("");
@@ -499,6 +624,96 @@ function UserProfileContent() {
     }
   };
 
+  const readApiError = async (res: Response, fallback: string) => {
+    const data = await res.json().catch(() => null);
+    const detailed = data?.errors?.[0]?.message || data?.message || data?.error;
+    return detailed ? String(detailed) : fallback;
+  };
+
+  const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+  const syncProfileToState = (updatedUser: ProfileData) => {
+    const updated = { ...profile, ...updatedUser, role: normalizeRole(updatedUser.role || profile?.role) } as ProfileData;
+    setProfile(updated);
+    setName(getProfileName(updated));
+    setEmail(updated.email || "");
+    setLanguage(updated.language || "vi");
+
+    const saved = localStorage.getItem("txpro_user_session");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      parsed.name = getProfileName(updated);
+      parsed.email = updated.email;
+      localStorage.setItem("txpro_user_session", JSON.stringify(parsed));
+      window.dispatchEvent(new Event("storage"));
+    }
+  };
+
+  const requestEmailOtp = async (targetEmail: string) => {
+    const res = await fetchWithAuth(`${API_BASE}/auth/profile/email-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: targetEmail }),
+    });
+
+    if (!res.ok) {
+      throw new Error(await readApiError(res, "Không thể gửi mã OTP email"));
+    }
+
+    const data = await extractPayload<{ email?: string; devOtp?: string }>(res);
+    setPendingEmail(data?.email || targetEmail);
+    setEmailOtp("");
+    setEmailOtpError("");
+    setEmailOtpDevHint(data?.devOtp || "");
+    setShowEmailOtpModal(true);
+  };
+
+  const handleVerifyEmailOtp = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!/^\d{6}$/.test(emailOtp.trim())) {
+      setEmailOtpError("Vui lòng nhập mã OTP 6 số");
+      return;
+    }
+
+    setEmailOtpLoading(true);
+    setEmailOtpError("");
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/auth/profile/email-verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: pendingEmail, otp: emailOtp.trim() }),
+      });
+
+      if (!res.ok) {
+        throw new Error(await readApiError(res, "Mã OTP không chính xác"));
+      }
+
+      const data = await extractPayload<{ user: ProfileData }>(res);
+      if (data?.user) syncProfileToState(data.user);
+      setShowEmailOtpModal(false);
+      setEditing(false);
+      showToast(true, "Xác minh email thành công");
+    } catch (err) {
+      setEmailOtpError(err instanceof Error ? err.message : "Không thể xác minh email");
+    } finally {
+      setEmailOtpLoading(false);
+    }
+  };
+
+  const handleResendEmailOtp = async () => {
+    if (!pendingEmail) return;
+    setEmailOtpLoading(true);
+    setEmailOtpError("");
+    try {
+      await requestEmailOtp(pendingEmail);
+      showToast(true, "Đã gửi lại mã OTP email");
+    } catch (err) {
+      setEmailOtpError(err instanceof Error ? err.message : "Không thể gửi lại mã OTP");
+    } finally {
+      setEmailOtpLoading(false);
+    }
+  };
+
   const fetchProfile = async () => {
     setLoading(true);
     const sessionSaved = localStorage.getItem("txpro_user_session");
@@ -528,6 +743,7 @@ function UserProfileContent() {
 
       setProfile(mergedProfile);
       setName(getProfileName(mergedProfile));
+      setEmail(mergedProfile.email || "");
       setLanguage(mergedProfile.language || "vi");
       setIsOffline(false);
     } catch {
@@ -550,6 +766,7 @@ function UserProfileContent() {
         };
         setProfile(mockProfile);
         setName(getProfileName(mockProfile));
+        setEmail(mockProfile.email || "");
         setLanguage(mockProfile.language || "vi");
       } catch {
         router.push("/login");
@@ -601,6 +818,21 @@ function UserProfileContent() {
       ];
 
       setAllOrdersList(mergedList);
+
+      if (normalizedRole === "tai-xe") {
+        const postsRes = await fetchWithAuth(`${API_BASE}/tai-xe/posts?limit=100`);
+        if (postsRes.ok) {
+          const posts = await extractPayload<DriverPostSummary[]>(postsRes);
+          const waitingPosts = Array.isArray(posts)
+            ? posts.filter((post) => !["completed", "cancelled"].includes(post.status || ""))
+            : [];
+          setDriverPostsList(waitingPosts);
+        } else {
+          setDriverPostsList([]);
+        }
+      } else {
+        setDriverPostsList([]);
+      }
 
       // Filter local subset matching current tab to keep the workspace tab interactive
       const currentTabOrders = mergedList.filter((order) => {
@@ -660,6 +892,21 @@ function UserProfileContent() {
       ];
 
       setAllOrdersList(mockList);
+      setDriverPostsList(normalizedRole === "tai-xe" ? [
+        {
+          id: "mock-driver-post",
+          route: {
+            from: "Quận 1, TP.HCM",
+            to: "Thành phố Thủ Đức, TP.HCM",
+            pickupRadiusMeters: 3000,
+            dropoffRadiusMeters: 3000,
+          },
+          status: "active",
+          price: 1500000,
+          scheduleType: "active",
+          createdAt: new Date(Date.now() - 3600000).toISOString(),
+        },
+      ] : []);
 
       const currentTabOrders = mockList.filter((order) => {
         const status = order.status || "";
@@ -686,11 +933,18 @@ function UserProfileContent() {
   const handleUpdate = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return showToast(false, "Vui lòng nhập họ tên");
+    const normalizedEmail = email.trim().toLowerCase();
+    const currentEmail = (profile?.email || "").trim().toLowerCase();
+    const emailChanged = normalizedEmail !== currentEmail;
+
+    if (normalizedEmail && !isValidEmail(normalizedEmail)) {
+      return showToast(false, "Vui lòng nhập email hợp lệ");
+    }
 
     setActionLoading(true);
     try {
       if (isOffline) {
-        const updatedProfile = { ...profile!, name: name.trim(), language };
+        const updatedProfile = { ...profile!, name: name.trim(), email: normalizedEmail, language };
         setProfile(updatedProfile);
         showToast(true, "Cập nhật hồ sơ thành công");
         setEditing(false);
@@ -710,16 +964,13 @@ function UserProfileContent() {
 
       const data = await extractPayload<{ user: ProfileData }>(res);
       if (data?.user) {
-        const updated = { ...profile, ...data.user, role: normalizeRole(data.user.role) } as ProfileData;
-        setProfile(updated);
-        setName(getProfileName(updated));
-        const saved = localStorage.getItem("txpro_user_session");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          parsed.name = getProfileName(updated);
-          localStorage.setItem("txpro_user_session", JSON.stringify(parsed));
-          window.dispatchEvent(new Event("storage"));
-        }
+        syncProfileToState(data.user);
+      }
+
+      if (emailChanged && normalizedEmail) {
+        await requestEmailOtp(normalizedEmail);
+        showToast(true, "Đã gửi mã OTP đến email mới");
+        return;
       }
       showToast(true, "Cập nhật hồ sơ thành công");
       setEditing(false);
@@ -866,8 +1117,9 @@ function UserProfileContent() {
 
   const isVerified = kycStatus === "verified";
   const isDriver = normalizedRole === "tai-xe";
+  const ordersCount = allOrdersList.length;
   const summaryCards = [
-    { label: isDriver ? "Có thể nhận" : "Chờ tài xế", value: summaryData.waitingOrders || 0, icon: Clock3, id: "waiting" as const },
+    { label: isDriver ? "Đang chờ" : "Chờ tài xế", value: summaryData.waitingOrders || 0, icon: Clock3, id: "waiting" as const },
     { label: "Đang vận chuyển", value: summaryData.inProgressOrders || 0, icon: Route, id: "in_progress" as const },
     { label: "Hoàn thành", value: summaryData.completedOrders || 0, icon: FileCheck2, id: "history" as const },
     { label: isDriver ? "Lịch sử chuyến" : "Lịch sử đơn", value: summaryData.historyOrders || 0, icon: Package, id: "history" as const },
@@ -965,6 +1217,11 @@ function UserProfileContent() {
                     }`}
                 >
                   <Icon className="h-4 w-4" /> {item.label}
+                  {item.id === "orders" && (
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${activeTab === "orders" ? "bg-primary-100 text-primary-700" : "bg-slate-100 text-slate-500"}`}>
+                      {ordersCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1070,6 +1327,14 @@ function UserProfileContent() {
                         Điều kiện xác minh: {eligibilityLabel}.
                       </p>
 
+                      <Link
+                        href="/user/ekyc"
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-700"
+                      >
+                        <FileCheck2 className="h-4 w-4" />
+                        {isVerified ? "Xem hồ sơ eKYC" : "Xác minh giấy tờ"}
+                      </Link>
+
                       {/* Detailed verifications with checkmarks */}
                       <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
                         <div className="flex items-center justify-between text-sm">
@@ -1086,7 +1351,7 @@ function UserProfileContent() {
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-slate-600 font-semibold">Xác minh Email</span>
-                          {(profile.emailVerified || !!profile.email) ? (
+                          {(profile.emailVerified || profile.isEmailVerified) ? (
                             <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600">
                               <Check className="h-4 w-4 bg-emerald-100 rounded-full p-0.5" /> Thành công
                             </span>
@@ -1146,8 +1411,35 @@ function UserProfileContent() {
                         <p className="mt-1 text-sm text-slate-500">
                           {normalizedRole === "tai-xe" ? "Theo dõi đơn có thể nhận, đang chạy và lịch sử chuyến." : "Quản lý đơn đã đăng, đang vận chuyển và lịch sử giao hàng."}
                         </p>
+                        {isDriver && (
+                          <div className="mt-4 inline-flex rounded-xl bg-slate-100 p-1">
+                            <button
+                              type="button"
+                              onClick={() => setOrdersPanelTab("orders")}
+                              className={`rounded-lg px-4 py-2 text-xs font-bold transition ${ordersPanelTab === "orders" ? "bg-white text-primary-700 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+                            >
+                              Đơn hàng
+                              <span className="ml-2 rounded-full bg-primary-100 px-2 py-0.5 text-[10px] text-primary-700">
+                                {filteredAndSortedOrders.length}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setOrdersPanelTab("pending_posts")}
+                              className={`rounded-lg px-4 py-2 text-xs font-bold transition ${ordersPanelTab === "pending_posts" ? "bg-white text-primary-700 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+                            >
+                              Tin đơn đang chờ
+                              {driverPostsList.length > 0 && (
+                                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700">
+                                  {driverPostsList.length}
+                                </span>
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </div>
 
+                      {ordersPanelTab === "orders" && (
                       <div className="flex flex-wrap items-center gap-3">
                         {/* Status dropdown filter */}
                         <select
@@ -1156,7 +1448,7 @@ function UserProfileContent() {
                           className="border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-650 focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
                         >
                           <option value="">Tất cả Trạng thái</option>
-                          <option value="searching_driver">{isDriver ? "Có thể nhận" : "Chờ tài xế"}</option>
+                          <option value="searching_driver">{isDriver ? "Đang chờ" : "Chờ tài xế"}</option>
                           <option value="in_transit">Đang vận chuyển</option>
                           <option value="completed">Hoàn thành</option>
                           <option value="cancelled">Đã hủy</option>
@@ -1174,9 +1466,62 @@ function UserProfileContent() {
                           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         </div>
                       </div>
+                      )}
                     </div>
 
-                    {filteredAndSortedOrders.length === 0 ? (
+                    {ordersPanelTab === "pending_posts" && isDriver ? (
+                      driverPostsList.length === 0 ? (
+                        <div className="py-14 text-center">
+                          <Route className="mx-auto h-11 w-11 text-slate-300" />
+                          <p className="mt-3 text-sm font-bold text-slate-700">Chưa có tin đơn đang chờ</p>
+                          <p className="mt-1 text-sm text-slate-500">Các tin đăng xe của tài xế sẽ hiển thị tại đây.</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-xs font-semibold text-slate-700">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-[10px] font-extrabold uppercase tracking-wider">
+                                <th className="py-3.5 px-4">Mã tin</th>
+                                <th className="py-3.5 px-4">Lộ trình</th>
+                                <th className="py-3.5 px-4">Ngày tạo</th>
+                                <th className="py-3.5 px-4">Trạng thái</th>
+                                <th className="py-3.5 px-4">Giá</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {driverPostsList.map((post, index) => {
+                                const { pickupRadius, dropoffRadius } = getDriverPostRadiusInfo(post);
+                                return (
+                                  <tr key={post.id || post._id || `post-${index}`} className="hover:bg-slate-50/50 transition">
+                                    <td className="py-4 px-4 font-mono text-primary-600">
+                                      {post.id || post._id || `POST-${index + 1}`}
+                                    </td>
+                                    <td className="py-4 px-4 space-y-1 text-[11px] max-w-[260px]">
+                                      <div className="truncate"><span className="text-blue-600 font-bold">Nhận:</span> {post.route?.from || "Chưa có"}</div>
+                                      {pickupRadius && <div className="text-[10px] font-bold text-blue-500">Bán kính nhận: {pickupRadius}</div>}
+                                      <div className="truncate"><span className="text-emerald-600 font-bold">Trả:</span> {post.route?.to || "Chưa có"}</div>
+                                      {dropoffRadius && <div className="text-[10px] font-bold text-emerald-500">Bán kính trả: {dropoffRadius}</div>}
+                                      {post.note && <div className="line-clamp-1 text-slate-400">Ghi chú: {post.note}</div>}
+                                    </td>
+                                    <td className="py-4 px-4 whitespace-nowrap font-bold text-slate-600">
+                                      {formatDateTime(post.createdAt)}
+                                    </td>
+                                    <td className="py-4 px-4">
+                                      <span className={`inline-block px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider rounded-full text-center ${getStatusStyles(post.status || "active")}`}>
+                                        {getDriverPostStatusLabel(post.status)}
+                                      </span>
+                                    </td>
+                                    <td className="py-4 px-4 font-bold text-slate-950">
+                                      {formatCurrency(getDriverPostPrice(post))}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    ) : filteredAndSortedOrders.length === 0 ? (
                       <EmptyOrders />
                     ) : (
                       <div className="overflow-x-auto">
@@ -1205,6 +1550,15 @@ function UserProfileContent() {
                               <th
                                 className="py-3.5 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
                                 onClick={() => {
+                                  setOrdersSortKey("createdAt");
+                                  setOrdersSortDir(d => d === "asc" ? "desc" : "asc");
+                                }}
+                              >
+                                Ngày tạo {ordersSortKey === "createdAt" && (ordersSortDir === "asc" ? "▲" : "▼")}
+                              </th>
+                              <th
+                                className="py-3.5 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                onClick={() => {
                                   setOrdersSortKey("status");
                                   setOrdersSortDir(d => d === "asc" ? "desc" : "asc");
                                 }}
@@ -1226,12 +1580,15 @@ function UserProfileContent() {
                             {filteredAndSortedOrders.map((order, index) => {
                               const price = getOrderPrice(order);
                               const status = order.status || "pending";
+                              const { pickupRadius, dropoffRadius } = getOrderRadiusInfo(order);
                               return (
                                 <tr key={getOrderKey(order, index)} className="hover:bg-slate-50/50 transition">
                                   <td className="py-4 px-4 font-mono text-primary-600">
                                     <Link
-                                      href={`/route-tracking?code=${order.orderCode || order._id}`}
+                                      href={`/tracking?code=${encodeURIComponent(order.orderCode || order._id)}`}
                                       className="hover:underline"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
                                     >
                                       {order.orderCode || order._id}
                                     </Link>
@@ -1242,7 +1599,16 @@ function UserProfileContent() {
                                   </td>
                                   <td className="py-4 px-4 space-y-1 text-[11px] max-w-[200px] truncate">
                                     <div className="truncate"><span className="text-blue-600 font-bold">Nhận:</span> {order.pickup?.address}</div>
+                                    {pickupRadius && (
+                                      <div className="text-[10px] font-bold text-blue-500">Bán kính nhận: {pickupRadius}</div>
+                                    )}
                                     <div className="truncate"><span className="text-emerald-600 font-bold">Trả:</span> {order.dropoff?.address}</div>
+                                    {dropoffRadius && (
+                                      <div className="text-[10px] font-bold text-emerald-500">Bán kính trả: {dropoffRadius}</div>
+                                    )}
+                                  </td>
+                                  <td className="py-4 px-4 whitespace-nowrap font-bold text-slate-600">
+                                    {formatDateTime(order.createdAt)}
                                   </td>
                                   <td className="py-4 px-4">
                                     <span className={`inline-block px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider rounded-full text-center ${getStatusStyles(status)}`}>
@@ -1292,6 +1658,19 @@ function UserProfileContent() {
                           />
                         </div>
                         <div>
+                          <label className="text-xs font-bold uppercase text-slate-500">Email</label>
+                          <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="name@example.com"
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-primary-500"
+                          />
+                          <p className="mt-2 text-xs font-semibold text-slate-500">
+                            Nếu email thay đổi, hệ thống sẽ gửi OTP để xác minh trước khi cập nhật.
+                          </p>
+                        </div>
+                        <div>
                           <label className="text-xs font-bold uppercase text-slate-500">Ngôn ngữ</label>
                           <select
                             value={language}
@@ -1314,7 +1693,11 @@ function UserProfileContent() {
                       <div className="grid gap-4">
                         <InfoRow icon={User} label="Họ tên" value={displayName} />
                         <InfoRow icon={Phone} label="Số điện thoại" value={profile.phone} />
-                        <InfoRow icon={Mail} label="Email" value={profile.email} />
+                        <InfoRow
+                          icon={Mail}
+                          label={(profile.emailVerified || profile.isEmailVerified) ? "Email đã xác minh" : "Email"}
+                          value={profile.email}
+                        />
                         <InfoRow icon={Globe} label="Ngôn ngữ" value={profile.language === "en" ? "English" : "Tiếng Việt"} />
                       </div>
                     )}
@@ -1448,36 +1831,92 @@ function UserProfileContent() {
               </p>
 
               <div className="mt-4 rounded-xl bg-slate-50 border border-slate-100 p-4 text-xs font-bold text-slate-650 leading-5 text-left">
-                Vui lòng tải ứng dụng di động <span className="text-primary-700 font-extrabold">TXEPRO</span> để thực hiện quét căn cước và đối chiếu gương mặt một cách tự động và an toàn.
-              </div>
-
-              {/* Download Badges or Links */}
-              <div className="mt-5 grid grid-cols-2 gap-3 w-full">
-                <a
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); alert("Ứng dụng App Store đang cập nhật!"); }}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 px-3 hover:bg-slate-50 transition font-bold text-xs text-slate-800"
-                >
-                  App Store
-                </a>
-                <a
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); alert("Ứng dụng Google Play đang cập nhật!"); }}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 px-3 hover:bg-slate-50 transition font-bold text-xs text-slate-800"
-                >
-                  Google Play
-                </a>
+                Bạn có thể xác minh giấy tờ ngay trên web bằng CCCD mặt trước, mặt sau và ảnh chân dung. Hệ thống sẽ gọi VNPT eKYC theo cùng flow với app mobile.
               </div>
 
               <div className="mt-6 flex w-full flex-col gap-2">
+                <Link
+                  href="/user/ekyc"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-primary-700"
+                >
+                  <FileCheck2 className="h-4 w-4" />
+                  Xác minh giấy tờ ngay
+                </Link>
                 <button
                   onClick={() => setShowKycWarningModal(false)}
-                  className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 hover:bg-slate-950 text-white py-3 text-sm font-bold transition shadow-sm"
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
                 >
-                  Đồng ý
+                  Để sau
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showEmailOtpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950">Xác minh email</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  Nhập mã OTP 6 số đã gửi đến <span className="font-bold text-slate-800">{pendingEmail}</span>.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEmailOtpModal(false)}
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleVerifyEmailOtp} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold uppercase text-slate-500">Mã OTP</label>
+                <input
+                  value={emailOtp}
+                  onChange={(e) => {
+                    setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+                    setEmailOtpError("");
+                  }}
+                  inputMode="numeric"
+                  autoFocus
+                  placeholder="000000"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-4 py-3 text-center font-mono text-2xl font-bold tracking-[0.35em] text-slate-950 outline-none focus:border-primary-500"
+                />
+              </div>
+
+              {emailOtpDevHint && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-700">
+                  Mã dev: {emailOtpDevHint}
+                </div>
+              )}
+              {emailOtpError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                  {emailOtpError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={emailOtpLoading}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-primary-700 disabled:opacity-60"
+              >
+                <Check className="h-4 w-4" />
+                {emailOtpLoading ? "Đang xác minh..." : "Xác minh email"}
+              </button>
+              <button
+                type="button"
+                disabled={emailOtpLoading}
+                onClick={handleResendEmailOtp}
+                className="inline-flex w-full items-center justify-center rounded-lg border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                Gửi lại mã OTP
+              </button>
+            </form>
           </div>
         </div>
       )}
@@ -1530,15 +1969,18 @@ function OrderRow({
 }) {
   const price = getOrderPrice(order);
   const status = order.status || "pending";
+  const { pickupRadius, dropoffRadius } = getOrderRadiusInfo(order);
 
   return (
     <div className="grid gap-5 p-5 transition hover:bg-slate-50 lg:grid-cols-[1fr_auto] lg:items-center">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href={`/route-tracking?code=${order.orderCode || order._id}`}
+            href={`/tracking?code=${encodeURIComponent(order.orderCode || order._id)}`}
             className="font-mono text-sm font-bold text-primary-600 hover:text-primary-800 hover:underline transition"
             title="Nhấp vào để theo dõi bản đồ live GPS"
+            target="_blank"
+            rel="noopener noreferrer"
           >
             {order.orderCode || order._id}
           </Link>
@@ -1558,6 +2000,8 @@ function OrderRow({
         <div className="mt-4 flex flex-wrap gap-3 text-xs font-bold text-slate-500">
           <span>Loại xe: {order.vehicleType || "Chưa chọn"}</span>
           <span>Ngày tạo: {formatDate(order.createdAt)}</span>
+          {pickupRadius && <span>Bán kính nhận: {pickupRadius}</span>}
+          {dropoffRadius && <span>Bán kính trả: {dropoffRadius}</span>}
         </div>
       </div>
 

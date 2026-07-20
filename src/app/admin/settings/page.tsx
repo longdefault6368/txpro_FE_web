@@ -116,7 +116,7 @@ export default function AdminSettingsPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Cài Đặt Hệ Thống</h1>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Cài Đặt Hệ Thống</h1>
         <p className="text-slate-400 text-xs mt-1">Quản lý cấu hình dịch vụ, mẫu tin nhắn SMS OTP và trạng thái tài nguyên máy chủ.</p>
       </div>
 

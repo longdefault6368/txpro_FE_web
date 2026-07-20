@@ -25,10 +25,16 @@ interface Order {
   dropoff?: { address: string };
   shipperId?: UserInfo;
   driverId?: UserInfo;
+  cancellationReason?: string | null;
+  rejectionReason?: string | null;
+  cancelledByRole?: string | null;
+  cancelledByName?: string | null;
+  cancelledAt?: string | null;
+  timeoutAt?: string | null;
   createdAt: string;
 }
 
-type SortKey = "orderCode" | "title" | "cost" | "status";
+type SortKey = "orderCode" | "title" | "cost" | "status" | "createdAt";
 type SortDirection = "asc" | "desc";
 
 const STATUS_SORT_ORDER: Record<string, number> = {
@@ -47,6 +53,70 @@ const STATUS_SORT_ORDER: Record<string, number> = {
 };
 
 const getOrderCost = (order: Order) => order.offerPrice || order.budget || 0;
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "---";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "---";
+
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const CANCEL_REASON_LABELS: Record<string, string> = {
+  accident: "Xe hư hỏng / tai nạn",
+  dispute: "Tranh chấp cước",
+  blocked: "Đoạn đường không đi được",
+  no_need: "Không còn nhu cầu vận chuyển",
+  change_driver: "Muốn chọn tài xế khác",
+  edit_order: "Thông tin đơn hàng cần chỉnh sửa",
+  wait_too_long: "Thời gian chờ tài xế quá lâu",
+  driver_rejected: "Tài xế từ chối nhận đơn",
+  driver_timeout: "Tài xế không phản hồi trong thời gian quy định",
+  changed_mind: "Người gửi thay đổi nhu cầu vận chuyển",
+  wrong_info: "Thông tin đơn hàng chưa chính xác",
+  found_other_driver: "Chủ hàng đã tìm được phương án vận chuyển khác",
+  driver_unavailable: "Tài xế không thể tiếp tục thực hiện chuyến",
+  vehicle_issue: "Phương tiện gặp sự cố",
+  price_not_agreed: "Hai bên chưa thống nhất được giá cước",
+  no_contact: "Không liên hệ được với bên còn lại",
+  cannot_contact: "Không liên hệ được với bên còn lại",
+  no_show: "Không có mặt tại điểm hẹn",
+  weather: "Thời tiết không đảm bảo an toàn",
+  emergency: "Có việc khẩn cấp",
+  other: "Lý do khác",
+  timeout: "Quá thời gian xác nhận đơn",
+};
+
+function getCancelledByDisplay(order: Order) {
+  const roleLabel =
+    order.cancelledByRole === "driver" ? "Tài xế" :
+    order.cancelledByRole === "shipper" ? "Chủ hàng" :
+    order.cancelledByRole === "system" ? "Hệ thống" :
+    "";
+
+  if (roleLabel && order.cancelledByName) return `${roleLabel} - ${order.cancelledByName}`;
+  return order.cancelledByName || roleLabel;
+}
+
+function getCancelReasonText(order: Order) {
+  const reason = order.cancellationReason || order.rejectionReason;
+  if (!reason && order.timeoutAt) return "Quá thời gian xác nhận đơn";
+  if (!reason) return "";
+
+  const normalizedReason = reason.trim().toLowerCase();
+  const translatedReason = CANCEL_REASON_LABELS[normalizedReason] || reason;
+  const note = order.cancellationReason && order.rejectionReason && order.rejectionReason !== order.cancellationReason
+    ? order.rejectionReason.trim()
+    : "";
+
+  return note ? `${translatedReason}. Ghi chú: ${note}` : translatedReason;
+}
 
 const INITIAL_MOCK_ORDERS: Order[] = [
   {
@@ -210,6 +280,8 @@ function AdminOrdersContent() {
 
       if (sortConfig.key === "cost") {
         comparison = getOrderCost(a) - getOrderCost(b);
+      } else if (sortConfig.key === "createdAt") {
+        comparison = new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
       } else if (sortConfig.key === "status") {
         const aStatus = STATUS_SORT_ORDER[a.status] ?? Number.MAX_SAFE_INTEGER;
         const bStatus = STATUS_SORT_ORDER[b.status] ?? Number.MAX_SAFE_INTEGER;
@@ -264,7 +336,7 @@ function AdminOrdersContent() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Danh Sách Vận Đơn</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Danh Sách Vận Đơn</h1>
           <p className="text-slate-400 text-xs mt-1">Giám sát trạng thái di chuyển, lộ trình vận tải và giá trị các đơn đặt xe.</p>
         </div>
       </div>
@@ -359,6 +431,9 @@ function AdminOrdersContent() {
                     {renderSortableHeader("cost", "Chi Phí")}
                   </th>
                   <th className="py-4 px-6">
+                    {renderSortableHeader("createdAt", "Ngày Tạo")}
+                  </th>
+                  <th className="py-4 px-6">
                     {renderSortableHeader("status", "Trạng Thái")}
                   </th>
                   <th className="py-4 px-6 text-right">Chi Tiết</th>
@@ -368,6 +443,8 @@ function AdminOrdersContent() {
                 {sortedOrders.map((order) => {
                   const statusInfo = STATUS_MAP[order.status] || { label: order.status, color: "text-slate-500 bg-slate-50", icon: Clock };
                   const StatusIcon = statusInfo.icon;
+                  const cancelReason = order.status === "cancelled" ? getCancelReasonText(order) : "";
+                  const cancelledBy = order.status === "cancelled" ? getCancelledByDisplay(order) : "";
                   return (
                     <tr key={order._id} className="hover:bg-slate-50/50 transition-colors">
                       {/* Code */}
@@ -403,12 +480,29 @@ function AdminOrdersContent() {
                         {(getOrderCost(order) / 1000).toLocaleString()}K ₫
                       </td>
 
+                      {/* Created At */}
+                      <td className="py-4.5 px-6 text-xs font-bold text-slate-600 whitespace-nowrap">
+                        {formatDateTime(order.createdAt)}
+                      </td>
+
                       {/* Status */}
                       <td className="py-4.5 px-6">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${statusInfo.color}`}>
-                          <StatusIcon className="w-3.5 h-3.5" />
-                          {statusInfo.label}
-                        </span>
+                        <div className="space-y-1.5">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${statusInfo.color}`}>
+                            <StatusIcon className="w-3.5 h-3.5" />
+                            {statusInfo.label}
+                          </span>
+                          {cancelReason && (
+                            <p className="max-w-48 text-[11px] font-semibold leading-5 text-red-600">
+                              Lý do: {cancelReason}
+                            </p>
+                          )}
+                          {cancelledBy && (
+                            <p className="max-w-48 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                              Bên hủy: {cancelledBy}
+                            </p>
+                          )}
+                        </div>
                       </td>
 
                       {/* Action */}
