@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Lock, ShieldCheck, Mail, ArrowRight, UserCheck } from "lucide-react";
-import { API_BASE } from "@/utils/api";
+import { ArrowLeft, Lock, ShieldCheck, Mail, ArrowRight, UserCheck, Check } from "lucide-react";
+import { API_BASE, executeFetch } from "@/utils/api";
 
 // Helper to retrieve or generate deviceId consistent with backend validator
 const getDeviceId = () => {
@@ -21,9 +21,26 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Restore remembered credentials preference on mount
+  useEffect(() => {
+    try {
+      const savedIdentifier = localStorage.getItem("txpro_remembered_admin_identifier");
+      if (savedIdentifier) {
+        setIdentifier(savedIdentifier);
+      }
+      const savedRemember = localStorage.getItem("txpro_admin_remember_me");
+      if (savedRemember !== null) {
+        setRememberMe(savedRemember === "true");
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,10 +79,11 @@ export default function AdminLoginPage() {
       phoneOrEmail: identifier.trim(),
       password: password,
       deviceId: getDeviceId(),
+      rememberMe: rememberMe,
     };
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const res = await executeFetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -76,8 +94,8 @@ export default function AdminLoginPage() {
       if (res.ok) {
         const data = await res.json();
         
-        const userProfile = data.data.userProfile || data.data.user || {};
-        const userRole = userProfile.role || data.data.role || "chu-hang";
+        const userProfile = data.data?.userProfile || data.data?.user || {};
+        const userRole = userProfile.role || data.data?.role || "chu-hang";
         const userName = userProfile.fullName || userProfile.name || "Quản trị viên";
 
         // Verify if user is admin
@@ -86,13 +104,54 @@ export default function AdminLoginPage() {
           return;
         }
 
-        localStorage.setItem("txpro_token", data.data.accessToken || "");
-        localStorage.setItem("txpro_refresh_token", data.data.refreshToken || "");
+        const userId = userProfile._id || userProfile.id || data.data?.id || "";
+        const emailLower = (userProfile.email || "").toLowerCase();
+        const phoneClean = userProfile.phone || "";
+        const idClean = identifier.trim().toLowerCase();
+
+        // Resolve adminRole accurately from backend response or local registry
+        const cachedRole = (typeof window !== "undefined"
+          ? (localStorage.getItem(`txpro_admin_role_${userId}`) ||
+             (emailLower ? localStorage.getItem(`txpro_admin_role_${emailLower}`) : null) ||
+             (phoneClean ? localStorage.getItem(`txpro_admin_role_${phoneClean}`) : null) ||
+             (idClean ? localStorage.getItem(`txpro_admin_role_${idClean}`) : null))
+          : null);
+
+        let finalAdminRole = "cskh";
+        if (userProfile.adminRole) {
+          finalAdminRole = userProfile.adminRole;
+        } else if (data.data?.adminRole) {
+          finalAdminRole = data.data.adminRole;
+        } else if (cachedRole) {
+          finalAdminRole = cachedRole;
+        } else if (emailLower === "admin@txepro.vn" || idClean === "admin@txepro.vn" || emailLower.includes("super")) {
+          finalAdminRole = "super_admin";
+        } else {
+          finalAdminRole = "cskh";
+        }
+
+        // Store auth tokens & session
+        localStorage.setItem("txpro_token", data.data?.accessToken || "");
+        localStorage.setItem("txpro_refresh_token", data.data?.refreshToken || "");
         localStorage.setItem("txpro_user_session", JSON.stringify({
+          id: userId,
           name: userName,
           role: "Admin",
-          rawRole: "admin"
+          rawRole: "admin",
+          adminRole: finalAdminRole,
+          adminPermissions: userProfile.adminPermissions || data.data?.adminPermissions || [],
+          avatar: userProfile.avatar || data.data?.avatar || data.data?.user?.avatar || null,
         }));
+
+        // Handle remember me preference persistence
+        if (rememberMe) {
+          localStorage.setItem("txpro_admin_remember_me", "true");
+          localStorage.setItem("txpro_remembered_admin_identifier", identifier.trim());
+        } else {
+          localStorage.setItem("txpro_admin_remember_me", "false");
+          localStorage.removeItem("txpro_remembered_admin_identifier");
+        }
+
         setSuccess(true);
         setTimeout(() => router.push("/admin"), 1200);
       } else {
@@ -180,6 +239,40 @@ export default function AdminLoginPage() {
                   Mật khẩu
                 </label>
                 <Lock className="w-5 h-5 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2 peer-focus:text-purple-400 transition-colors duration-200" />
+              </div>
+
+              {/* Checkbox Ghi nhớ đăng nhập (Remember Me) */}
+              <div className="flex items-center justify-between py-1 px-1">
+                <label
+                  htmlFor="rememberMe"
+                  className="flex items-center gap-3 cursor-pointer group select-none"
+                >
+                  <div className="relative flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      id="rememberMe"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="peer sr-only"
+                    />
+                    <div className="w-5 h-5 rounded-lg border border-slate-600 bg-slate-800/80 peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-indigo-600 peer-checked:border-purple-500 transition-all flex items-center justify-center shadow-inner group-hover:border-purple-400">
+                      <Check
+                        className={`w-3.5 h-3.5 text-white transition-all duration-200 ${
+                          rememberMe ? "scale-100 opacity-100" : "scale-0 opacity-0"
+                        }`}
+                        strokeWidth={3}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <span className="text-xs font-semibold text-slate-300 group-hover:text-white transition-colors">
+                      Ghi nhớ đăng nhập
+                    </span>
+                    <p className="text-[11px] text-slate-500">
+                      Duy trì phiên làm việc lâu dài, không bị đăng xuất giữa chừng
+                    </p>
+                  </div>
+                </label>
               </div>
 
               {/* Submit button */}

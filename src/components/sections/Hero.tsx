@@ -46,7 +46,7 @@ export default function Hero() {
 
           {/* Image/Mockup */}
           <div className="relative" data-aos="fade-left" data-aos-duration="1000" data-aos-delay="200">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl animate-float">
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl animate-float transform-gpu">
               <Image
                 src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80"
                 alt="Truck delivery"

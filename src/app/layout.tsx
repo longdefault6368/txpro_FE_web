@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import NextTopLoader from "nextjs-toploader";
-import FirstLoadProgressBar from "@/components/common/FirstLoadProgressBar";
 import GlobalChatWidget from "@/components/common/GlobalChatWidget";
 import ScrollToTop from "@/components/common/ScrollToTop";
 import { LanguageProvider } from "@/context/LanguageContext";
@@ -30,7 +29,6 @@ export default function RootLayout({
     <html lang="vi" className="scroll-smooth">
       <body className={`${plusJakartaSans.variable} font-sans antialiased selection:bg-primary-600 selection:text-white relative`}>
         <LanguageProvider>
-          <FirstLoadProgressBar />
           <NextTopLoader
             color="#2563eb" // primary-600 theme color
             initialPosition={0.08}

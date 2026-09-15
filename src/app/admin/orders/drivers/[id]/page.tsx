@@ -124,7 +124,7 @@ export default function AdminDriverPostDetailPage() {
     if (!existingScript) {
       const script = document.createElement("script");
       script.id = "google-maps-script";
-      script.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyDAom_mi4uBknVObU46tCt6l3RsgPEzzPE&libraries=places,geometry";
+      script.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyDDq4-qHUd9qYi5go9mI3OpoLEgpMhzgGU&libraries=places,geometry";
       script.async = true;
       script.defer = true;
       document.body.appendChild(script);

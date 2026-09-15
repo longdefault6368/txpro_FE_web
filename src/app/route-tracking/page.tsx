@@ -180,7 +180,7 @@ const MOCK_TRACKING_DETAILS: Record<string, OrderData> = {
 
 const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
 const GOOGLE_MAPS_SCRIPT_SRC =
-  "https://maps.googleapis.com/maps/api/js?key=AIzaSyDAom_mi4uBknVObU46tCt6l3RsgPEzzPE&libraries=places,geometry";
+  "https://maps.googleapis.com/maps/api/js?key=AIzaSyDDq4-qHUd9qYi5go9mI3OpoLEgpMhzgGU&libraries=places,geometry";
 const TRACKING_REFRESH_MS = 3 * 60 * 1000;
 
 

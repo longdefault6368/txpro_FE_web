@@ -21,7 +21,7 @@ type LatLng = { lat: number; lng: number };
 
 const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
 const GOOGLE_MAPS_SCRIPT_SRC =
-  "https://maps.googleapis.com/maps/api/js?key=AIzaSyDAom_mi4uBknVObU46tCt6l3RsgPEzzPE&libraries=places,geometry";
+  "https://maps.googleapis.com/maps/api/js?key=AIzaSyDDq4-qHUd9qYi5go9mI3OpoLEgpMhzgGU&libraries=places,geometry";
 
 // Real options derived from Flutter/Backend definitions. "ô tô" is placed first matching the mobile logic.
 const VEHICLE_TYPES = [

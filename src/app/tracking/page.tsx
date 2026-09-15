@@ -46,7 +46,7 @@ type LatLng = { lat: number; lng: number };
 
 const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
 const GOOGLE_MAPS_SCRIPT_SRC =
-  "https://maps.googleapis.com/maps/api/js?key=AIzaSyDAom_mi4uBknVObU46tCt6l3RsgPEzzPE&libraries=places,geometry";
+  "https://maps.googleapis.com/maps/api/js?key=AIzaSyDDq4-qHUd9qYi5go9mI3OpoLEgpMhzgGU&libraries=places,geometry";
 
 function hasValidPoint(point?: { lat?: number | null; lng?: number | null } | null): point is LatLng {
   return Boolean(point && Number.isFinite(point.lat) && Number.isFinite(point.lng));

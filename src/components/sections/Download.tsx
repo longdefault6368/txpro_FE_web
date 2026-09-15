@@ -12,7 +12,7 @@ export default function Download() {
             <Smartphone className="w-5 h-5" />
             <span className="font-semibold">Ứng Dụng Đã Có Mặt</span>
           </div>
-          <h2 className="text-3xl md:text-4xl font-extrabold mb-6 leading-relaxed">
+          <h2 className="text-3xl md:text-4xl font-bold mb-6 leading-relaxed">
             Tải Ngay Ứng Dụng TXEPRO
           </h2>
           <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
