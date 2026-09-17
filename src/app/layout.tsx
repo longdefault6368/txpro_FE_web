@@ -4,6 +4,7 @@ import NextTopLoader from "nextjs-toploader";
 import GlobalChatWidget from "@/components/common/GlobalChatWidget";
 import ScrollToTop from "@/components/common/ScrollToTop";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { CompanyInfoProvider } from "@/context/CompanyInfoContext";
 import "./globals.css";
 
 const plusJakartaSans = localFont({
@@ -29,20 +30,22 @@ export default function RootLayout({
     <html lang="vi" className="scroll-smooth">
       <body className={`${plusJakartaSans.variable} font-sans antialiased selection:bg-primary-600 selection:text-white relative`}>
         <LanguageProvider>
-          <NextTopLoader
-            color="#2563eb" // primary-600 theme color
-            initialPosition={0.08}
-            crawlSpeed={200}
-            height={3}
-            crawl={true}
-            showSpinner={false}
-            easing="ease"
-            speed={200}
-            shadow="0 0 10px #2563eb,0 0 5px #2563eb"
-          />
-          {children}
-          <ScrollToTop />
-          <GlobalChatWidget />
+          <CompanyInfoProvider>
+            <NextTopLoader
+              color="#2563eb" // primary-600 theme color
+              initialPosition={0.08}
+              crawlSpeed={200}
+              height={3}
+              crawl={true}
+              showSpinner={false}
+              easing="ease"
+              speed={200}
+              shadow="0 0 10px #2563eb,0 0 5px #2563eb"
+            />
+            {children}
+            <ScrollToTop />
+            <GlobalChatWidget />
+          </CompanyInfoProvider>
         </LanguageProvider>
       </body>
     </html>

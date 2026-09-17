@@ -26,6 +26,7 @@ import {
   Shield,
   User,
   ChevronDown,
+  Mail,
   type LucideIcon
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
@@ -52,7 +53,7 @@ export const ADMIN_ROLE_CONFIG: Record<AdminRole, {
     shortLabel: "Vận Hành",
     badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
     color: "#2563eb",
-    allowedPaths: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/analytics", "/admin/support"],
+    allowedPaths: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/analytics", "/admin/support", "/admin/contacts"],
   },
   dispatcher: {
     label: "Điều Phối Viên",
@@ -73,7 +74,7 @@ export const ADMIN_ROLE_CONFIG: Record<AdminRole, {
     shortLabel: "CSKH",
     badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-200",
     color: "#16a34a",
-    allowedPaths: ["/admin/support", "/admin/notifications"],
+    allowedPaths: ["/admin/support", "/admin/notifications", "/admin/contacts"],
   },
   accountant: {
     label: "Kế Toán & Đối Soát",
@@ -136,6 +137,13 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
     category: "support",
   },
   {
+    id: "contacts",
+    name: "Liên Hệ Website",
+    description: "Xem và xử lý danh sách khách hàng gửi yêu cầu liên hệ từ website",
+    path: "/admin/contacts",
+    category: "support",
+  },
+  {
     id: "logs",
     name: "Nhật Ký Hệ Thống",
     description: "Tra cứu log truy cập, audit trail và sự kiện máy chủ",
@@ -160,10 +168,10 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
   super_admin: ["*"],
-  operations: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/analytics", "/admin/support"],
+  operations: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/analytics", "/admin/support", "/admin/contacts"],
   dispatcher: ["/admin", "/admin/notifications", "/admin/orders", "/admin/support"],
   kyc_officer: ["/admin/notifications", "/admin/users"],
-  cskh: ["/admin/notifications", "/admin/support"],
+  cskh: ["/admin/notifications", "/admin/support", "/admin/contacts"],
   accountant: ["/admin/notifications", "/admin/orders", "/admin/analytics"],
 };
 
@@ -204,6 +212,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: "/admin/analytics", icon: BarChart3, label: "Phân Tích", roles: ["super_admin", "operations", "accountant"] },
   { href: "/admin/support", icon: Headset, label: "Hỗ trợ & Live Chat", roles: ["super_admin", "operations", "dispatcher", "cskh"] },
+  { href: "/admin/contacts", icon: Mail, label: "Liên Hệ Website", roles: ["super_admin", "operations", "cskh"] },
   { href: "/admin/logs", icon: TerminalSquare, label: "Log hệ thống", roles: ["super_admin"] },
   { href: "/admin/settings", icon: Settings, label: "Cài Đặt", roles: ["super_admin"] },
 ];

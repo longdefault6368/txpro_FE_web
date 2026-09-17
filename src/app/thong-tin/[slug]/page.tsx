@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, FileText } from "lucide-react";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
+import SubpageHeroBanner from "@/components/common/SubpageHeroBanner";
+import SubpageCtaBanner from "@/components/common/SubpageCtaBanner";
 import { useLanguage } from "@/context/LanguageContext";
 import type { Language } from "@/utils/translations";
 
@@ -685,22 +687,24 @@ export default function InfoPage() {
   const page = content[slug]?.[language] || content[slug]?.vi || content[fallbackSlug][language] || content[fallbackSlug].vi;
 
   return (
-    <>
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-primary-100 selection:text-primary-900">
       <Header />
-      <main className="min-h-screen bg-slate-50 pt-28 pb-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">
-            <ArrowLeft className="w-4 h-4" /> TXEPRO
-          </Link>
+      <main className="flex-1">
+        {/* SHARED SUBPAGE HERO BANNER */}
+        <SubpageHeroBanner
+          title={page.title}
+          subtitle={page.intro}
+        />
 
-          <section className="mt-8 bg-white border border-slate-200 rounded-lg p-6 md:p-10 shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-10 pb-16">
+          <section className="bg-white border border-slate-200/80 rounded-3xl p-6 md:p-10 shadow-xl">
             <div className="flex items-start gap-4 border-b border-slate-100 pb-6">
-              <div className="w-12 h-12 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
                 <FileText className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-slate-950 tracking-tight">{page.title}</h1>
-                <p className="mt-3 text-slate-600 leading-7 font-medium">{page.intro}</p>
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-950 tracking-tight">{page.title}</h1>
+                <p className="mt-2 text-slate-600 leading-relaxed font-normal">{page.intro}</p>
               </div>
             </div>
 
@@ -710,7 +714,7 @@ export default function InfoPage() {
                   <h2 className="text-lg font-bold text-slate-950">{section.heading}</h2>
                   <ul className="mt-4 space-y-3">
                     {section.items.map((item) => (
-                      <li key={item} className="flex gap-3 text-sm leading-7 text-slate-600 font-medium">
+                      <li key={item} className="flex gap-3 text-sm leading-7 text-slate-600 font-normal">
                         <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
                         <span>{item}</span>
                       </li>
@@ -721,8 +725,11 @@ export default function InfoPage() {
             </div>
           </section>
         </div>
+
+        {/* SHARED SUBPAGE CTA BANNER */}
+        <SubpageCtaBanner />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }

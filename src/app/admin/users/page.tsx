@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { getServerMediaUrl, normalizePersistedImagePath } from "@/utils/media";
+import { getVehicleCapabilities } from "@/utils/vehicleCapabilities";
 import { 
   Search, UserPlus, Filter, Trash2, Edit3, ShieldAlert, Check, 
   X, Lock, ToggleLeft, ToggleRight, RotateCcw, AlertTriangle, ChevronLeft, ChevronRight,
@@ -21,6 +22,7 @@ interface VehicleItem {
   ownerName?: string | null;
   brand: string;
   model?: string | null;
+  cargoTypes?: string[];
   capacity?: number | null;
   dimensions?: {
     length?: number | null;
@@ -771,10 +773,6 @@ function AdminUsersContent() {
   // Open modal to edit existing vehicle
   const handleOpenEditVehicle = (veh: VehicleItem) => {
     setEditingVehicle(veh);
-    const parsedCargo = veh.model
-      ? veh.model.split(",").map((s) => s.trim()).filter(Boolean)
-      : [];
-    setSelectedCargoTypes(parsedCargo);
 
     // Resolve parent & child from veh
     let resolvedParent = veh.vehicleTypeParent || "";
@@ -788,6 +786,8 @@ function AdminUsersContent() {
         resolvedParent = "Ô tô";
       } else if (rawType.includes("container") || rawType.includes("kéo")) {
         resolvedParent = "Container / xe đầu kéo";
+      } else if (rawType.includes("cẩu") || rawType.includes("cau")) {
+        resolvedParent = "Xe cẩu tự hành";
       } else if (rawType.includes("công trình") || rawType.includes("cong-trinh")) {
         resolvedParent = "Các xe công trình";
       } else if (rawType.includes("van") || rawType.includes("bán tải")) {
@@ -808,7 +808,23 @@ function AdminUsersContent() {
       }
     }
 
-    const isPassenger = resolvedParent.trim().toLowerCase() === "ô tô";
+    const capabilities = getVehicleCapabilities({
+      vehicleTypeParent: resolvedParent,
+      vehicleTypeChild: resolvedChild,
+      type: veh.type || resolvedChild || resolvedParent,
+    });
+
+    const parsedCargo = Array.isArray(veh.cargoTypes) && veh.cargoTypes.length > 0
+      ? veh.cargoTypes
+      : veh.model
+      ? veh.model.split(/[,;]/).map((s) => s.trim()).filter(Boolean)
+      : [];
+
+    const activeCargo = capabilities.hasCargoTypes
+      ? (parsedCargo.length > 0 ? parsedCargo : ["Hàng thực phẩm / nông sản"])
+      : [];
+    setSelectedCargoTypes(activeCargo);
+
     const parsedImages = parseVehicleImageGroups(veh.licenseImages || []);
 
     setVehicleForm({
@@ -816,15 +832,15 @@ function AdminUsersContent() {
       type: veh.type || resolvedChild || resolvedParent,
       vehicleTypeParent: resolvedParent,
       vehicleTypeChild: resolvedChild,
-      seats: veh.seats ? String(veh.seats) : (isPassenger ? "4" : ""),
+      seats: capabilities.hasSeats ? (veh.seats ? String(veh.seats) : "4") : "",
       ownerName: veh.ownerName || "",
       brand: veh.brand || "Hyundai",
-      model: veh.model || "",
-      capacity: veh.capacity !== null && veh.capacity !== undefined ? String(veh.capacity) : (isPassenger ? "" : "5"),
+      model: capabilities.hasCargoTypes ? (activeCargo.join(", ") || veh.model || "") : (veh.model || ""),
+      capacity: capabilities.hasCapacity ? (veh.capacity !== null && veh.capacity !== undefined ? String(veh.capacity) : "5") : "",
       capacityUnit: "tan",
-      length: veh.dimensions?.length ? String(veh.dimensions.length) : "",
-      width: veh.dimensions?.width ? String(veh.dimensions.width) : "",
-      height: veh.dimensions?.height ? String(veh.dimensions.height) : "",
+      length: capabilities.hasCapacity && veh.dimensions?.length ? String(veh.dimensions.length) : (capabilities.hasCapacity ? "5.2" : ""),
+      width: capabilities.hasCapacity && veh.dimensions?.width ? String(veh.dimensions.width) : (capabilities.hasCapacity ? "2.1" : ""),
+      height: capabilities.hasCapacity && veh.dimensions?.height ? String(veh.dimensions.height) : (capabilities.hasCapacity ? "2.2" : ""),
       operatingProvinceName: veh.operatingProvinceName || "Hà Nội",
       status: veh.status || "active",
       licenseImages: Array.isArray(veh.licenseImages) ? [...veh.licenseImages] : [],
@@ -842,23 +858,37 @@ function AdminUsersContent() {
 
   // Vehicle catalog & cargo helpers (aligned with mobile Flutter)
   const handleParentTypeChange = (newParent: string) => {
-    const isPassenger = newParent.trim().toLowerCase() === "ô tô";
     const found = vehicleCatalogTree.find((v) => v.name.toLowerCase() === newParent.toLowerCase());
     let defaultChild = "";
     let defaultSeats = "";
     if (found && found.children && found.children.length > 0) {
       defaultChild = found.children[0].name;
-      if (isPassenger) {
-        defaultSeats = String(found.children[0].seats || 4);
+      if (found.children[0].seats) {
+        defaultSeats = String(found.children[0].seats);
       }
     }
+    const capabilities = getVehicleCapabilities({
+      vehicleTypeParent: newParent,
+      vehicleTypeChild: defaultChild,
+      type: defaultChild || newParent,
+    });
+
+    const updatedCargo = capabilities.hasCargoTypes
+      ? (selectedCargoTypes.length > 0 ? selectedCargoTypes : ["Hàng thực phẩm / nông sản"])
+      : [];
+    setSelectedCargoTypes(updatedCargo);
+
     setVehicleForm((prev) => ({
       ...prev,
       type: defaultChild || newParent,
       vehicleTypeParent: newParent,
       vehicleTypeChild: defaultChild,
-      seats: isPassenger ? (defaultSeats || prev.seats || "4") : "",
-      capacity: isPassenger ? "" : (prev.capacity || "5"),
+      seats: capabilities.hasSeats ? (defaultSeats || prev.seats || "4") : "",
+      capacity: capabilities.hasCapacity ? (prev.capacity || "5") : "",
+      length: capabilities.hasCapacity ? (prev.length || "5.2") : "",
+      width: capabilities.hasCapacity ? (prev.width || "2.1") : "",
+      height: capabilities.hasCapacity ? (prev.height || "2.2") : "",
+      model: capabilities.hasCargoTypes ? updatedCargo.join(", ") : "",
     }));
   };
 
@@ -868,11 +898,18 @@ function AdminUsersContent() {
     );
     const foundChild = currentParent?.children?.find((c) => c.name === newChild);
     const seatsVal = foundChild?.seats ? String(foundChild.seats) : vehicleForm.seats;
+    const capabilities = getVehicleCapabilities({
+      vehicleTypeParent: vehicleForm.vehicleTypeParent,
+      vehicleTypeChild: newChild,
+      type: newChild || vehicleForm.vehicleTypeParent,
+    });
+
     setVehicleForm((prev) => ({
       ...prev,
       type: newChild || prev.vehicleTypeParent,
       vehicleTypeChild: newChild,
-      seats: seatsVal,
+      seats: capabilities.hasSeats ? (seatsVal || "4") : "",
+      capacity: capabilities.hasCapacity ? prev.capacity : "",
     }));
   };
 
@@ -907,15 +944,15 @@ function AdminUsersContent() {
     }
 
     setSavingVehicle(true);
-    const isPassenger = (vehicleForm.vehicleTypeParent || vehicleForm.type || "").trim().toLowerCase() === "ô tô";
-    const capacityVal = !isPassenger && vehicleForm.capacity ? Number(vehicleForm.capacity) : null;
+    const capabilities = getVehicleCapabilities(vehicleForm);
+    const capacityVal = capabilities.hasCapacity && vehicleForm.capacity ? Number(vehicleForm.capacity) : null;
     const finalCapacity = capacityVal !== null && vehicleForm.capacityUnit === "kg" 
       ? capacityVal / 1000 
       : capacityVal;
 
-    const cargoString = selectedCargoTypes.length > 0 
+    const cargoString = capabilities.hasCargoTypes && selectedCargoTypes.length > 0 
       ? selectedCargoTypes.join(", ") 
-      : vehicleForm.model.trim() || null;
+      : capabilities.hasCargoTypes ? vehicleForm.model.trim() || null : null;
 
     const allLicenseImages = [
       ...vehicleForm.frontImages,
@@ -932,12 +969,13 @@ function AdminUsersContent() {
       type: vehicleForm.vehicleTypeChild || vehicleForm.vehicleTypeParent || vehicleForm.type,
       vehicleTypeParent: vehicleForm.vehicleTypeParent || null,
       vehicleTypeChild: vehicleForm.vehicleTypeChild || null,
-      seats: isPassenger ? (vehicleForm.seats ? Number(vehicleForm.seats) : null) : null,
+      seats: capabilities.hasSeats ? (vehicleForm.seats ? Number(vehicleForm.seats) : null) : null,
       ownerName: vehicleForm.ownerName.trim() || null,
       brand: vehicleForm.brand.trim() || "Khác",
       model: cargoString,
+      cargoTypes: capabilities.hasCargoTypes ? selectedCargoTypes : [],
       capacity: finalCapacity,
-      dimensions: !isPassenger ? {
+      dimensions: capabilities.hasCapacity ? {
         length: vehicleForm.length ? Number(vehicleForm.length) : null,
         width: vehicleForm.width ? Number(vehicleForm.width) : null,
         height: vehicleForm.height ? Number(vehicleForm.height) : null,
@@ -2698,12 +2736,15 @@ function AdminUsersContent() {
                                     {veh.vehicleTypeChild || veh.type || "Xe tải"}
                                   </span>
                                 </div>
+                                {getVehicleCapabilities(veh).hasCapacity && (
                                 <div className="bg-slate-50/80 rounded-xl p-2 border border-slate-100">
                                   <span className="text-slate-400 text-[11px] block">Tải trọng thiết kế:</span>
                                   <span className="font-bold text-primary-600 block">
                                     {veh.capacity ? `${veh.capacity} Tấn` : "Chưa cập nhật"}
                                   </span>
                                 </div>
+                                )}
+                                {getVehicleCapabilities(veh).hasCapacity && (
                                 <div className="bg-slate-50/80 rounded-xl p-2 border border-slate-100">
                                   <span className="text-slate-400 text-[11px] block">Kích thước (DxRxC):</span>
                                   <span className="font-bold text-slate-700 block">
@@ -2712,6 +2753,7 @@ function AdminUsersContent() {
                                       : "Chưa cập nhật"}
                                   </span>
                                 </div>
+                                )}
                                 {veh.ownerName && (
                                   <div className="bg-slate-50/80 rounded-xl p-2 border border-slate-100">
                                     <span className="text-slate-400 text-[11px] block">Chủ sở hữu:</span>
@@ -2728,7 +2770,7 @@ function AdminUsersContent() {
                                     </span>
                                   </div>
                                 )}
-                                {veh.seats ? (
+                                {getVehicleCapabilities(veh).hasSeats && veh.seats ? (
                                   <div className="bg-slate-50/80 rounded-xl p-2 border border-slate-100">
                                     <span className="text-slate-400 text-[11px] block">Số ghế:</span>
                                     <span className="font-semibold text-slate-700 block">
@@ -2736,7 +2778,7 @@ function AdminUsersContent() {
                                     </span>
                                   </div>
                                 ) : null}
-                                {veh.model && (
+                                {getVehicleCapabilities(veh).hasCargoTypes && veh.model && (
                                   <div className="bg-slate-50/80 rounded-xl p-2 border border-slate-100 sm:col-span-2">
                                     <span className="text-slate-400 text-[11px] block">Loại hàng vận chuyển:</span>
                                     <span className="font-semibold text-slate-700 truncate block">
@@ -3108,7 +3150,7 @@ function AdminUsersContent() {
 
               {/* SECTION 2: Chủng loại & Nhãn hiệu xe (Phân cấp Cấp Cha - Cấp Con chuẩn Mobile Flutter) */}
               {(() => {
-                const isPassenger = (vehicleForm.vehicleTypeParent || vehicleForm.type || "").trim().toLowerCase() === "ô tô";
+                const capabilities = getVehicleCapabilities(vehicleForm);
                 const currentParent = vehicleCatalogTree.find(
                   (v) => v.name.toLowerCase() === (vehicleForm.vehicleTypeParent || vehicleForm.type || "").toLowerCase()
                 );
@@ -3149,7 +3191,7 @@ function AdminUsersContent() {
                       {/* Cấp Con: Phân loại chi tiết / Thùng xe / Số chỗ */}
                       <div>
                         <label className="text-xs font-bold text-slate-600 pl-1 block mb-1">
-                          {isPassenger ? "Số chỗ ngồi (Cấp con)" : "Phân loại chi tiết (Cấp con)"}
+                          {capabilities.hasSeats ? "Số chỗ ngồi (Cấp con)" : "Phân loại chi tiết (Cấp con)"}
                         </label>
                         {hasChildren ? (
                           <select
@@ -3236,7 +3278,8 @@ function AdminUsersContent() {
                 );
               })()}
 
-              {/* SECTION 3: Loại Hàng Hóa Có Thể Vận Chuyển (Select Multiple Gọn Gàng) */}
+              {/* SECTION: Loại Hàng Hóa Có Thể Vận Chuyển (chỉ áp dụng xe tải, container/đầu kéo, xe cẩu) */}
+              {getVehicleCapabilities(vehicleForm).hasCargoTypes && (
               <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -3370,16 +3413,18 @@ function AdminUsersContent() {
                   )}
                 </div>
               </div>
+              )}
 
-              {/* SECTION 4: Tải Trọng & Kích Thước Thùng (Hoặc Số Chỗ nếu là Ô tô) */}
+              {/* SECTION: Tải Trọng & Kích Thước Thùng (xe tải, container, xe cẩu) Hoặc Số Chỗ (chỉ Ô tô) */}
               {(() => {
-                const isPassenger = (vehicleForm.vehicleTypeParent || vehicleForm.type || "").trim().toLowerCase() === "ô tô";
+                const capabilities = getVehicleCapabilities(vehicleForm);
+                const stepNum = capabilities.hasCargoTypes ? 4 : 3;
 
-                if (isPassenger) {
+                if (capabilities.hasSeats) {
                   return (
                     <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-3.5">
                       <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                        4. Số Chỗ Ngồi & Tiện Ích Xe Khách / Ô Tô Du Lịch
+                        {stepNum}. Số Chỗ Ngồi Cho Phép Chở Khách (Ô Tô)
                       </h4>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-center">
@@ -3403,7 +3448,7 @@ function AdminUsersContent() {
                         <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3 text-xs text-blue-800">
                           <p className="font-bold">Phương tiện chở khách</p>
                           <p className="text-[11px] text-blue-700 mt-0.5">
-                            Xe du lịch & ô tô chở khách quản lý dựa trên số chỗ ngồi. Tải trọng hàng hóa được bỏ qua tự động như trên ứng dụng mobile.
+                            Xe du lịch & ô tô chở khách quản lý dựa trên số chỗ ngồi. Không áp dụng tải trọng hay danh mục hàng hóa.
                           </p>
                         </div>
                       </div>
@@ -3411,11 +3456,13 @@ function AdminUsersContent() {
                   );
                 }
 
+                if (!capabilities.hasCapacity) return null;
+
                 return (
                   <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-3.5">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                        4. Tải Trọng & Kích Thước Thùng Hàng
+                        {stepNum}. Tải Trọng & Kích Thước Thùng Hàng
                       </h4>
                       {/* Auto-calculated volume badge */}
                       {vehicleForm.length && vehicleForm.width && vehicleForm.height ? (
@@ -3494,25 +3541,30 @@ function AdminUsersContent() {
                 );
               })()}
 
-              {/* SECTION 5: Hình ảnh xe & Giấy tờ đăng ký */}
-              <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      5. Hình Ảnh Xe & Giấy Tờ Cà Vẹt / Đăng Kiểm
-                    </h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      4 danh mục hình ảnh đồng bộ như ứng dụng di động TXEPRO
-                    </p>
-                  </div>
-                  <span className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full shadow-2xs">
-                    {vehicleForm.frontImages.length +
-                      vehicleForm.sideImages.length +
-                      vehicleForm.registrationFrontImages.length +
-                      vehicleForm.registrationBackImages.length}{" "}
-                    ảnh
-                  </span>
-                </div>
+              {/* SECTION: Hình ảnh xe & Giấy tờ đăng ký */}
+              {(() => {
+                const capabilities = getVehicleCapabilities(vehicleForm);
+                const imageStepNum = 2 + (capabilities.hasCargoTypes ? 1 : 0) + (capabilities.hasSeats || capabilities.hasCapacity ? 1 : 0) + 1;
+
+                return (
+                  <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          {imageStepNum}. Hình Ảnh Xe & Giấy Tờ Cà Vẹt / Đăng Kiểm
+                        </h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          4 danh mục hình ảnh đồng bộ như ứng dụng di động TXEPRO
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full shadow-2xs">
+                        {vehicleForm.frontImages.length +
+                          vehicleForm.sideImages.length +
+                          vehicleForm.registrationFrontImages.length +
+                          vehicleForm.registrationBackImages.length}{" "}
+                        ảnh
+                      </span>
+                    </div>
 
                 {/* 4 Category Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -3679,6 +3731,8 @@ function AdminUsersContent() {
                   })}
                 </div>
               </div>
+            );
+          })()}
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-3 border-t border-slate-100">

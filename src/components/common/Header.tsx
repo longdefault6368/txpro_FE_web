@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Menu, X, LogOut, User, Globe } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { useCompanyInfo } from "@/context/CompanyInfoContext";
 
 interface UserSession {
   name: string;
@@ -16,6 +17,7 @@ interface UserSession {
 export default function Header() {
   const router = useRouter();
   const { t, language, changeLanguage } = useLanguage();
+  const { companyInfo } = useCompanyInfo();
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
@@ -94,13 +96,14 @@ export default function Header() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
           <div className="flex justify-between items-center h-full">
-            <Link href="/" className="flex-shrink-0 flex items-center gap-3">
+            <Link href="/" className="flex-shrink-0 flex items-center group" title="TXEPRO">
               <Image
                 src="/logo.png"
                 alt="TXEPRO Logo"
-                width={40}
-                height={40}
-                className="rounded-full object-cover shadow-md hover:rotate-[360deg] hover:scale-110 transition-all duration-700"
+                width={44}
+                height={44}
+                className="rounded-full object-cover shadow-md group-hover:scale-105 transition-transform"
+                priority
               />
             </Link>
             
