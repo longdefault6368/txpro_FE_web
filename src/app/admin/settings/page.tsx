@@ -32,7 +32,11 @@ import {
   Percent,
   CreditCard,
   Sliders,
-  ExternalLink
+  ExternalLink,
+  ArrowRight,
+  X,
+  KeyRound,
+  Inbox
 } from "lucide-react";
 import { DEFAULT_COMPANY_INFO, CompanyInfo } from "@/utils/companyInfo";
 
@@ -50,12 +54,16 @@ interface SmsDeliveryMode {
 
 interface SmsMockItem {
   id: string;
-  phone: string;
-  code: string;
-  purpose: string;
-  content: string;
+  phone?: string;
+  maskedPhone?: string;
+  code?: string;
+  otpCode?: string;
+  purpose?: string;
+  content?: string;
   createdAt: string;
   expiresAt?: string;
+  otpExpiresAt?: string;
+  [key: string]: any;
 }
 
 const PURPOSE_MAP: Record<string, string> = {
@@ -72,9 +80,30 @@ const formatPurpose = (purpose?: string) => {
   return PURPOSE_MAP[purpose] || purpose.replace(/_/g, " ");
 };
 
+const getOtpPhone = (msg: SmsMockItem) => {
+  return msg.phone || msg.maskedPhone || "Không có SĐT";
+};
+
+const getOtpCode = (msg: SmsMockItem) => {
+  return msg.otpCode || msg.code || "";
+};
+
+const getOtpExpiry = (msg: SmsMockItem) => {
+  return msg.otpExpiresAt || msg.expiresAt;
+};
+
 const isOtpExpired = (expiresAt?: string) => {
   if (!expiresAt) return false;
   return new Date(expiresAt).getTime() <= Date.now();
+};
+
+const getOtpContent = (msg: SmsMockItem) => {
+  if (msg.content) return msg.content;
+  const phone = getOtpPhone(msg);
+  const code = getOtpCode(msg);
+  const purpose = formatPurpose(msg.purpose);
+  const timeStr = msg.createdAt ? new Date(msg.createdAt).toLocaleString("vi-VN") : "";
+  return `[TXEPRO] Số nhận: ${phone} | Mục đích: ${purpose} | Mã OTP: ${code} | Tạo lúc: ${timeStr}`;
 };
 
 export default function AdminSettingsPage() {
@@ -84,6 +113,7 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedContentId, setCopiedContentId] = useState<string | null>(null);
 
   // 1. Company Info State
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(DEFAULT_COMPANY_INFO);
@@ -187,40 +217,109 @@ export default function AdminSettingsPage() {
     }
   };
 
-  // Fetch Mock Inbox Messages
-  const fetchMockInbox = async (phoneQuery = "") => {
+  // Fetch Mock Inbox Messages (GET all or search)
+  const fetchMockInbox = async (phoneQuery?: string, isManualAction = false) => {
     setMockInboxLoading(true);
     try {
       if (isOffline) {
         setMockInboxLoading(false);
         return;
       }
-      const queryParam = phoneQuery ? `?phone=${encodeURIComponent(phoneQuery)}` : "";
-      const res = await fetchWithAuth(`${API_BASE}/admin/settings/sms-mock-inbox${queryParam}`);
+      const targetPhone = (phoneQuery !== undefined ? phoneQuery : phoneSearch).trim();
+      let res: Response;
+
+      if (targetPhone) {
+        res = await fetchWithAuth(`${API_BASE}/admin/settings/sms-mock-inbox/search`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: targetPhone, limit: 50 }),
+        });
+        if (!res.ok) {
+          // If search endpoint rejected or 400, fallback to listing all
+          res = await fetchWithAuth(`${API_BASE}/admin/settings/sms-mock-inbox?limit=50`);
+        }
+      } else {
+        res = await fetchWithAuth(`${API_BASE}/admin/settings/sms-mock-inbox?limit=50`);
+      }
+
+      let retrievedList: SmsMockItem[] = [];
       if (res.ok) {
         const data = await res.json();
-        setMockMessages(data.data.messages || []);
+        const list = data?.data?.messages || data?.messages || (Array.isArray(data?.data) ? data?.data : []);
+        retrievedList = Array.isArray(list) ? list : [];
+        setMockMessages(retrievedList);
+      } else {
+        const fallbackRes = await fetchWithAuth(`${API_BASE}/admin/settings/sms-mock-inbox?limit=50`);
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          const list = fallbackData?.data?.messages || fallbackData?.messages || (Array.isArray(fallbackData?.data) ? fallbackData?.data : []);
+          retrievedList = Array.isArray(list) ? list : [];
+          setMockMessages(retrievedList);
+        }
+      }
+
+      if (isManualAction) {
+        if (retrievedList.length > 0) {
+          showSuccess(`Đã lấy thành công ${retrievedList.length} log OTP từ hệ thống!`);
+        } else {
+          showError("Hiện chưa có bản ghi log OTP nào trên hệ thống.");
+        }
       }
     } catch (err) {
       console.warn("Failed to fetch mock inbox", err);
+      if (isManualAction) {
+        showError("Lỗi kết nối tới máy chủ khi lấy log OTP.");
+      }
     } finally {
       setMockInboxLoading(false);
     }
   };
 
-  const handleSearchInbox = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchMockInbox(phoneSearch);
+  const handleGetOtp = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    fetchMockInbox(phoneSearch, true);
   };
 
+  // Directly display all messages from server without hiding or filtering out
+  const displayedMockMessages = mockMessages;
+
+  // Sync activeTab with URL and sessionStorage
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get("tab") as SettingsTab | null;
+      if (tabParam && ["company", "sms", "operations"].includes(tabParam)) {
+        setActiveTab(tabParam);
+      } else {
+        const savedTab = sessionStorage.getItem("admin_settings_tab") as SettingsTab | null;
+        if (savedTab && ["company", "sms", "operations"].includes(savedTab)) {
+          setActiveTab(savedTab);
+        }
+      }
+    }
+
     const loadAll = async () => {
       setLoading(true);
-      await Promise.all([fetchCompanySettings(), fetchOtpTemplate(), fetchDeliveryMode()]);
+      await Promise.all([
+        fetchCompanySettings(),
+        fetchOtpTemplate(),
+        fetchDeliveryMode(),
+        fetchMockInbox()
+      ]);
       setLoading(false);
     };
     loadAll();
   }, []);
+
+  const handleTabChange = (tab: SettingsTab) => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("admin_settings_tab", tab);
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tab);
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
 
   useEffect(() => {
     if (activeTab === "sms" && (deliveryMode?.effectiveMockEnabled || isOffline)) {
@@ -367,25 +466,12 @@ export default function AdminSettingsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Send Test OTP Generator
-  const handleSendTestOtp = async () => {
-    setMockInboxLoading(true);
-    try {
-      const testPhone = "0901234567";
-      const res = await fetch(`${API_BASE}/auth/register-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: testPhone, role: "chu-hang" }),
-      });
-      if (res.ok || res.status === 400 || res.status === 409) {
-        await fetchMockInbox();
-        showSuccess("Đã kích hoạt tạo tin nhắn OTP thử nghiệm!");
-      }
-    } catch (err) {
-      console.warn("Test OTP trigger error", err);
-    } finally {
-      setMockInboxLoading(false);
-    }
+  // Copy Full Log Content Handler
+  const handleCopyContent = (content: string, id: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedContentId(id);
+    showSuccess("Đã sao chép toàn bộ nội dung log tin nhắn!");
+    setTimeout(() => setCopiedContentId(null), 2000);
   };
 
   // Save Operation Settings
@@ -426,29 +512,46 @@ export default function AdminSettingsPage() {
           </p>
         </div>
 
-        {/* Live / Mock Mode Status Badge */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <span className="text-xs font-semibold text-slate-500">Trạng thái phát SMS:</span>
-          {isMockEffective ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-sm">
-              <Radio className="w-3.5 h-3.5 text-amber-600 animate-pulse" /> MOCK (Thử nghiệm)
-            </span>
-          ) : deliveryMode?.providerConfigured ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
-              <Send className="w-3.5 h-3.5 text-emerald-600" /> LIVE (Thực tế)
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-300 shadow-sm">
-              <ShieldAlert className="w-3.5 h-3.5 text-red-600" /> Chưa cấu hình Provider
-            </span>
+        {/* Live / Mock Mode Status Badge & Quick OTP Link */}
+        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+          {isMockEffective && (
+            <button
+              onClick={() => handleTabChange("sms")}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                activeTab === "sms"
+                  ? "bg-amber-600 text-white ring-2 ring-amber-400/50 shadow-md"
+                  : "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300"
+              }`}
+              title="Nhấn để mở Hộp thư OTP"
+            >
+              <Radio className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+              <span>Hộp Thư OTP {mockMessages.length > 0 ? `(${mockMessages.length})` : ""}</span>
+            </button>
           )}
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500">Trạng thái SMS:</span>
+            {isMockEffective ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-sm">
+                <Radio className="w-3.5 h-3.5 text-amber-600 animate-pulse" /> MOCK (Thử nghiệm)
+              </span>
+            ) : deliveryMode?.providerConfigured ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
+                <Send className="w-3.5 h-3.5 text-emerald-600" /> LIVE (Thực tế)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-300 shadow-sm">
+                <ShieldAlert className="w-3.5 h-3.5 text-red-600" /> Chưa cấu hình Provider
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* TAB NAVIGATION BAR */}
       <div className="bg-white rounded-2xl p-1.5 border border-slate-200/80 shadow-sm flex flex-wrap gap-1.5">
         <button
-          onClick={() => setActiveTab("company")}
+          onClick={() => handleTabChange("company")}
           className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeTab === "company"
               ? "bg-primary-600 text-white shadow-md shadow-primary-600/25"
@@ -456,11 +559,11 @@ export default function AdminSettingsPage() {
           }`}
         >
           <Building2 className="w-4 h-4" />
-          <span>Thông Tin Doanh Nghiệp & Liên Hệ</span>
+          <span>1. Thông Tin Doanh Nghiệp & Liên Hệ</span>
         </button>
 
         <button
-          onClick={() => setActiveTab("sms")}
+          onClick={() => handleTabChange("sms")}
           className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeTab === "sms"
               ? "bg-primary-600 text-white shadow-md shadow-primary-600/25"
@@ -468,11 +571,20 @@ export default function AdminSettingsPage() {
           }`}
         >
           <Smartphone className="w-4 h-4" />
-          <span>Cổng SMS & Hộp Thư OTP</span>
+          <span>2. Cổng SMS & Hộp Thư OTP</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              activeTab === "sms"
+                ? "bg-white/20 text-white"
+                : "bg-amber-100 text-amber-900 border border-amber-300 animate-pulse"
+            }`}
+          >
+            Lấy mã OTP {mockMessages.length > 0 ? `(${mockMessages.length})` : ""}
+          </span>
         </button>
 
         <button
-          onClick={() => setActiveTab("operations")}
+          onClick={() => handleTabChange("operations")}
           className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeTab === "operations"
               ? "bg-primary-600 text-white shadow-md shadow-primary-600/25"
@@ -480,7 +592,7 @@ export default function AdminSettingsPage() {
           }`}
         >
           <Sliders className="w-4 h-4" />
-          <span>Tham Số Vận Hành & Sàn</span>
+          <span>3. Tham Số Vận Hành & Sàn</span>
         </button>
       </div>
 
@@ -489,6 +601,33 @@ export default function AdminSettingsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Main Edit Form (8 cols) */}
           <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm">
+            {/* Guidance Banner pointing to OTP Inbox */}
+            {isMockEffective && (
+              <div className="mb-6 p-4 rounded-2xl bg-amber-50/90 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                    <Radio className="w-5 h-5 text-amber-600 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-900">
+                      Bạn đang tìm mã OTP để kiểm thử tài khoản?
+                    </h4>
+                    <p className="text-[11px] text-amber-700 mt-0.5">
+                      Hộp thư OTP hiện nằm ở <strong>Tab 2: Cổng SMS & Hộp Thư OTP</strong> (có {mockMessages.length} tin nhắn).
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleTabChange("sms")}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition-all cursor-pointer shrink-0"
+                >
+                  <span>Mở Hộp Thư OTP ngay</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             <div className="border-b border-slate-100 pb-4 mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -828,10 +967,246 @@ export default function AdminSettingsPage() {
 
       {/* TAB 2: SMS & OTP SETTINGS */}
       {activeTab === "sms" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Left Column (2 Cols) */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* SECTION 1: SMS Delivery Mode Card */}
+        <div className="space-y-6">
+          {/* MAIN SECTION: DANH SÁCH LOG OTP & LẤY OTP */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <KeyRound className="w-5 h-5 text-primary-600" />
+                  Danh Sách Log OTP Hệ Thống
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Nhập số điện thoại (hoặc để trống) rồi bấm <strong>Lấy OTP</strong> để hiển thị toàn bộ log tin nhắn và mã xác thực.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchMockInbox(phoneSearch, true)}
+                  disabled={mockInboxLoading}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                  title="Làm mới log OTP"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${mockInboxLoading ? "animate-spin text-primary-600" : ""}`} />
+                  <span>Làm mới</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearInbox}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs transition-colors cursor-pointer"
+                  title="Xóa toàn bộ log"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Xóa sạch log</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Action Bar / Form Lấy OTP */}
+            <form onSubmit={handleGetOtp} className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+              <label className="block text-xs font-bold text-slate-700">
+                Số điện thoại tra cứu:
+              </label>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={phoneSearch}
+                    onChange={(e) => setPhoneSearch(e.target.value)}
+                    placeholder="Nhập SĐT tra cứu (hoặc để trống để lấy tất cả log gần nhất)..."
+                    className="w-full pl-10 pr-9 py-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium text-slate-800"
+                  />
+                  {phoneSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPhoneSearch("");
+                        fetchMockInbox("", false);
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-md"
+                      title="Xóa nhập liệu"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={mockInboxLoading}
+                  className="inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-primary-600/25 transition-all disabled:opacity-50 cursor-pointer shrink-0"
+                >
+                  <KeyRound className={`w-4 h-4 ${mockInboxLoading ? "animate-spin" : ""}`} />
+                  <span>{mockInboxLoading ? "Đang lấy OTP..." : "Lấy OTP"}</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Counter Bar */}
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+              <span className="flex items-center gap-2">
+                <Inbox className="w-4 h-4 text-primary-600" />
+                Danh sách log OTP ({displayedMockMessages.length} kết quả)
+              </span>
+              {mockInboxLoading && (
+                <span className="text-primary-600 font-medium animate-pulse text-[11px]">
+                  Đang đồng bộ dữ liệu từ máy chủ...
+                </span>
+              )}
+            </div>
+
+            {/* Message List */}
+            <div className="space-y-4">
+              {displayedMockMessages.length === 0 ? (
+                <div className="text-center py-16 bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 p-6 space-y-3">
+                  <Inbox className="w-10 h-10 text-slate-300 mx-auto" />
+                  <p className="font-bold text-sm text-slate-700">Chưa có bản ghi log OTP nào</p>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Vui lòng bấm nút <strong>&ldquo;Lấy OTP&rdquo;</strong> ở trên để cập nhật nhật ký mã xác thực từ hệ thống.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => fetchMockInbox("", true)}
+                    disabled={mockInboxLoading}
+                    className="px-5 py-2 rounded-xl bg-primary-50 text-primary-600 hover:bg-primary-100 font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-2"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${mockInboxLoading ? "animate-spin" : ""}`} />
+                    Tải lại danh sách OTP
+                  </button>
+                </div>
+              ) : (
+                displayedMockMessages.map((msg) => {
+                  const phone = getOtpPhone(msg);
+                  const code = getOtpCode(msg);
+                  const expiry = getOtpExpiry(msg);
+                  const expired = isOtpExpired(expiry);
+                  const isCopied = copiedId === msg.id;
+                  const isContentCopied = copiedContentId === msg.id;
+                  const content = getOtpContent(msg);
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`p-5 rounded-2xl border transition-all ${
+                        expired
+                          ? "bg-slate-50/70 border-slate-200/80 text-slate-600"
+                          : "bg-white border-slate-200 shadow-sm hover:border-primary-300"
+                      }`}
+                    >
+                      {/* Top Row: Phone, Purpose, Time, Status */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center font-bold shrink-0">
+                            <Phone className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="text-base font-mono font-bold text-slate-900 flex items-center gap-2">
+                              <span>{phone}</span>
+                            </div>
+                            <div className="text-xs text-slate-500 font-medium">
+                              Mục đích: <strong className="text-slate-800">{formatPurpose(msg.purpose)}</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                              expired
+                                ? "bg-slate-100 text-slate-600 border border-slate-200"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            }`}
+                          >
+                            {expired ? "Đã hết hạn" : "Còn hiệu lực"}
+                          </span>
+
+                          <div className="text-xs text-slate-500 flex items-center gap-1.5 font-medium">
+                            <Clock className="w-4 h-4 text-slate-400" />
+                            <span>{new Date(msg.createdAt).toLocaleString("vi-VN")}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Prominent Monospace OTP Code Row */}
+                      <div className="my-4 p-4 rounded-2xl bg-primary-50/70 border border-primary-200 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <span className="text-xs font-bold text-primary-800 uppercase tracking-wider block">
+                            Mã OTP xác thực:
+                          </span>
+                          <span className="text-3xl font-mono font-bold text-primary-700 tracking-widest select-all">
+                            {code || "---"}
+                          </span>
+                        </div>
+
+                        {code && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyCode(code, msg.id)}
+                            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm cursor-pointer ${
+                              isCopied
+                                ? "bg-emerald-600 text-white"
+                                : "bg-white hover:bg-primary-600 text-primary-700 hover:text-white border border-primary-200"
+                            }`}
+                          >
+                            {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                            <span>{isCopied ? "Đã chép mã OTP" : "Sao chép mã OTP"}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Full Log Content */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                            <FileText className="w-4 h-4 text-slate-400" />
+                            Toàn bộ nội dung log tin nhắn:
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyContent(content, msg.id)}
+                            className="text-xs text-primary-600 hover:text-primary-800 font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                          >
+                            {isContentCopied ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                <span className="text-emerald-600">Đã sao chép log</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5" />
+                                <span>Sao chép toàn bộ log</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-slate-900 text-emerald-400 font-mono text-xs leading-relaxed border border-slate-800 break-words whitespace-pre-wrap select-all shadow-inner">
+                          {content}
+                        </div>
+                      </div>
+
+                      {/* Footer Metadata */}
+                      <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-[11px] text-slate-500 font-mono gap-2">
+                        <span>Log ID: {msg.id}</span>
+                        {expiry && (
+                          <span>Hết hạn: {new Date(expiry).toLocaleString("vi-VN")}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* SECONDARY SECTION: CẤU HÌNH CỔNG SMS & MẪU TIN NHẮN */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* SMS Delivery Mode Card */}
             <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-3">
@@ -839,29 +1214,51 @@ export default function AdminSettingsPage() {
                     <Smartphone className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-base font-bold text-slate-900">Chế Độ Phát SMS OTP</h2>
-                    <p className="text-xs text-slate-400">Chọn giữa chế độ gửi tin SMS thực tế hoặc giả lập thử nghiệm</p>
+                    <h2 className="text-base font-bold text-slate-900">Chế Độ Gửi Tin Nhắn SMS</h2>
+                    <p className="text-xs text-slate-400">Điều phối luồng OTP thật hoặc luồng thử nghiệm</p>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={fetchDeliveryMode}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"
+                  title="Làm mới trạng thái"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                </button>
               </div>
 
-              {/* Toggle Switch */}
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200/60">
+              {/* Mode Toggle Switch */}
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                    Bật Chế Độ Giả Lập SMS (Mock Delivery Mode)
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed max-w-md">
-                    Khi bật, mã OTP sẽ được lưu vào hộp thư thử nghiệm hệ thống mà không tốn cước gửi tin nhắn Brandname/Twilio.
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-800">
+                      Chế độ phát SMS:
+                    </span>
+                    <span
+                      className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                        isMockEffective
+                          ? "bg-amber-100 text-amber-800 border border-amber-300"
+                          : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                      }`}
+                    >
+                      {isMockEffective ? "MOCK (Thử nghiệm)" : "LIVE (Thực tế)"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    {isMockEffective
+                      ? "Không tốn chi phí SMS brandname. OTP được lưu vào log để tra cứu ở bảng trên."
+                      : "Gửi tin nhắn SMS thật tới điện thoại qua tài khoản cổng SMS đã cấu hình."}
                   </p>
                 </div>
 
-                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
                   <input
                     type="checkbox"
                     checked={isMockEffective}
-                    disabled={savingDeliveryMode}
                     onChange={(e) => handleToggleDeliveryMode(e.target.checked)}
+                    disabled={savingDeliveryMode}
                     className="sr-only peer"
                   />
                   <div className="w-12 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
@@ -880,7 +1277,7 @@ export default function AdminSettingsPage() {
                 <div>
                   {isMockEffective ? (
                     <span>
-                      <strong>Đang trong chế độ MOCK:</strong> Mọi mã OTP đăng ký / khôi phục mật khẩu sẽ hiển thị trực tiếp ở phần <em>Hộp Thư Thử Nghiệm SMS</em> bên dưới để bạn dễ dàng test tài khoản.
+                      <strong>Đang trong chế độ MOCK:</strong> Mọi mã OTP đăng ký / khôi phục mật khẩu sẽ lưu vào log hệ thống. Bạn có thể bấm nút <strong>&ldquo;Lấy OTP&rdquo;</strong> ở bảng trên để copy mã.
                     </span>
                   ) : (
                     <span>
@@ -891,7 +1288,7 @@ export default function AdminSettingsPage() {
               </div>
             </div>
 
-            {/* SECTION 2: SMS Template Configuration Card */}
+            {/* SMS Template Configuration Card */}
             <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-3">
@@ -904,35 +1301,46 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
 
-                {updatedAt && (
-                  <span className="text-[10px] text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full font-medium">
-                    Cập nhật: {new Date(updatedAt).toLocaleDateString("vi-VN")}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {updatedAt && (
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      Cập nhật: {new Date(updatedAt).toLocaleTimeString("vi-VN")}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <form onSubmit={handleSaveTemplate} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Nội dung mẫu SMS (Bắt buộc chứa biến{" "}
-                    <code className="bg-slate-100 text-primary-600 px-1.5 py-0.5 rounded font-mono">{"{otp}"}</code>)
-                  </label>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-700">
+                      Nội dung mẫu SMS
+                    </label>
+                    <span className="text-[11px] text-slate-400">
+                      Độ dài: {template.length} ký tự
+                    </span>
+                  </div>
                   <textarea
-                    rows={3}
                     value={template}
                     onChange={(e) => {
                       setTemplate(e.target.value);
                       setPreview(e.target.value.replace(/{otp}/g, "123456"));
                     }}
-                    className="w-full text-sm font-medium px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all font-mono"
+                    rows={3}
+                    placeholder="VD: [TXEPRO] Ma OTP xac thuc cua ban la {otp}. Hieu luc 10 phut."
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-primary-500 focus:outline-none transition-all leading-relaxed"
                   />
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-slate-400" />
+                    Sử dụng biến <code className="bg-slate-100 px-1.5 py-0.5 rounded text-primary-600 font-bold font-mono">{"{otp}"}</code> để hệ thống tự động chèn mã 6 số.
+                  </p>
                 </div>
 
-                {/* Live Preview */}
-                <div>
-                  <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Xem trước tin nhắn SMS người dùng nhận được:
-                  </span>
+                {/* Preview Box */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Xem trước tin nhắn khi gửi tới điện thoại:
+                  </label>
                   <div className="p-3.5 rounded-2xl bg-slate-900 text-emerald-400 font-mono text-xs border border-slate-800 leading-relaxed shadow-inner">
                     {preview || "Đang tải mẫu xem trước..."}
                   </div>
@@ -961,106 +1369,6 @@ export default function AdminSettingsPage() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-
-          {/* Right Column: SMS Mock Inbox */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Radio className="w-4 h-4 text-amber-500" />
-                    Hộp Thư OTP Thử Nghiệm
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Lấy mã OTP để kiểm thử tính năng</p>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => fetchMockInbox()}
-                    disabled={mockInboxLoading}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-slate-50"
-                    title="Làm mới"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${mockInboxLoading ? "animate-spin text-primary-600" : ""}`} />
-                  </button>
-                  <button
-                    onClick={handleClearInbox}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
-                    title="Xóa hộp thư"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Action: Send Test OTP */}
-              <button
-                onClick={handleSendTestOtp}
-                disabled={mockInboxLoading}
-                className="w-full py-2.5 px-4 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 border border-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-amber-600" />
-                <span>Kích hoạt tạo thử 1 OTP Demo</span>
-              </button>
-
-              {/* Search Inbox */}
-              <form onSubmit={handleSearchInbox} className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={phoneSearch}
-                  onChange={(e) => setPhoneSearch(e.target.value)}
-                  placeholder="Lọc theo SĐT..."
-                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-primary-500"
-                />
-              </form>
-
-              {/* Message List */}
-              <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
-                {mockMessages.length === 0 ? (
-                  <div className="text-center py-10 text-slate-400 text-xs">
-                    Chưa có tin nhắn OTP nào trong hộp thư thử nghiệm.
-                  </div>
-                ) : (
-                  mockMessages.map((msg) => {
-                    const expired = isOtpExpired(msg.expiresAt);
-                    const isCopied = copiedId === msg.id;
-
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`p-3.5 rounded-2xl border transition-all ${
-                          expired ? "bg-slate-50/60 border-slate-200 opacity-60" : "bg-white border-slate-200 shadow-sm"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1.5">
-                          <span className="font-semibold text-slate-700">{formatPurpose(msg.purpose)}</span>
-                          <span>{new Date(msg.createdAt).toLocaleTimeString("vi-VN")}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs font-mono font-bold text-slate-800">{msg.phone}</div>
-                          <button
-                            onClick={() => handleCopyCode(msg.code, msg.id)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1 transition-all ${
-                              isCopied
-                                ? "bg-emerald-600 text-white"
-                                : "bg-primary-50 text-primary-600 hover:bg-primary-100"
-                            }`}
-                          >
-                            {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                            <span>{msg.code}</span>
-                          </button>
-                        </div>
-
-                        <div className="text-[10px] text-slate-500 mt-1.5 font-mono truncate">{msg.content}</div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
             </div>
           </div>
         </div>
