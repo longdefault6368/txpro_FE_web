@@ -708,7 +708,7 @@ function AdminSupportContent() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-black text-sm text-slate-900 truncate">{ticket.title}</p>
+                        <p className="font-bold text-sm text-slate-900 truncate">{ticket.title}</p>
                         <p className="text-xs font-semibold text-slate-500 mt-1 truncate">{ticket.userId?.name || "Người dùng"} · {CATEGORY_LABEL[ticket.category] || ticket.category}</p>
                       </div>
                       <span className={`shrink-0 border rounded-lg px-2 py-1 text-[10px] font-bold ${statusInfo.className}`}>{statusInfo.label}</span>
@@ -740,7 +740,7 @@ function AdminSupportContent() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-black text-sm text-slate-900 truncate">{displayTitle}</p>
+                        <p className="font-bold text-sm text-slate-900 truncate">{displayTitle}</p>
                         <p className="text-xs font-semibold text-slate-500 mt-1 truncate">{displaySubtitle || "---"}</p>
                       </div>
                       {row.chat.orderId?._id && (
@@ -801,9 +801,9 @@ function AdminSupportContent() {
               <>
                 <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 text-xs">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <p><span className="font-black text-slate-400 uppercase">Người gửi:</span> <span className="font-bold text-slate-800">{selectedTicket.userId?.name || "---"}</span></p>
-                    <p><span className="font-black text-slate-400 uppercase">Vai trò:</span> <span className="font-bold text-slate-800">{ROLE_LABEL[selectedTicket.userId?.role || ""] || selectedTicket.userId?.role || "---"}</span></p>
-                    <p><span className="font-black text-slate-400 uppercase">Liên hệ:</span> <span className="font-bold text-slate-800">{selectedTicket.userId?.phone || selectedTicket.userId?.email || "---"}</span></p>
+                    <p><span className="font-bold text-slate-400 uppercase">Người gửi:</span> <span className="font-bold text-slate-800">{selectedTicket.userId?.name || "---"}</span></p>
+                    <p><span className="font-bold text-slate-400 uppercase">Vai trò:</span> <span className="font-bold text-slate-800">{ROLE_LABEL[selectedTicket.userId?.role || ""] || selectedTicket.userId?.role || "---"}</span></p>
+                    <p><span className="font-bold text-slate-400 uppercase">Liên hệ:</span> <span className="font-bold text-slate-800">{selectedTicket.userId?.phone || selectedTicket.userId?.email || "---"}</span></p>
                   </div>
                   <p className="mt-3 text-slate-600 font-semibold leading-relaxed">{selectedTicket.description}</p>
                 </div>
@@ -853,9 +853,9 @@ function AdminSupportContent() {
                 return (
                   <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 text-xs">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <p><span className="font-black text-slate-400 uppercase">Người nhắn:</span> <span className="font-bold text-slate-800">{activeParticipant?.name || "Người dùng"}</span></p>
-                      <p><span className="font-black text-slate-400 uppercase">Vai trò:</span> <span className="font-bold text-slate-800">{ROLE_LABEL[activeParticipant?.role || ""] || activeParticipant?.role || "---"}</span></p>
-                      <p><span className="font-black text-slate-400 uppercase">Liên hệ:</span> <span className="font-bold text-slate-800">{activeParticipant?.phone || activeParticipant?.email || "---"}</span></p>
+                      <p><span className="font-bold text-slate-400 uppercase">Người nhắn:</span> <span className="font-bold text-slate-800">{activeParticipant?.name || "Người dùng"}</span></p>
+                      <p><span className="font-bold text-slate-400 uppercase">Vai trò:</span> <span className="font-bold text-slate-800">{ROLE_LABEL[activeParticipant?.role || ""] || activeParticipant?.role || "---"}</span></p>
+                      <p><span className="font-bold text-slate-400 uppercase">Liên hệ:</span> <span className="font-bold text-slate-800">{activeParticipant?.phone || activeParticipant?.email || "---"}</span></p>
                     </div>
                     {selectedChat.chat.orderId?.orderCode && (
                       <p className="mt-2 text-slate-600 font-semibold">

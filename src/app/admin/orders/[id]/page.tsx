@@ -701,7 +701,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">Chi Tiết Vận Đơn</h1>
-              <span className="font-extrabold text-primary-600 text-sm bg-primary-50 px-2 py-0.5 rounded-md">{order.orderCode}</span>
+              <span className="font-bold text-primary-600 text-sm bg-primary-50 px-2 py-0.5 rounded-md">{order.orderCode}</span>
               {isOffline && (
                 <span className="text-[10px] bg-amber-500 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Mẫu mô phỏng

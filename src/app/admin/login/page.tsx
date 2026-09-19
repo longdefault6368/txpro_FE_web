@@ -181,7 +181,7 @@ export default function AdminLoginPage() {
             <div className="w-14 h-14 bg-purple-500/10 text-purple-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-purple-500/20">
               <UserCheck className="w-7 h-7" />
             </div>
-            <h2 className="text-3xl font-extrabold text-white tracking-tight">Khu Vực Quản Trị</h2>
+            <h2 className="text-3xl font-bold text-white tracking-tight">Khu Vực Quản Trị</h2>
             <p className="text-slate-400 text-xs mt-2">Cổng đăng nhập bảo mật dành cho Quản trị viên TXEPRO</p>
           </div>
 

@@ -42,7 +42,7 @@ export default function TermsOfServicePage() {
   const [activeSection, setActiveSection] = useState<string>("section-1");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  const pageCopy = {
+  const pageCopyMap = {
     vi: {
       badge: "Văn Bản Pháp Lý Chính Thức",
       title: "Điều Khoản Sử Dụng Nền Tảng TXEPRO",
@@ -325,22 +325,10 @@ export default function TermsOfServicePage() {
       btnContact: "联系法务专员",
       sections: [],
     },
-  }[language] || {
-    badge: "Văn Bản Pháp Lý Chính Thức",
-    title: "Điều Khoản Sử Dụng Nền Tảng TXEPRO",
-    subtitle: "Quy định chi tiết về quyền, nghĩa vụ giữa các bên.",
-    lastUpdated: "Cập nhật lần cuối: 15/09/2026",
-    version: "Phiên bản: 2.4.0",
-    tocTitle: "Mục lục điều khoản",
-    searchPlaceholder: "Tìm kiếm...",
-    printBtn: "In",
-    contactSupport: "Thắc mắc?",
-    contactDesc: "Hỗ trợ 24/7",
-    btnContact: "Liên hệ",
-    sections: [],
   };
+  const pageCopy = pageCopyMap[language as "vi" | "en" | "zh"] || pageCopyMap.vi;
 
-  const sectionsList = pageCopy.sections.length > 0 ? pageCopy.sections : [];
+  const sectionsList = (pageCopy.sections && pageCopy.sections.length > 0) ? pageCopy.sections : pageCopyMap.vi.sections;
 
   const filteredSections = sectionsList.filter((sec) => {
     if (!searchQuery.trim()) return true;

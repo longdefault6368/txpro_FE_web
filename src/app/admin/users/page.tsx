@@ -1872,7 +1872,7 @@ function AdminUsersContent() {
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-6 min-w-0 max-w-full">
         {/* Dashboard Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -1907,11 +1907,6 @@ function AdminUsersContent() {
             <UserPlus className="w-4 h-4" /> Thêm Người Dùng
           </button>
         </div>
-          {errorMsg && (
-            <div className="fixed bottom-5 right-5 bg-red-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 z-50 text-sm font-semibold animate-fade-in">
-              <AlertTriangle className="w-5 h-5" /> {errorMsg}
-            </div>
-          )}
 
           {/* Filters Bar */}
           <div className="bg-white/80 backdrop-blur-xl border border-slate-200/50 p-6 rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.03)] mb-6 flex flex-col md:flex-row gap-4 items-center">
@@ -2007,7 +2002,7 @@ function AdminUsersContent() {
           </div>
 
           {/* Table Container */}
-          <div className="bg-white rounded-3xl border border-slate-200/50 shadow-xl overflow-hidden">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/50 shadow-xl overflow-hidden w-full max-w-full">
             {loading ? (
               <div className="text-center py-20">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600 mx-auto"></div>
@@ -2020,157 +2015,165 @@ function AdminUsersContent() {
                 <p className="text-xs">Vui lòng điều chỉnh lại bộ lọc hoặc từ khóa tìm kiếm</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] font-extrabold uppercase tracking-wider">
-                      <th className="py-4 px-6">Họ và Tên</th>
-                      <th className="py-4 px-6">Số điện thoại / Email</th>
-                      <th className="py-4 px-6">Vai trò</th>
-                      <th className="py-4 px-6">Xác minh eKYC</th>
-                      <th className="py-4 px-6">Ngày Tạo</th>
-                      <th className="py-4 px-6 text-center">Trạng thái</th>
-                      <th className="py-4 px-6 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
-                    {users.map((user) => {
-                      const avatarUrl = getUserAvatarUrl(user);
-                      return (
-                      <tr key={user._id} className="hover:bg-slate-50/50 transition-colors">
-                        {/* Name */}
-                        <td className="py-4.5 px-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-primary-50 text-primary-600 rounded-full font-bold flex items-center justify-center text-xs shadow-inner overflow-hidden ring-1 ring-slate-100">
-                              {avatarUrl ? (
-                                <img src={avatarUrl} alt={user.name || user.phone || "Người dùng"} className="h-full w-full object-cover" />
-                              ) : (
-                                getUserInitials(user)
-                              )}
-                            </div>
-                            <span className="font-bold text-slate-800">{user.name || "Người dùng TXEPRO"}</span>
-                          </div>
-                        </td>
-                        
-                        {/* Phone / Email */}
-                        <td className="py-4.5 px-6">
-                          <div className="space-y-0.5">
-                            <p className="font-semibold text-slate-700">{user.phone || "---"}</p>
-                            <p className="text-xs text-slate-400">{user.email || "---"}</p>
-                          </div>
-                        </td>
+              <>
+                {/* Mobile Scroll Hint Banner */}
+                <div className="md:hidden px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                  <span>Danh sách thành viên</span>
+                  <span className="text-primary-600 font-bold flex items-center gap-1">
+                    ← Kéo qua lại để xem đủ cột →
+                  </span>
+                </div>
 
-                        {/* Role Select & Badge */}
-                        <td className="py-4.5 px-6">
-                          <select
-                            value={user.role}
-                            onChange={(e) => handleChangeRole(user, e.target.value as ManagedUserRole)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold focus:outline-none border border-slate-200 bg-white transition-all cursor-pointer ${
-                              user.role === "tai-xe" 
-                                  ? "text-emerald-600 bg-emerald-50 border-emerald-100" 
-                                  : "text-blue-600 bg-blue-50 border-blue-100"
-                            }`}
-                          >
-                            <option value="chu-hang">Chủ Hàng</option>
-                            <option value="tai-xe">Tài Xế</option>
-                          </select>
-                        </td>
-
-                        {/* eKYC Verification Status Badge */}
-                        <td className="py-4.5 px-6">
-                          <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border ${
-                            user.kycStatus === "verified"
-                              ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                              : user.kycStatus === "pending" || user.kycStatus === "pending_review"
-                                ? "text-amber-700 bg-amber-50 border-amber-200 animate-pulse"
-                                : user.kycStatus === "rejected"
-                                  ? "text-red-700 bg-red-50 border-red-200"
-                                  : "text-slate-500 bg-slate-50 border-slate-200"
-                          }`}>
-                            {user.kycStatus === "verified"
-                              ? "Đã xác minh"
-                              : user.kycStatus === "pending" || user.kycStatus === "pending_review"
-                                ? "Chờ duyệt"
-                                : user.kycStatus === "rejected"
-                                  ? "Bị từ chối"
-                                  : "Chưa gửi"}
-                          </span>
-                        </td>
-
-                        {/* Created At */}
-                        <td className="py-4.5 px-6 text-xs font-semibold text-slate-400">
-                          {formatDateTime(user.createdAt)}
-                        </td>
-
-                        {/* Status Switch Toggle */}
-                        <td className="py-4.5 px-6 text-center">
-                          <button
-                            onClick={() => handleToggleStatus(user)}
-                            className={`transition-colors duration-200 outline-none focus:outline-none cursor-pointer ${
-                              user.isActive ? "text-primary-500" : "text-slate-300"
-                            }`}
-                            title={user.isActive ? "Khóa tài khoản" : "Kích hoạt tài khoản"}
-                          >
-                            {user.isActive ? (
-                              <ToggleRight className="w-8 h-8" />
-                            ) : (
-                              <ToggleLeft className="w-8 h-8" />
-                            )}
-                          </button>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-4.5 px-6 text-right">
-                          <div className="flex justify-end gap-2">
-                            {/* Chat With User */}
-                            <button
-                              onClick={() => handleOpenChat(user)}
-                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all cursor-pointer"
-                              title={`Nhắn tin với ${user.name || user.phone || 'người dùng'}`}
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                            </button>
-
-                            {/* Reset Password */}
-                            <button
-                              onClick={() => {
-                                setCurrentUser(user);
-                                setNewPassword("");
-                                setShowPasswordModal(true);
-                              }}
-                              className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all cursor-pointer"
-                              title="Đặt lại mật khẩu"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                            </button>
-
-
-
-                            {/* Edit */}
-                            <button
-                              onClick={() => handleOpenEditModal(user)}
-                              className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all cursor-pointer"
-                              title="Chỉnh sửa thông tin"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-
-                            {/* Delete */}
-                            <button
-                              onClick={() => handleDeleteUser(user._id)}
-                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
-                              title="Xóa tài khoản"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
+                <div className="overflow-x-auto w-full max-w-full overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
+                  <table className="w-full min-w-[960px] text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+                        <th className="py-4 px-6 whitespace-nowrap min-w-[200px]">Họ và Tên</th>
+                        <th className="py-4 px-6 whitespace-nowrap min-w-[160px]">Số điện thoại / Email</th>
+                        <th className="py-4 px-6 whitespace-nowrap min-w-[130px]">Vai trò</th>
+                        <th className="py-4 px-6 whitespace-nowrap min-w-[140px]">Xác minh eKYC</th>
+                        <th className="py-4 px-6 whitespace-nowrap min-w-[130px]">Ngày Tạo</th>
+                        <th className="py-4 px-6 text-center whitespace-nowrap min-w-[100px]">Trạng thái</th>
+                        <th className="py-4 px-6 text-right whitespace-nowrap min-w-[160px]">Thao tác</th>
                       </tr>
-                    );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
+                      {users.map((user) => {
+                        const avatarUrl = getUserAvatarUrl(user);
+                        return (
+                        <tr key={user._id} className="hover:bg-slate-50/50 transition-colors">
+                          {/* Name */}
+                          <td className="py-4.5 px-6 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 bg-primary-50 text-primary-600 rounded-full font-bold flex items-center justify-center text-xs shadow-inner overflow-hidden ring-1 ring-slate-100 flex-shrink-0">
+                                {avatarUrl ? (
+                                  <img src={avatarUrl} alt={user.name || user.phone || "Người dùng"} className="h-full w-full object-cover" />
+                                ) : (
+                                  getUserInitials(user)
+                                )}
+                              </div>
+                              <span className="font-bold text-slate-800">{user.name || "Người dùng TXEPRO"}</span>
+                            </div>
+                          </td>
+                          
+                          {/* Phone / Email */}
+                          <td className="py-4.5 px-6 whitespace-nowrap">
+                            <div className="space-y-0.5">
+                              <p className="font-semibold text-slate-700">{user.phone || "---"}</p>
+                              <p className="text-xs text-slate-400">{user.email || "---"}</p>
+                            </div>
+                          </td>
+
+                          {/* Role Select & Badge */}
+                          <td className="py-4.5 px-6 whitespace-nowrap">
+                            <select
+                              value={user.role}
+                              onChange={(e) => handleChangeRole(user, e.target.value as ManagedUserRole)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold focus:outline-none border border-slate-200 bg-white transition-all cursor-pointer ${
+                                user.role === "tai-xe" 
+                                    ? "text-emerald-600 bg-emerald-50 border-emerald-100" 
+                                    : "text-blue-600 bg-blue-50 border-blue-100"
+                              }`}
+                            >
+                              <option value="chu-hang">Chủ Hàng</option>
+                              <option value="tai-xe">Tài Xế</option>
+                            </select>
+                          </td>
+
+                          {/* eKYC Verification Status Badge */}
+                          <td className="py-4.5 px-6 whitespace-nowrap">
+                            <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border ${
+                              user.kycStatus === "verified"
+                                ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                : user.kycStatus === "pending" || user.kycStatus === "pending_review"
+                                  ? "text-amber-700 bg-amber-50 border-amber-200 animate-pulse"
+                                  : user.kycStatus === "rejected"
+                                    ? "text-red-700 bg-red-50 border-red-200"
+                                    : "text-slate-500 bg-slate-50 border-slate-200"
+                            }`}>
+                              {user.kycStatus === "verified"
+                                ? "Đã xác minh"
+                                : user.kycStatus === "pending" || user.kycStatus === "pending_review"
+                                  ? "Chờ duyệt"
+                                  : user.kycStatus === "rejected"
+                                    ? "Bị từ chối"
+                                    : "Chưa gửi"}
+                            </span>
+                          </td>
+
+                          {/* Created At */}
+                          <td className="py-4.5 px-6 text-xs font-semibold text-slate-400 whitespace-nowrap">
+                            {formatDateTime(user.createdAt)}
+                          </td>
+
+                          {/* Status Switch Toggle */}
+                          <td className="py-4.5 px-6 text-center whitespace-nowrap">
+                            <button
+                              onClick={() => handleToggleStatus(user)}
+                              className={`transition-colors duration-200 outline-none focus:outline-none cursor-pointer ${
+                                user.isActive ? "text-primary-500" : "text-slate-300"
+                              }`}
+                              title={user.isActive ? "Khóa tài khoản" : "Kích hoạt tài khoản"}
+                            >
+                              {user.isActive ? (
+                                <ToggleRight className="w-8 h-8" />
+                              ) : (
+                                <ToggleLeft className="w-8 h-8" />
+                              )}
+                            </button>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-4.5 px-6 text-right whitespace-nowrap">
+                            <div className="flex justify-end gap-2">
+                              {/* Chat With User */}
+                              <button
+                                onClick={() => handleOpenChat(user)}
+                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all cursor-pointer"
+                                title={`Nhắn tin với ${user.name || user.phone || 'người dùng'}`}
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                              </button>
+
+                              {/* Reset Password */}
+                              <button
+                                onClick={() => {
+                                  setCurrentUser(user);
+                                  setNewPassword("");
+                                  setShowPasswordModal(true);
+                                }}
+                                className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all cursor-pointer"
+                                title="Đặt lại mật khẩu"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+
+                              {/* Edit */}
+                              <button
+                                onClick={() => handleOpenEditModal(user)}
+                                className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all cursor-pointer"
+                                title="Chỉnh sửa thông tin"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+
+                              {/* Delete */}
+                              <button
+                                onClick={() => handleDeleteUser(user._id)}
+                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                                title="Xóa tài khoản"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
 
             {/* Pagination Controls */}
@@ -2459,7 +2462,7 @@ function AdminUsersContent() {
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
                             <span>Phương tiện đã đăng ký</span>
-                            <span className="bg-amber-200 text-amber-900 text-[10px] px-1.5 py-0.2 rounded-full font-extrabold">
+                            <span className="bg-amber-200 text-amber-900 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
                               {userVehicles.length}
                             </span>
                           </p>
@@ -2582,7 +2585,7 @@ function AdminUsersContent() {
                         >
                           <Truck className="w-4 h-4" />
                           <span>Phương Tiện Vận Tải</span>
-                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                             editModalTab === "vehicles" ? "bg-primary-100 text-primary-700" : "bg-slate-300 text-slate-700"
                           }`}>
                             {userVehicles.length}
@@ -2709,7 +2712,7 @@ function AdminUsersContent() {
                               <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
                                 <div className="flex items-center gap-2.5">
                                   {/* Vietnamese License Plate Style Badge */}
-                                  <div className="border-2 border-slate-800 bg-white text-slate-900 font-mono font-black text-xs px-2.5 py-1 rounded-md tracking-wider shadow-inner flex items-center gap-1.5 ring-1 ring-slate-200">
+                                  <div className="border-2 border-slate-800 bg-white text-slate-900 font-mono font-bold text-xs px-2.5 py-1 rounded-md tracking-wider shadow-inner flex items-center gap-1.5 ring-1 ring-slate-200">
                                     <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                                     <span>{veh.plateNumber}</span>
                                   </div>
@@ -3095,7 +3098,7 @@ function AdminUsersContent() {
                     {vehicleForm.plateNumber && (
                       <div className="mt-2 flex items-center gap-2">
                         <span className="text-[11px] text-slate-400">Xem trước:</span>
-                        <div className="border-2 border-slate-800 bg-white text-slate-900 font-mono font-black text-xs px-2.5 py-0.5 rounded shadow-2xs tracking-widest inline-flex items-center gap-1.5">
+                        <div className="border-2 border-slate-800 bg-white text-slate-900 font-mono font-bold text-xs px-2.5 py-0.5 rounded shadow-2xs tracking-widest inline-flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
                           <span>{vehicleForm.plateNumber}</span>
                         </div>

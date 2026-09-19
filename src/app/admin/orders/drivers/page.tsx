@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, Car, ChevronLeft, ChevronRight, Filter, Search, SlidersHorizontal, UserRound } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarClock, Car, ChevronLeft, ChevronRight, Filter, RotateCcw, Search, SlidersHorizontal, UserRound } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 
 interface UserInfo {
@@ -81,8 +81,76 @@ export default function AdminDriverPostsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [datePreset, setDatePreset] = useState<string>("all");
   const [limit, setLimit] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const applyDatePreset = (preset: string) => {
+    setDatePreset(preset);
+    setCurrentPage(1);
+
+    const today = new Date();
+    const formatDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    if (preset === "all") {
+      setStartDate("");
+      setEndDate("");
+      return;
+    }
+
+    if (preset === "today") {
+      const formatted = formatDate(today);
+      setStartDate(formatted);
+      setEndDate(formatted);
+      return;
+    }
+
+    if (preset === "yesterday") {
+      const yest = new Date(today);
+      yest.setDate(yest.getDate() - 1);
+      const formatted = formatDate(yest);
+      setStartDate(formatted);
+      setEndDate(formatted);
+      return;
+    }
+
+    if (preset === "7days") {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 7);
+      setStartDate(formatDate(past));
+      setEndDate(formatDate(today));
+      return;
+    }
+
+    if (preset === "30days") {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 30);
+      setStartDate(formatDate(past));
+      setEndDate(formatDate(today));
+      return;
+    }
+
+    if (preset === "this_month") {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      setStartDate(formatDate(firstDay));
+      setEndDate(formatDate(today));
+      return;
+    }
+  };
+
+  const clearDateFilter = () => {
+    setDatePreset("all");
+    setStartDate("");
+    setEndDate("");
+    setCurrentPage(1);
+  };
 
   const fetchDriverPosts = async () => {
     setLoading(true);
@@ -91,6 +159,8 @@ export default function AdminDriverPostsPage() {
       limit: String(limit),
       ...(search ? { search } : {}),
       ...(statusFilter ? { status: statusFilter } : {}),
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {}),
     });
 
     try {
@@ -112,7 +182,7 @@ export default function AdminDriverPostsPage() {
 
   useEffect(() => {
     fetchDriverPosts();
-  }, [currentPage, search, statusFilter, limit]);
+  }, [currentPage, search, statusFilter, startDate, endDate, limit]);
 
   return (
     <div className="space-y-6">
@@ -129,49 +199,124 @@ export default function AdminDriverPostsPage() {
         </div>
       </div>
 
-      <div className="bg-white/80 backdrop-blur-xl border border-slate-200/50 p-6 rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.03)] flex flex-col md:flex-row gap-4 items-center">
-        <div className="relative w-full md:flex-1">
-          <input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Tìm theo tài xế, SĐT, biển số, điểm đi, điểm đến..."
-            className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 text-slate-800 text-sm transition-all"
-          />
-          <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+      <div className="bg-white/80 backdrop-blur-xl border border-slate-200/50 p-5 sm:p-6 rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.03)] space-y-4">
+        <div className="flex flex-col md:flex-row gap-3 sm:gap-4 items-center">
+          <div className="relative w-full md:flex-1">
+            <input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Tìm theo tài xế, SĐT, biển số, điểm đi, điểm đến..."
+              className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 text-slate-800 text-sm transition-all"
+            />
+            <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+          </div>
+          <div className="relative w-full md:w-52">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="appearance-none w-full pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
+            >
+              <option value="">Tất cả trạng thái</option>
+              {Object.entries(STATUS_MAP).map(([value, item]) => (
+                <option key={value} value={value}>{item.label}</option>
+              ))}
+            </select>
+            <Filter className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+          <div className="relative w-full md:w-44">
+            <select
+              value={limit}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="appearance-none w-full pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
+            >
+              <option value={10}>10 dòng / trang</option>
+              <option value={20}>20 dòng / trang</option>
+              <option value={50}>50 dòng / trang</option>
+            </select>
+            <SlidersHorizontal className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
-        <div className="relative w-full md:w-52">
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="appearance-none w-full pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
-          >
-            <option value="">Tất cả trạng thái</option>
-            {Object.entries(STATUS_MAP).map(([value, item]) => (
-              <option key={value} value={value}>{item.label}</option>
+
+        {/* Date Range Filter Section */}
+        <div className="pt-3.5 border-t border-slate-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-1.5 flex-wrap w-full lg:w-auto">
+            <span className="text-slate-500 font-bold flex items-center gap-1.5 mr-1">
+              <Calendar className="w-3.5 h-3.5 text-primary-600" />
+              <span>Khoảng ngày:</span>
+            </span>
+            {[
+              { id: "all", label: "Tất cả" },
+              { id: "today", label: "Hôm nay" },
+              { id: "yesterday", label: "Hôm qua" },
+              { id: "7days", label: "7 ngày qua" },
+              { id: "30days", label: "30 ngày qua" },
+              { id: "this_month", label: "Tháng này" },
+            ].map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => applyDatePreset(p.id)}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                  datePreset === p.id && (p.id === "all" || (startDate && endDate))
+                    ? "bg-primary-600 text-white shadow-sm shadow-primary-600/30"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
+                }`}
+              >
+                {p.label}
+              </button>
             ))}
-          </select>
-          <Filter className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-        <div className="relative w-full md:w-44">
-          <select
-            value={limit}
-            onChange={(e) => {
-              setLimit(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="appearance-none w-full pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
-          >
-            <option value={10}>10 dòng / trang</option>
-            <option value={20}>20 dòng / trang</option>
-            <option value={50}>50 dòng / trang</option>
-          </select>
-          <SlidersHorizontal className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          <div className="flex items-center gap-2 w-full lg:w-auto flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-slate-700 w-full sm:w-auto">
+              <span className="text-[11px] font-bold text-slate-400">Từ:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setDatePreset("custom");
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer w-full sm:w-auto text-slate-800"
+              />
+            </div>
+            <span className="text-slate-400 font-bold hidden sm:inline">-</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-slate-700 w-full sm:w-auto">
+              <span className="text-[11px] font-bold text-slate-400">Đến:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setDatePreset("custom");
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer w-full sm:w-auto text-slate-800"
+              />
+            </div>
+
+            {(startDate || endDate) && (
+              <button
+                type="button"
+                onClick={clearDateFilter}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-500 font-bold rounded-xl transition-colors cursor-pointer ml-auto sm:ml-0"
+                title="Xóa lọc theo ngày"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="text-[11px]">Đặt lại</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -187,92 +332,99 @@ export default function AdminDriverPostsPage() {
             <p className="font-bold text-slate-600 text-sm">Không tìm thấy tin đăng tài xế</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] font-extrabold uppercase tracking-wider">
-                  <th className="py-4 px-6">Tài xế</th>
-                  <th className="py-4 px-6">Phương tiện</th>
-                  <th className="py-4 px-6">Tuyến đăng</th>
-                  <th className="py-4 px-6">Giá / loại chuyến</th>
-                  <th className="py-4 px-6">Lịch khả dụng</th>
-                  <th className="py-4 px-6">Sức chứa</th>
-                  <th className="py-4 px-6">Trạng thái</th>
-                  <th className="py-4 px-6">Ngày đăng</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
-                {posts.map((post) => {
-                  const statusInfo = STATUS_MAP[post.status] || { label: post.status, color: "text-slate-600 bg-slate-50 border-slate-200" };
-                  const vehicle = post.vehicleId;
-                  const priceRange = post.price
-                    ? formatMoney(post.price)
-                    : `${formatMoney(post.pricing?.minPrice)} - ${formatMoney(post.pricing?.maxPrice)}`;
-                  return (
-                    <tr key={post._id} className="hover:bg-slate-50/50 transition-colors align-top">
-                      <td className="py-4.5 px-6 min-w-56">
-                        <div className="flex items-start gap-3">
-                          <div className="w-9 h-9 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
-                            <UserRound className="w-4 h-4" />
+          <div className="w-full">
+            {/* Mobile Swipe Hint */}
+            <div className="md:hidden px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+              <span>Danh sách tin đăng tài xế</span>
+              <span className="text-primary-600 font-bold">← Vuốt ngang để xem đủ cột →</span>
+            </div>
+            <div className="overflow-x-auto w-full max-w-full overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
+              <table className="w-full min-w-[1100px] text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+                    <th className="py-4 px-6 min-w-56">Tài xế</th>
+                    <th className="py-4 px-6 min-w-56">Phương tiện</th>
+                    <th className="py-4 px-6 min-w-64">Tuyến đăng</th>
+                    <th className="py-4 px-6 min-w-44">Giá / loại chuyến</th>
+                    <th className="py-4 px-6 min-w-56">Lịch khả dụng</th>
+                    <th className="py-4 px-6 min-w-36">Sức chứa</th>
+                    <th className="py-4 px-6 min-w-32">Trạng thái</th>
+                    <th className="py-4 px-6 min-w-32">Ngày đăng</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
+                  {posts.map((post) => {
+                    const statusInfo = STATUS_MAP[post.status] || { label: post.status, color: "text-slate-600 bg-slate-50 border-slate-200" };
+                    const vehicle = post.vehicleId;
+                    const priceRange = post.price
+                      ? formatMoney(post.price)
+                      : `${formatMoney(post.pricing?.minPrice)} - ${formatMoney(post.pricing?.maxPrice)}`;
+                    return (
+                      <tr key={post._id} className="hover:bg-slate-50/50 transition-colors align-top">
+                        <td className="py-4.5 px-6 min-w-56">
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
+                              <UserRound className="w-4 h-4" />
+                            </div>
+                            <div className="space-y-0.5">
+                              <Link href={`/admin/orders/drivers/${post._id}`} className="font-bold text-primary-600 hover:underline">
+                                {post.driverId?.name || "---"}
+                              </Link>
+                              <p className="text-xs font-semibold text-slate-500">{post.driverId?.phone || "---"}</p>
+                              <p className="text-xs text-slate-400">{post.driverId?.email || "---"}</p>
+                            </div>
                           </div>
-                          <div className="space-y-0.5">
-                            <Link href={`/admin/orders/drivers/${post._id}`} className="font-bold text-primary-600 hover:underline">
-                              {post.driverId?.name || "---"}
+                        </td>
+                        <td className="py-4.5 px-6 min-w-56">
+                          <p className="font-bold text-slate-800">{vehicle?.vehicleTypeChild || vehicle?.type || "---"}</p>
+                          <p className="text-xs font-semibold text-slate-500">{[vehicle?.brand, vehicle?.model].filter(Boolean).join(" ") || "---"}</p>
+                          <p className="text-xs font-bold text-primary-600 mt-1">{vehicle?.plateNumber || "---"}</p>
+                        </td>
+                        <td className="py-4.5 px-6 min-w-64">
+                          <div className="space-y-1 text-xs">
+                            <Link href={`/admin/orders/drivers/${post._id}`} className="block hover:text-primary-600">
+                              <p className="font-semibold text-slate-700"><span className="text-slate-400 font-bold uppercase text-[9px] mr-1">Từ:</span>{post.route?.from || "---"}</p>
+                              <p className="font-semibold text-slate-700"><span className="text-slate-400 font-bold uppercase text-[9px] mr-1">Đến:</span>{post.route?.to || "---"}</p>
                             </Link>
-                            <p className="text-xs font-semibold text-slate-500">{post.driverId?.phone || "---"}</p>
-                            <p className="text-xs text-slate-400">{post.driverId?.email || "---"}</p>
+                            <div className="grid grid-cols-2 gap-1 pt-1">
+                              <span className="rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-500">BK đi: {formatRadius(post.route?.pickupRadiusMeters || post.route?.radiusMeters)}</span>
+                              <span className="rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-500">BK đến: {formatRadius(post.route?.dropoffRadiusMeters || post.route?.radiusMeters)}</span>
+                            </div>
+                            {post.note && <p className="text-slate-400 line-clamp-2 pt-1">{post.note}</p>}
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-4.5 px-6 min-w-56">
-                        <p className="font-bold text-slate-800">{vehicle?.vehicleTypeChild || vehicle?.type || "---"}</p>
-                        <p className="text-xs font-semibold text-slate-500">{[vehicle?.brand, vehicle?.model].filter(Boolean).join(" ") || "---"}</p>
-                        <p className="text-xs font-bold text-primary-600 mt-1">{vehicle?.plateNumber || "---"}</p>
-                      </td>
-                      <td className="py-4.5 px-6 min-w-64">
-                        <div className="space-y-1 text-xs">
-                          <Link href={`/admin/orders/drivers/${post._id}`} className="block hover:text-primary-600">
-                            <p className="font-semibold text-slate-700"><span className="text-slate-400 font-bold uppercase text-[9px] mr-1">Từ:</span>{post.route?.from || "---"}</p>
-                            <p className="font-semibold text-slate-700"><span className="text-slate-400 font-bold uppercase text-[9px] mr-1">Đến:</span>{post.route?.to || "---"}</p>
-                          </Link>
-                          <div className="grid grid-cols-2 gap-1 pt-1">
-                            <span className="rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-500">BK đi: {formatRadius(post.route?.pickupRadiusMeters || post.route?.radiusMeters)}</span>
-                            <span className="rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-500">BK đến: {formatRadius(post.route?.dropoffRadiusMeters || post.route?.radiusMeters)}</span>
+                        </td>
+                        <td className="py-4.5 px-6 min-w-44">
+                          <p className="font-bold text-slate-800 text-xs">{priceRange}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{PRICING_MODE_LABEL[post.pricingMode || ""] || post.pricingMode || "---"}</p>
+                          <p className="text-[10px] text-slate-400">{post.pricing?.type === "fixed" ? "Giá cố định" : "Thương lượng"}</p>
+                        </td>
+                        <td className="py-4.5 px-6 min-w-56 text-xs">
+                          <div className="flex gap-2">
+                            <CalendarClock className="w-4 h-4 text-slate-300 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold text-slate-700">{post.scheduleType === "scheduled" ? "Đặt lịch" : "Đang sẵn sàng"}</p>
+                              <p className="text-slate-500">Từ: {formatDateTime(post.availableFrom)}</p>
+                              <p className="text-slate-500">Đến: {formatDateTime(post.availableTo)}</p>
+                            </div>
                           </div>
-                          {post.note && <p className="text-slate-400 line-clamp-2 pt-1">{post.note}</p>}
-                        </div>
-                      </td>
-                      <td className="py-4.5 px-6 min-w-44">
-                        <p className="font-extrabold text-slate-800 text-xs">{priceRange}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{PRICING_MODE_LABEL[post.pricingMode || ""] || post.pricingMode || "---"}</p>
-                        <p className="text-[10px] text-slate-400">{post.pricing?.type === "fixed" ? "Giá cố định" : "Thương lượng"}</p>
-                      </td>
-                      <td className="py-4.5 px-6 min-w-56 text-xs">
-                        <div className="flex gap-2">
-                          <CalendarClock className="w-4 h-4 text-slate-300 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-bold text-slate-700">{post.scheduleType === "scheduled" ? "Đặt lịch" : "Đang sẵn sàng"}</p>
-                            <p className="text-slate-500">Từ: {formatDateTime(post.availableFrom)}</p>
-                            <p className="text-slate-500">Đến: {formatDateTime(post.availableTo)}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4.5 px-6 text-xs font-semibold min-w-36">
-                        <p>Tải trọng: <span className="font-black text-slate-800">{vehicle?.capacity ? `${vehicle.capacity.toLocaleString("vi-VN")} kg` : "---"}</span></p>
-                        <p>Ghế: <span className="font-black text-slate-800">{post.availableSeats ?? vehicle?.seats ?? post.vehicleSeats ?? "---"}</span></p>
-                        <p className={post.isFull ? "text-red-500 font-bold" : "text-emerald-600 font-bold"}>{post.isFull ? "Đã đầy" : "Còn nhận"}</p>
-                      </td>
-                      <td className="py-4.5 px-6">
-                        <span className={`inline-flex px-3 py-1.5 rounded-xl text-xs font-bold border ${statusInfo.color}`}>{statusInfo.label}</span>
-                      </td>
-                      <td className="py-4.5 px-6 text-xs font-semibold text-slate-400 min-w-32">
-                        {formatDateTime(post.createdAt)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="py-4.5 px-6 text-xs font-semibold min-w-36">
+                          <p>Tải trọng: <span className="font-bold text-slate-800">{vehicle?.capacity ? `${vehicle.capacity.toLocaleString("vi-VN")} kg` : "---"}</span></p>
+                          <p>Ghế: <span className="font-bold text-slate-800">{post.availableSeats ?? vehicle?.seats ?? post.vehicleSeats ?? "---"}</span></p>
+                          <p className={post.isFull ? "text-red-500 font-bold" : "text-emerald-600 font-bold"}>{post.isFull ? "Đã đầy" : "Còn nhận"}</p>
+                        </td>
+                        <td className="py-4.5 px-6 whitespace-nowrap">
+                          <span className={`inline-flex px-3 py-1.5 rounded-xl text-xs font-bold border ${statusInfo.color}`}>{statusInfo.label}</span>
+                        </td>
+                        <td className="py-4.5 px-6 text-xs font-semibold text-slate-400 min-w-32 whitespace-nowrap">
+                          {formatDateTime(post.createdAt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

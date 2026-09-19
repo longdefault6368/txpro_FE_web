@@ -238,16 +238,18 @@ function AdminDashboardContent() {
       trend: "+12%",
       trendUp: true,
       gradient: "from-blue-500 to-indigo-600",
-      bgLight: "bg-blue-50"
+      bgLight: "bg-blue-50",
+      iconColor: "text-blue-600"
     },
     {
       label: "Tổng Tài Xế",
       value: metrics?.totalDrivers || 0,
       icon: Truck,
-      trend: `${metrics?.activeDrivers || 0} đang hoạt động`,
+      trend: `${metrics?.activeDrivers || 0} hoạt động`,
       trendUp: true,
       gradient: "from-emerald-500 to-teal-600",
-      bgLight: "bg-emerald-50"
+      bgLight: "bg-emerald-50",
+      iconColor: "text-emerald-600"
     },
     {
       label: "Tổng Chủ Hàng",
@@ -256,7 +258,8 @@ function AdminDashboardContent() {
       trend: "+8%",
       trendUp: true,
       gradient: "from-violet-500 to-purple-600",
-      bgLight: "bg-violet-50"
+      bgLight: "bg-violet-50",
+      iconColor: "text-violet-600"
     },
     {
       label: "Tổng Đơn Hàng",
@@ -265,7 +268,8 @@ function AdminDashboardContent() {
       trend: `${metrics?.totalViolations || 0} vi phạm`,
       trendUp: false,
       gradient: "from-orange-500 to-red-500",
-      bgLight: "bg-orange-50"
+      bgLight: "bg-orange-50",
+      iconColor: "text-orange-600"
     }
   ];
 
@@ -284,47 +288,138 @@ function AdminDashboardContent() {
       )}
 
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
         {statsCards.map((card, idx) => (
           <div
             key={idx}
-            className="bg-white rounded-2xl border border-slate-200/50 p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group"
+            className="bg-white rounded-2xl border border-slate-200/50 p-4 sm:p-5 lg:p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group min-w-0"
           >
-            <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${card.gradient} opacity-5 rounded-bl-[60px] group-hover:opacity-10 transition-opacity`} />
-            <div className="flex items-start justify-between mb-4">
-              <div className={`w-11 h-11 ${card.bgLight} rounded-xl flex items-center justify-center`}>
-                <card.icon className={`w-5 h-5 bg-gradient-to-br ${card.gradient} bg-clip-text`} style={{ color: "transparent", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", background: `linear-gradient(135deg, var(--tw-gradient-from), var(--tw-gradient-to))` }} />
-                <card.icon className={`w-5 h-5 absolute`} style={{ opacity: 0 }} />
+            <div className={`absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-gradient-to-br ${card.gradient} opacity-5 rounded-bl-[60px] group-hover:opacity-10 transition-opacity pointer-events-none`} />
+            <div className="flex items-start justify-between gap-2 mb-3 sm:mb-4">
+              <div className={`w-10 h-10 sm:w-11 sm:h-11 ${card.bgLight} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                <card.icon className={`w-5 h-5 ${card.iconColor}`} />
               </div>
-              <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${card.trendUp ? "text-emerald-600 bg-emerald-50" : "text-red-500 bg-red-50"}`}>
-                {card.trendUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {card.trend}
+              <div className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${card.trendUp ? "text-emerald-600 bg-emerald-50" : "text-red-500 bg-red-50"}`}>
+                {card.trendUp ? <ArrowUpRight className="w-3 h-3 flex-shrink-0" /> : <ArrowDownRight className="w-3 h-3 flex-shrink-0" />}
+                <span>{card.trend}</span>
               </div>
             </div>
-            <p className="text-3xl font-bold text-slate-900 tracking-tight">{card.value.toLocaleString()}</p>
-            <p className="text-xs font-semibold text-slate-400 mt-1">{card.label}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight truncate">{card.value.toLocaleString()}</p>
+            <p className="text-xs font-semibold text-slate-400 mt-1 truncate">{card.label}</p>
           </div>
         ))}
       </div>
 
       {/* Charts & Tables & Activity Feed Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-        {/* Left Column (1 col): Phân Bổ Vai Trò & Thông Báo Hoạt Động Mới Nhất */}
-        <div className="space-y-6">
+        {/* Main Column (2 cols on xl): Recent Orders & Quick Stats */}
+        <div className="xl:col-span-2 space-y-6 min-w-0 max-w-full">
+          {/* Recent Orders */}
+          <div className="bg-white rounded-2xl border border-slate-200/50 shadow-sm overflow-hidden">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-slate-800">Đơn Hàng Gần Đây</h3>
+              <Link href="/admin/orders" className="text-primary-600 hover:text-primary-700 text-xs font-bold transition-colors flex items-center gap-1 flex-shrink-0">
+                Xem tất cả <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+            {/* Mobile Swipe Hint */}
+            <div className="md:hidden px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+              <span>Đơn hàng gần đây</span>
+              <span className="text-primary-600 font-bold">← Vuốt ngang để xem →</span>
+            </div>
+            <div className="overflow-x-auto w-full max-w-full overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
+              <table className="w-full min-w-[620px] text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 text-slate-500 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100 whitespace-nowrap">
+                    <th className="py-3 px-4 sm:px-6">Mã Đơn</th>
+                    <th className="py-3 px-4 sm:px-6">Tiêu Đề</th>
+                    <th className="py-3 px-4 sm:px-6">Trạng Thái</th>
+                    <th className="py-3 px-4 sm:px-6 text-right">Giá Trị</th>
+                    <th className="py-3 px-4 sm:px-6">Ngày Tạo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {recentOrders.length > 0 ? recentOrders.map((order) => {
+                    const statusInfo = STATUS_MAP[order.status] || { label: order.status, color: "text-slate-500 bg-slate-50", icon: Clock };
+                    const StatusIcon = statusInfo.icon;
+                    return (
+                      <tr key={order._id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3.5 px-4 sm:px-6 whitespace-nowrap">
+                          <Link href={`/admin/orders/${order._id}`} className="font-bold text-primary-600 text-xs hover:underline">
+                            {order.orderCode}
+                          </Link>
+                        </td>
+                        <td className="py-3.5 px-4 sm:px-6 font-semibold text-slate-700 text-xs max-w-[200px] truncate">{order.title || "---"}</td>
+                        <td className="py-3.5 px-4 sm:px-6 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold ${statusInfo.color}`}>
+                            <StatusIcon className="w-3 h-3 flex-shrink-0" />
+                            {statusInfo.label}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 sm:px-6 text-right font-bold text-slate-800 text-xs whitespace-nowrap">
+                          {((order.offerPrice || order.budget || 0) / 1000).toFixed(0)}K ₫
+                        </td>
+                        <td className="py-3.5 px-4 sm:px-6 text-xs text-slate-400 font-semibold whitespace-nowrap">
+                          {formatDateTime(order.createdAt)}
+                        </td>
+                      </tr>
+                    );
+                  }) : (
+                    <tr><td colSpan={5} className="text-center py-10 text-slate-400 text-xs">Chưa có đơn hàng nào</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Quick Stats Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-5">
+            <div className="bg-white rounded-2xl border border-slate-200/50 p-4 sm:p-5 shadow-sm flex items-center gap-3.5 sm:gap-4 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-400 truncate">Tài Xế Đang Hoạt Động</p>
+                <p className="text-xl font-bold text-slate-900 mt-0.5">{metrics?.activeDrivers || 0}</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200/50 p-4 sm:p-5 shadow-sm flex items-center gap-3.5 sm:gap-4 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-amber-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-400 truncate">KYC Chờ Duyệt</p>
+                <p className="text-xl font-bold text-slate-900 mt-0.5">{metrics?.pendingKyc || 0}</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200/50 p-4 sm:p-5 shadow-sm flex items-center gap-3.5 sm:gap-4 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-400 truncate">Vi Phạm Hệ Thống</p>
+                <p className="text-xl font-bold text-slate-900 mt-0.5">{metrics?.totalViolations || 0}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Side Column (1 col on xl): Role Distribution & Notifications */}
+        <div className="space-y-6 min-w-0 max-w-full">
           {/* Role Distribution Chart (CSS-only donut) */}
-          <div className="bg-white rounded-2xl border border-slate-200/50 p-6 shadow-sm">
-            <h3 className="text-sm font-extrabold text-slate-800 mb-6">Phân Bổ Vai Trò</h3>
+          <div className="bg-white rounded-2xl border border-slate-200/50 p-5 sm:p-6 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-800 mb-5 sm:mb-6">Phân Bổ Vai Trò</h3>
             <div className="flex items-center justify-center mb-6">
               <div
-                className="w-36 h-36 rounded-full relative"
+                className="w-36 h-36 rounded-full relative shadow-xs"
                 style={{
                   background: `conic-gradient(#10b981 0% ${driverPct}%, #8b5cf6 ${driverPct}% 100%)`
                 }}
               >
-                <div className="absolute inset-3 bg-white rounded-full flex items-center justify-center">
+                <div className="absolute inset-3 bg-white rounded-full flex items-center justify-center shadow-inner">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-slate-900">{total}</p>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase">Thành viên</p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Thành viên</p>
                   </div>
                 </div>
               </div>
@@ -332,37 +427,37 @@ function AdminDashboardContent() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full flex-shrink-0"></div>
                   <span className="text-xs font-semibold text-slate-600">Tài Xế</span>
                 </div>
                 <span className="text-xs font-bold text-slate-800">{metrics?.totalDrivers || 0} ({driverPct}%)</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-violet-500 rounded-full"></div>
+                  <div className="w-3 h-3 bg-violet-500 rounded-full flex-shrink-0"></div>
                   <span className="text-xs font-semibold text-slate-600">Chủ Hàng</span>
                 </div>
                 <span className="text-xs font-bold text-slate-800">{metrics?.totalShippers || 0} ({shipperPct}%)</span>
               </div>
               {metrics?.pendingKyc ? (
                 <div className="mt-4 bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-500" />
+                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
                   <span className="text-[11px] font-semibold text-amber-700">{metrics.pendingKyc} hồ sơ KYC đang chờ duyệt</span>
                 </div>
               ) : null}
             </div>
           </div>
 
-          {/* Notifications Card - width bằng card Phân Bổ Vai Trò */}
+          {/* Notifications Card */}
           <div className="bg-white rounded-2xl border border-slate-200/50 shadow-sm overflow-hidden flex flex-col">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
+            <div className="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
                   <Bell className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <h3 className="text-sm font-extrabold text-slate-800 truncate">Hoạt Động Mới Nhất</h3>
+                    <h3 className="text-sm font-bold text-slate-800 truncate">Hoạt Động Mới Nhất</h3>
                     {unreadCount > 0 && (
                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white shadow-xs">
                         {unreadCount}
@@ -384,7 +479,7 @@ function AdminDashboardContent() {
                     title="Đánh dấu tất cả đã đọc"
                   >
                     <CheckCheck className="w-3.5 h-3.5 text-primary-600" />
-                    <span className="text-[10px]">Đã đọc</span>
+                    <span className="text-[10px] hidden xs:inline">Đã đọc</span>
                   </button>
                 )}
                 <Link
@@ -449,7 +544,7 @@ function AdminDashboardContent() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                           <span
-                            className={`text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                            className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                               isOrder
                                 ? "bg-red-100/70 text-red-700"
                                 : isKyc
@@ -496,93 +591,6 @@ function AdminDashboardContent() {
                 })}
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Right Column (2 cols): Recent Orders & Quick Stats */}
-        <div className="xl:col-span-2 space-y-6">
-          {/* Recent Orders */}
-          <div className="bg-white rounded-2xl border border-slate-200/50 shadow-sm overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-extrabold text-slate-800">Đơn Hàng Gần Đây</h3>
-              <Link href="/admin/orders" className="text-primary-600 hover:text-primary-700 text-xs font-bold transition-colors flex items-center gap-1">
-                Xem tất cả <ArrowUpRight className="w-3 h-3" />
-              </Link>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-50/80 text-slate-500 text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-100">
-                    <th className="py-3 px-6">Mã Đơn</th>
-                    <th className="py-3 px-6">Tiêu Đề</th>
-                    <th className="py-3 px-6">Trạng Thái</th>
-                    <th className="py-3 px-6 text-right">Giá Trị</th>
-                    <th className="py-3 px-6">Ngày Tạo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {recentOrders.length > 0 ? recentOrders.map((order) => {
-                    const statusInfo = STATUS_MAP[order.status] || { label: order.status, color: "text-slate-500 bg-slate-50", icon: Clock };
-                    const StatusIcon = statusInfo.icon;
-                    return (
-                      <tr key={order._id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3.5 px-6">
-                          <Link href={`/admin/orders/${order._id}`} className="font-bold text-primary-600 text-xs hover:underline">
-                            {order.orderCode}
-                          </Link>
-                        </td>
-                        <td className="py-3.5 px-6 font-semibold text-slate-700 text-xs">{order.title || "---"}</td>
-                        <td className="py-3.5 px-6">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold ${statusInfo.color}`}>
-                            <StatusIcon className="w-3 h-3" />
-                            {statusInfo.label}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-6 text-right font-bold text-slate-800 text-xs">
-                          {((order.offerPrice || order.budget || 0) / 1000).toFixed(0)}K ₫
-                        </td>
-                        <td className="py-3.5 px-6 text-xs text-slate-400 font-semibold">
-                          {formatDateTime(order.createdAt)}
-                        </td>
-                      </tr>
-                    );
-                  }) : (
-                    <tr><td colSpan={5} className="text-center py-10 text-slate-400 text-xs">Chưa có đơn hàng nào</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Quick Stats Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div className="bg-white rounded-2xl border border-slate-200/50 p-5 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-emerald-500" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-400">Tài Xế Đang Hoạt Động</p>
-                <p className="text-xl font-bold text-slate-900">{metrics?.activeDrivers || 0}</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-slate-200/50 p-5 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
-                <AlertCircle className="w-6 h-6 text-amber-500" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-400">KYC Chờ Duyệt</p>
-                <p className="text-xl font-bold text-slate-900">{metrics?.pendingKyc || 0}</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-slate-200/50 p-5 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
-                <XCircle className="w-6 h-6 text-red-500" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-400">Vi Phạm Hệ Thống</p>
-                <p className="text-xl font-bold text-slate-900">{metrics?.totalViolations || 0}</p>
-              </div>
-            </div>
           </div>
         </div>
       </div>

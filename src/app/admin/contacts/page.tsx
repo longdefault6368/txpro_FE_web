@@ -298,79 +298,85 @@ export default function AdminContactsPage() {
             <p className="text-xs text-slate-500 mt-1">Các liên hệ gửi từ website sẽ hiển thị đầy đủ tại đây.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-xs uppercase font-bold text-slate-500">
-                  <th className="py-3.5 px-4">Khách hàng</th>
-                  <th className="py-3.5 px-4">Đối tượng</th>
-                  <th className="py-3.5 px-4">Tiêu đề & Nội dung</th>
-                  <th className="py-3.5 px-4">Thời gian</th>
-                  <th className="py-3.5 px-4">Trạng thái</th>
-                  <th className="py-3.5 px-4 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {contacts.map((contact) => {
-                  const cat = CATEGORY_LABELS[contact.category] || CATEGORY_LABELS.other;
-                  const CatIcon = cat.icon;
-                  const st = STATUS_BADGES[contact.status] || STATUS_BADGES.new;
-                  const formattedDate = new Date(contact.createdAt).toLocaleDateString("vi-VN", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
+          <div className="w-full">
+            {/* Mobile Swipe Hint */}
+            <div className="md:hidden px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+              <span>Danh sách liên hệ</span>
+              <span className="text-primary-600 font-bold">← Vuốt ngang để xem đủ cột →</span>
+            </div>
+            <div className="overflow-x-auto w-full max-w-full overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
+              <table className="w-full min-w-[890px] text-left border-collapse text-sm">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-xs uppercase font-bold text-slate-500 whitespace-nowrap">
+                    <th className="py-3.5 px-4 min-w-[180px]">Khách hàng</th>
+                    <th className="py-3.5 px-4 min-w-[130px]">Đối tượng</th>
+                    <th className="py-3.5 px-4 min-w-[220px]">Tiêu đề & Nội dung</th>
+                    <th className="py-3.5 px-4 min-w-[130px]">Thời gian</th>
+                    <th className="py-3.5 px-4 min-w-[120px]">Trạng thái</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {contacts.map((contact) => {
+                    const cat = CATEGORY_LABELS[contact.category] || CATEGORY_LABELS.other;
+                    const CatIcon = cat.icon;
+                    const st = STATUS_BADGES[contact.status] || STATUS_BADGES.new;
+                    const formattedDate = new Date(contact.createdAt).toLocaleDateString("vi-VN", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
 
-                  return (
-                    <tr
-                      key={contact._id}
-                      onClick={() => openContactDetail(contact)}
-                      className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
-                        contact.status === "new" ? "bg-blue-50/15" : ""
-                      }`}
-                    >
-                      {/* Customer Info */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900">{contact.fullName}</div>
-                        <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                          <span className="font-medium">{contact.phone}</span>
-                          <span>•</span>
-                          <span className="truncate max-w-[140px]">{contact.email}</span>
-                        </div>
-                      </td>
+                    return (
+                      <tr
+                        key={contact._id}
+                        onClick={() => openContactDetail(contact)}
+                        className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
+                          contact.status === "new" ? "bg-blue-50/15" : ""
+                        }`}
+                      >
+                        {/* Customer Info */}
+                        <td className="py-3.5 px-4 min-w-[180px]">
+                          <div className="font-bold text-slate-900">{contact.fullName}</div>
+                          <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                            <span className="font-medium">{contact.phone}</span>
+                            <span>•</span>
+                            <span className="truncate max-w-[140px]">{contact.email}</span>
+                          </div>
+                        </td>
 
-                      {/* Category */}
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${cat.badge}`}
-                        >
-                          <CatIcon className="w-3 h-3" />
-                          {cat.label}
-                        </span>
-                      </td>
+                        {/* Category */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${cat.badge}`}
+                          >
+                            <CatIcon className="w-3 h-3" />
+                            {cat.label}
+                          </span>
+                        </td>
 
-                      {/* Subject & snippet */}
-                      <td className="py-3.5 px-4 max-w-xs sm:max-w-sm">
-                        <div className="font-semibold text-slate-900 truncate">{contact.subject}</div>
-                        <div className="text-xs text-slate-500 truncate mt-0.5">{contact.message}</div>
-                      </td>
+                        {/* Subject & snippet */}
+                        <td className="py-3.5 px-4 min-w-[220px] max-w-xs sm:max-w-sm">
+                          <div className="font-semibold text-slate-900 truncate">{contact.subject}</div>
+                          <div className="text-xs text-slate-500 truncate mt-0.5">{contact.message}</div>
+                        </td>
 
-                      {/* Created date */}
-                      <td className="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">
-                        {formattedDate}
-                      </td>
+                        {/* Created date */}
+                        <td className="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">
+                          {formattedDate}
+                        </td>
 
-                      {/* Status badge */}
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${st.badge}`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-                          {st.label}
-                        </span>
-                      </td>
+                        {/* Status badge */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${st.badge}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+                            {st.label}
+                          </span>
+                        </td>
 
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -396,7 +402,8 @@ export default function AdminContactsPage() {
               </tbody>
             </table>
           </div>
-        )}
+        </div>
+      )}
 
         {/* Pagination */}
         {totalPages > 1 && (

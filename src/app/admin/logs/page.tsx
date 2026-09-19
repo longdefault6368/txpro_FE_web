@@ -84,7 +84,7 @@ export default function AdminLogsPage() {
             <TerminalSquare className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-950">Log hệ thống</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-950">Log hệ thống</h1>
             <p className="mt-1 text-xs font-semibold text-slate-400">
               Hiển thị các log backend gần đây từ console và HTTP request.
             </p>
@@ -143,7 +143,7 @@ export default function AdminLogsPage() {
               {logs.map((log) => (
                 <div key={log.id} className="grid gap-3 px-5 py-4 text-xs md:grid-cols-[170px_84px_90px_1fr]">
                   <span className="font-mono text-slate-500">{formatDateTime(log.timestamp)}</span>
-                  <span className={`w-fit rounded-lg border px-2 py-1 font-black uppercase ${LEVEL_STYLE[log.level] || LEVEL_STYLE.info}`}>
+                  <span className={`w-fit rounded-lg border px-2 py-1 font-bold uppercase ${LEVEL_STYLE[log.level] || LEVEL_STYLE.info}`}>
                     {log.level}
                   </span>
                   <span className="font-bold text-slate-500">{log.source}</span>

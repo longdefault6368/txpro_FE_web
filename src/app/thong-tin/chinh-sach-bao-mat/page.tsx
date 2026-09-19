@@ -27,13 +27,35 @@ import SubpageCtaBanner from "@/components/common/SubpageCtaBanner";
 import { useLanguage } from "@/context/LanguageContext";
 import { useCompanyInfo } from "@/context/CompanyInfoContext";
 
+interface PolicySection {
+  id: string;
+  number: string;
+  title: string;
+  icon: any;
+  content: string[];
+  notes?: string;
+}
+
 export default function PrivacyPolicyPage() {
   const { language } = useLanguage();
   const { companyInfo } = useCompanyInfo();
   const [activeSection, setActiveSection] = useState<string>("sec-1");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  const pageCopy = {
+  const pageCopyMap: Record<string, {
+    badge: string;
+    title: string;
+    subtitle: string;
+    lastUpdated: string;
+    version: string;
+    tocTitle: string;
+    searchPlaceholder: string;
+    printBtn: string;
+    dpoTitle: string;
+    dpoDesc: string;
+    dpoEmail: string;
+    sections: PolicySection[];
+  }> = {
     vi: {
       badge: "Cam Kết Bảo Vệ Dữ Liệu Cá Nhân",
       title: "Chính Sách Bảo Mật TXEPRO",
@@ -199,29 +221,17 @@ export default function PrivacyPolicyPage() {
       dpoEmail: companyInfo.emailPrivacy || "",
       sections: [],
     },
-  }[language] || {
-    badge: "Bảo Vệ Dữ Liệu",
-    title: "Chính Sách Bảo Mật TXEPRO",
-    subtitle: "Cam kết bảo vệ dữ liệu cá nhân.",
-    lastUpdated: "15/09/2026",
-    version: "2.3.0",
-    tocTitle: "Mục lục",
-    searchPlaceholder: "Tìm kiếm...",
-    printBtn: "In",
-    dpoTitle: "DPO",
-    dpoDesc: "Hỗ trợ bảo mật",
-    dpoEmail: companyInfo.emailPrivacy || "",
-    sections: [],
   };
+  const pageCopy = pageCopyMap[language as "vi" | "en" | "zh"] || pageCopyMap.vi;
 
-  const sectionsList = pageCopy.sections.length > 0 ? pageCopy.sections : [];
+  const sectionsList: PolicySection[] = (pageCopy.sections && pageCopy.sections.length > 0) ? pageCopy.sections : pageCopyMap.vi.sections;
 
-  const filteredSections = sectionsList.filter((sec) => {
+  const filteredSections = sectionsList.filter((sec: PolicySection) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     return (
       sec.title.toLowerCase().includes(q) ||
-      sec.content.some((c) => c.toLowerCase().includes(q))
+      sec.content.some((c: string) => c.toLowerCase().includes(q))
     );
   });
 

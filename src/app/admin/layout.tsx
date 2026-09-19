@@ -110,7 +110,7 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
   },
   {
     id: "users",
-    name: "KYC",
+    name: "Người Dùng",
     description: "Quản lý hồ sơ xác thực, duyệt CCCD, bằng lái & phương tiện",
     path: "/admin/users",
     category: "operations",
@@ -198,7 +198,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin", icon: LayoutDashboard, label: "Tổng Quan", roles: ["super_admin", "operations", "dispatcher"] },
   { href: "/admin/notifications", icon: Bell, label: "Thông Báo" },
   { href: "/admin/team", icon: UserCheck, label: "Ban Quản Trị", roles: ["super_admin"] },
-  { href: "/admin/users", icon: Users, label: "KYC", roles: ["super_admin", "operations", "kyc_officer"] },
+  { href: "/admin/users", icon: Users, label: "Người Dùng", roles: ["super_admin", "operations", "kyc_officer"] },
   {
     href: "/admin/orders",
     icon: Package,
@@ -497,7 +497,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className="rounded-full shadow-lg"
           />
           <div>
-            <h1 className="text-white font-extrabold text-sm tracking-tight">TXEPRO</h1>
+            <h1 className="text-white font-bold text-sm tracking-tight">TXEPRO</h1>
             <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Admin Panel</p>
           </div>
           <button
@@ -596,23 +596,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 lg:ml-[260px] flex flex-col min-h-screen">
+      <div className="flex-1 lg:ml-[260px] flex flex-col min-h-screen min-w-0 max-w-full">
         {/* Top Bar */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-6 sticky top-0 z-30 shadow-sm">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-3.5 sm:px-6 sticky top-0 z-30 shadow-sm">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden mr-4 p-2 text-slate-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all cursor-pointer"
+            className="lg:hidden mr-2.5 sm:mr-4 p-2 text-slate-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all cursor-pointer"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex-1">
-            <h2 className="text-sm font-extrabold text-slate-800 tracking-tight">
+          <div className="flex-1 min-w-0 mr-2">
+            <h2 className="text-sm font-bold text-slate-800 tracking-tight truncate">
               {currentNavLabel}
             </h2>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Notification Bell Dropdown */}
             <div className="relative">
               <button
@@ -626,7 +626,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 <Bell className="w-5 h-5" />
                 {unreadNotifCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white font-extrabold text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center shadow-md animate-pulse">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white font-bold text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center shadow-md animate-pulse">
                     {unreadNotifCount > 99 ? "99+" : unreadNotifCount}
                   </span>
                 )}
@@ -639,12 +639,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     className="fixed inset-0 z-40"
                     onClick={() => setNotifDropdownOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200/80 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-24px)] bg-white rounded-2xl shadow-2xl border border-slate-200/80 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
                     <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-800 text-xs">Thông báo mới</span>
                         {unreadNotifCount > 0 && (
-                          <span className="bg-primary-100 text-primary-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                          <span className="bg-primary-100 text-primary-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
                             {unreadNotifCount} mới
                           </span>
                         )}
@@ -726,7 +726,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   setUserDropdownOpen(!userDropdownOpen);
                   setNotifDropdownOpen(false);
                 }}
-                className={`flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border transition-all cursor-pointer ${
+                className={`flex items-center gap-2 pl-1 pr-1.5 sm:pr-3 py-1 rounded-full border transition-all cursor-pointer ${
                   userDropdownOpen
                     ? "bg-primary-50 border-primary-200 ring-2 ring-primary-100"
                     : "bg-slate-50 border-slate-200/70 hover:border-primary-300 hover:bg-primary-50/40"
@@ -760,7 +760,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {userDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setUserDropdownOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200/80 z-50 overflow-hidden">
+                  <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-24px)] bg-white rounded-2xl shadow-2xl border border-slate-200/80 z-50 overflow-hidden">
                     {/* Header */}
                     <div className="px-4 py-3 bg-gradient-to-r from-slate-900 to-slate-800">
                       <div className="flex items-center gap-3">
@@ -822,7 +822,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Page Content with Route Guard */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3.5 sm:p-6 min-w-0 max-w-full overflow-x-hidden">
           {isCurrentRouteAllowed ? (
             children
           ) : (
@@ -831,7 +831,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <ShieldAlert className="w-8 h-8" />
               </div>
               <div>
-                <h3 className="text-xl font-black text-slate-900">Giới Hạn Quyền Truy Cập</h3>
+                <h3 className="text-xl font-bold text-slate-900">Giới Hạn Quyền Truy Cập</h3>
                 <p className="text-xs text-slate-500 mt-2 leading-relaxed max-w-md mx-auto">
                   Tài khoản của bạn hiện thuộc cấp bậc <span className="font-bold text-slate-800">{currentRoleConfig.label}</span> và chưa được phân quyền truy cập chức năng này.
                 </p>

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { 
   Search, Filter, Truck, CheckCircle, Clock, XCircle, 
-  ChevronLeft, ChevronRight, ChevronUp, ChevronDown, AlertTriangle, Eye, Loader, SlidersHorizontal 
+  ChevronLeft, ChevronRight, ChevronUp, ChevronDown, AlertTriangle, Eye, Loader, SlidersHorizontal,
+  Calendar, RotateCcw
 } from "lucide-react";
 
 interface UserInfo {
@@ -200,12 +201,80 @@ function AdminOrdersContent() {
   // Filters & Search
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [datePreset, setDatePreset] = useState<string>("all");
   const [limit, setLimit] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
 
   // Details Modal
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  const applyDatePreset = (preset: string) => {
+    setDatePreset(preset);
+    setCurrentPage(1);
+
+    const today = new Date();
+    const formatDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    if (preset === "all") {
+      setStartDate("");
+      setEndDate("");
+      return;
+    }
+
+    if (preset === "today") {
+      const formatted = formatDate(today);
+      setStartDate(formatted);
+      setEndDate(formatted);
+      return;
+    }
+
+    if (preset === "yesterday") {
+      const yest = new Date(today);
+      yest.setDate(yest.getDate() - 1);
+      const formatted = formatDate(yest);
+      setStartDate(formatted);
+      setEndDate(formatted);
+      return;
+    }
+
+    if (preset === "7days") {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 7);
+      setStartDate(formatDate(past));
+      setEndDate(formatDate(today));
+      return;
+    }
+
+    if (preset === "30days") {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 30);
+      setStartDate(formatDate(past));
+      setEndDate(formatDate(today));
+      return;
+    }
+
+    if (preset === "this_month") {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      setStartDate(formatDate(firstDay));
+      setEndDate(formatDate(today));
+      return;
+    }
+  };
+
+  const clearDateFilter = () => {
+    setDatePreset("all");
+    setStartDate("");
+    setEndDate("");
+    setCurrentPage(1);
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -214,7 +283,9 @@ function AdminOrdersContent() {
       page: String(currentPage),
       limit: String(limit),
       ...(search ? { search } : {}),
-      ...(statusFilter ? { status: statusFilter } : {})
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {})
     });
 
     try {
@@ -251,6 +322,17 @@ function AdminOrdersContent() {
         filtered = filtered.filter(o => o.status === statusFilter);
       }
 
+      if (startDate || endDate) {
+        const startMs = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
+        const endMs = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
+        filtered = filtered.filter(o => {
+          const itemMs = new Date(o.createdAt).getTime();
+          if (startMs && itemMs < startMs) return false;
+          if (endMs && itemMs > endMs) return false;
+          return true;
+        });
+      }
+
       const total = filtered.length;
       const pages = Math.ceil(total / limit) || 1;
       const startIdx = (currentPage - 1) * limit;
@@ -270,7 +352,7 @@ function AdminOrdersContent() {
 
   useEffect(() => {
     fetchOrders();
-  }, [currentPage, search, statusFilter, limit]);
+  }, [currentPage, search, statusFilter, startDate, endDate, limit]);
 
   const sortedOrders = useMemo(() => {
     if (!sortConfig) return orders;
@@ -342,62 +424,139 @@ function AdminOrdersContent() {
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white/80 backdrop-blur-xl border border-slate-200/50 p-6 rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.03)] flex flex-col md:flex-row gap-4 items-center">
-        {/* Search */}
-        <div className="relative w-full md:flex-1">
-          <input
-            type="text"
-            placeholder="Tìm theo mã vận đơn, tên hàng, địa điểm giao nhận..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 text-slate-800 text-sm transition-all"
-          />
-          <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+      <div className="bg-white/80 backdrop-blur-xl border border-slate-200/50 p-5 sm:p-6 rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.03)] space-y-4">
+        <div className="flex flex-col md:flex-row gap-3 sm:gap-4 items-center">
+          {/* Search */}
+          <div className="relative w-full md:flex-1">
+            <input
+              type="text"
+              placeholder="Tìm theo mã vận đơn, tên hàng, địa điểm giao nhận..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 text-slate-800 text-sm transition-all"
+            />
+            <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+          </div>
+
+          {/* Filters */}
+          <div className="relative w-full md:w-52">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="appearance-none w-full pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
+            >
+              <option value="">Tất cả Trạng thái</option>
+              <option value="searching_driver">Tìm tài xế</option>
+              <option value="waiting_driver">Đang chờ tài xế</option>
+              <option value="waiting_driver_acceptance">Chờ tài xế nhận</option>
+              <option value="accepted">Đã nhận đơn</option>
+              <option value="rejected">Đã từ chối</option>
+              <option value="in_progress">Đang vận chuyển</option>
+              <option value="delivered">Đã giao hàng</option>
+              <option value="completed">Đã hoàn thành</option>
+              <option value="cancelled">Đã hủy đơn</option>
+            </select>
+            <Filter className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {/* Page Size Select */}
+          <div className="relative w-full md:w-44">
+            <select
+              value={limit}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="appearance-none w-full pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
+            >
+              <option value={10}>10 dòng / trang</option>
+              <option value={20}>20 dòng / trang</option>
+              <option value={50}>50 dòng / trang</option>
+              <option value={100}>100 dòng / trang</option>
+            </select>
+            <SlidersHorizontal className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
 
-        {/* Filters */}
-        <div className="relative w-full md:w-52">
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="appearance-none w-full pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
-          >
-            <option value="">Tất cả Trạng thái</option>
-            <option value="searching_driver">Tìm tài xế</option>
-            <option value="waiting_driver">Đang chờ tài xế</option>
-            <option value="waiting_driver_acceptance">Chờ tài xế nhận</option>
-            <option value="accepted">Đã nhận đơn</option>
-            <option value="rejected">Đã từ chối</option>
-            <option value="in_progress">Đang vận chuyển</option>
-            <option value="delivered">Đã giao hàng</option>
-            <option value="completed">Đã hoàn thành</option>
-            <option value="cancelled">Đã hủy đơn</option>
-          </select>
-          <Filter className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
+        {/* Date Range Filter Section */}
+        <div className="pt-3.5 border-t border-slate-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 text-xs">
+          {/* Quick Preset Buttons */}
+          <div className="flex items-center gap-1.5 flex-wrap w-full lg:w-auto">
+            <span className="text-slate-500 font-bold flex items-center gap-1.5 mr-1">
+              <Calendar className="w-3.5 h-3.5 text-primary-600" />
+              <span>Khoảng ngày:</span>
+            </span>
+            {[
+              { id: "all", label: "Tất cả" },
+              { id: "today", label: "Hôm nay" },
+              { id: "yesterday", label: "Hôm qua" },
+              { id: "7days", label: "7 ngày qua" },
+              { id: "30days", label: "30 ngày qua" },
+              { id: "this_month", label: "Tháng này" },
+            ].map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => applyDatePreset(p.id)}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                  datePreset === p.id && (p.id === "all" || (startDate && endDate))
+                    ? "bg-primary-600 text-white shadow-sm shadow-primary-600/30"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
 
-        {/* Page Size Select */}
-        <div className="relative w-full md:w-44">
-          <select
-            value={limit}
-            onChange={(e) => {
-              setLimit(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="appearance-none w-full pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
-          >
-            <option value={10}>10 dòng / trang</option>
-            <option value={20}>20 dòng / trang</option>
-            <option value={50}>50 dòng / trang</option>
-            <option value={100}>100 dòng / trang</option>
-          </select>
-          <SlidersHorizontal className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          {/* Custom Date Pickers */}
+          <div className="flex items-center gap-2 w-full lg:w-auto flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-slate-700 w-full sm:w-auto">
+              <span className="text-[11px] font-bold text-slate-400">Từ:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setDatePreset("custom");
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer w-full sm:w-auto text-slate-800"
+              />
+            </div>
+            <span className="text-slate-400 font-bold hidden sm:inline">-</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-slate-700 w-full sm:w-auto">
+              <span className="text-[11px] font-bold text-slate-400">Đến:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setDatePreset("custom");
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer w-full sm:w-auto text-slate-800"
+              />
+            </div>
+
+            {(startDate || endDate) && (
+              <button
+                type="button"
+                onClick={clearDateFilter}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-500 font-bold rounded-xl transition-colors cursor-pointer ml-auto sm:ml-0"
+                title="Xóa lọc theo ngày"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="text-[11px]">Đặt lại</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -415,111 +574,118 @@ function AdminOrdersContent() {
             <p className="text-xs">Thử điều chỉnh lại từ khóa hoặc bộ lọc trạng thái</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] font-extrabold uppercase tracking-wider">
-                  <th className="py-4 px-6">
-                    {renderSortableHeader("orderCode", "Mã Đơn")}
-                  </th>
-                  <th className="py-4 px-6">
-                    {renderSortableHeader("title", "Tên Hàng Hóa")}
-                  </th>
-                  <th className="py-4 px-6">Lộ Trình (Điểm Đi / Điểm Đến)</th>
-                  <th className="py-4 px-6">Chủ Hàng / Tài Xế</th>
-                  <th className="py-4 px-6">
-                    {renderSortableHeader("cost", "Chi Phí")}
-                  </th>
-                  <th className="py-4 px-6">
-                    {renderSortableHeader("createdAt", "Ngày Tạo")}
-                  </th>
-                  <th className="py-4 px-6">
-                    {renderSortableHeader("status", "Trạng Thái")}
-                  </th>
-                  <th className="py-4 px-6 text-right">Chi Tiết</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
-                {sortedOrders.map((order) => {
-                  const statusInfo = STATUS_MAP[order.status] || { label: order.status, color: "text-slate-500 bg-slate-50", icon: Clock };
-                  const StatusIcon = statusInfo.icon;
-                  const cancelReason = order.status === "cancelled" ? getCancelReasonText(order) : "";
-                  const cancelledBy = order.status === "cancelled" ? getCancelledByDisplay(order) : "";
-                  return (
-                    <tr key={order._id} className="hover:bg-slate-50/50 transition-colors">
-                      {/* Code */}
-                      <td className="py-4.5 px-6">
-                        <Link href={`/admin/orders/${order._id}`} className="font-bold text-primary-600 text-xs hover:underline cursor-pointer">
-                          {order.orderCode}
-                        </Link>
-                      </td>
+          <div className="w-full">
+            {/* Mobile Swipe Hint */}
+            <div className="md:hidden px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+              <span>Danh sách đơn hàng</span>
+              <span className="text-primary-600 font-bold">← Vuốt ngang để xem đủ cột →</span>
+            </div>
+            <div className="overflow-x-auto w-full max-w-full overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
+              <table className="w-full min-w-[1000px] text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+                    <th className="py-4 px-6 min-w-[120px]">
+                      {renderSortableHeader("orderCode", "Mã Đơn")}
+                    </th>
+                    <th className="py-4 px-6 min-w-[160px]">
+                      {renderSortableHeader("title", "Tên Hàng Hóa")}
+                    </th>
+                    <th className="py-4 px-6 min-w-[220px]">Lộ Trình (Điểm Đi / Điểm Đến)</th>
+                    <th className="py-4 px-6 min-w-[180px]">Chủ Hàng / Tài Xế</th>
+                    <th className="py-4 px-6 min-w-[110px]">
+                      {renderSortableHeader("cost", "Chi Phí")}
+                    </th>
+                    <th className="py-4 px-6 min-w-[140px]">
+                      {renderSortableHeader("createdAt", "Ngày Tạo")}
+                    </th>
+                    <th className="py-4 px-6 min-w-[150px]">
+                      {renderSortableHeader("status", "Trạng Thái")}
+                    </th>
+                    <th className="py-4 px-6 text-right w-[80px]">Chi Tiết</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
+                  {sortedOrders.map((order) => {
+                    const statusInfo = STATUS_MAP[order.status] || { label: order.status, color: "text-slate-500 bg-slate-50", icon: Clock };
+                    const StatusIcon = statusInfo.icon;
+                    const cancelReason = order.status === "cancelled" ? getCancelReasonText(order) : "";
+                    const cancelledBy = order.status === "cancelled" ? getCancelledByDisplay(order) : "";
+                    return (
+                      <tr key={order._id} className="hover:bg-slate-50/50 transition-colors">
+                        {/* Code */}
+                        <td className="py-4.5 px-6 whitespace-nowrap">
+                          <Link href={`/admin/orders/${order._id}`} className="font-bold text-primary-600 text-xs hover:underline cursor-pointer">
+                            {order.orderCode}
+                          </Link>
+                        </td>
 
-                      {/* Title */}
-                      <td className="py-4.5 px-6">
-                        <span className="font-bold text-slate-800">{order.title}</span>
-                      </td>
+                        {/* Title */}
+                        <td className="py-4.5 px-6 min-w-[160px] max-w-xs">
+                          <span className="font-bold text-slate-800 line-clamp-2">{order.title}</span>
+                        </td>
 
-                      {/* Route */}
-                      <td className="py-4.5 px-6 max-w-xs">
-                        <div className="space-y-0.5 text-xs">
-                          <p className="font-semibold text-slate-700 truncate"><span className="text-slate-400 font-bold uppercase text-[9px] mr-1">TỪ:</span>{order.pickup?.address || "---"}</p>
-                          <p className="font-semibold text-slate-600 truncate"><span className="text-slate-400 font-bold uppercase text-[9px] mr-1">ĐẾN:</span>{order.dropoff?.address || "---"}</p>
-                        </div>
-                      </td>
+                        {/* Route */}
+                        <td className="py-4.5 px-6 min-w-[220px] max-w-xs">
+                          <div className="space-y-0.5 text-xs">
+                            <p className="font-semibold text-slate-700 truncate"><span className="text-slate-400 font-bold uppercase text-[9px] mr-1">TỪ:</span>{order.pickup?.address || "---"}</p>
+                            <p className="font-semibold text-slate-600 truncate"><span className="text-slate-400 font-bold uppercase text-[9px] mr-1">ĐẾN:</span>{order.dropoff?.address || "---"}</p>
+                          </div>
+                        </td>
 
-                      {/* Parties */}
-                      <td className="py-4.5 px-6 text-xs font-semibold">
-                        <div className="space-y-0.5">
-                          <p className="text-slate-700"><span className="text-blue-500 font-bold text-[9px] uppercase mr-1">Shipper:</span>{order.shipperId?.name || "---"}</p>
-                          <p className="text-slate-600"><span className="text-emerald-500 font-bold text-[9px] uppercase mr-1">Driver:</span>{order.driverId?.name || "---"}</p>
-                        </div>
-                      </td>
+                        {/* Parties */}
+                        <td className="py-4.5 px-6 min-w-[180px] text-xs font-semibold">
+                          <div className="space-y-0.5">
+                            <p className="text-slate-700 truncate"><span className="text-blue-500 font-bold text-[9px] uppercase mr-1">Shipper:</span>{order.shipperId?.name || "---"}</p>
+                            <p className="text-slate-600 truncate"><span className="text-emerald-500 font-bold text-[9px] uppercase mr-1">Driver:</span>{order.driverId?.name || "---"}</p>
+                          </div>
+                        </td>
 
-                      {/* Cost */}
-                      <td className="py-4.5 px-6 font-extrabold text-slate-800 text-xs">
-                        {(getOrderCost(order) / 1000).toLocaleString()}K ₫
-                      </td>
+                        {/* Cost */}
+                        <td className="py-4.5 px-6 font-bold text-slate-800 text-xs whitespace-nowrap">
+                          {(getOrderCost(order) / 1000).toLocaleString()}K ₫
+                        </td>
 
-                      {/* Created At */}
-                      <td className="py-4.5 px-6 text-xs font-bold text-slate-600 whitespace-nowrap">
-                        {formatDateTime(order.createdAt)}
-                      </td>
+                        {/* Created At */}
+                        <td className="py-4.5 px-6 text-xs font-bold text-slate-600 whitespace-nowrap">
+                          {formatDateTime(order.createdAt)}
+                        </td>
 
-                      {/* Status */}
-                      <td className="py-4.5 px-6">
-                        <div className="space-y-1.5">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${statusInfo.color}`}>
-                            <StatusIcon className="w-3.5 h-3.5" />
-                            {statusInfo.label}
-                          </span>
-                          {cancelReason && (
-                            <p className="max-w-48 text-[11px] font-semibold leading-5 text-red-600">
-                              Lý do: {cancelReason}
-                            </p>
-                          )}
-                          {cancelledBy && (
-                            <p className="max-w-48 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                              Bên hủy: {cancelledBy}
-                            </p>
-                          )}
-                        </div>
-                      </td>
+                        {/* Status */}
+                        <td className="py-4.5 px-6 whitespace-nowrap">
+                          <div className="space-y-1.5">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${statusInfo.color}`}>
+                              <StatusIcon className="w-3.5 h-3.5" />
+                              {statusInfo.label}
+                            </span>
+                            {cancelReason && (
+                              <p className="max-w-48 text-[11px] font-semibold leading-5 text-red-600 whitespace-normal">
+                                Lý do: {cancelReason}
+                              </p>
+                            )}
+                            {cancelledBy && (
+                              <p className="max-w-48 text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-normal">
+                                Bên hủy: {cancelledBy}
+                              </p>
+                            )}
+                          </div>
+                        </td>
 
-                      {/* Action */}
-                      <td className="py-4.5 px-6 text-right">
-                        <Link
-                          href={`/admin/orders/${order._id}`}
-                          className="p-2 inline-block text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all cursor-pointer"
-                          title="Xem chi tiết vận đơn"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {/* Action */}
+                        <td className="py-4.5 px-6 text-right whitespace-nowrap">
+                          <Link
+                            href={`/admin/orders/${order._id}`}
+                            className="p-2 inline-block text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all cursor-pointer"
+                            title="Xem chi tiết vận đơn"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -561,7 +727,7 @@ function AdminOrdersContent() {
             </button>
             
             <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-              Chi Tiết Vận Đơn: <span className="text-primary-600 font-extrabold">{selectedOrder.orderCode}</span>
+              Chi Tiết Vận Đơn: <span className="text-primary-600 font-bold">{selectedOrder.orderCode}</span>
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -581,7 +747,7 @@ function AdminOrdersContent() {
                 </div>
                 <div>
                   <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chi phí vận chuyển</h4>
-                  <p className="text-primary-600 font-extrabold mt-1 text-base">
+                  <p className="text-primary-600 font-bold mt-1 text-base">
                     {(selectedOrder.offerPrice || selectedOrder.budget || 0).toLocaleString()} ₫
                   </p>
                 </div>

@@ -65,7 +65,7 @@ const MODULE_ICONS: Record<string, any> = {
 const PATH_SHORT_LABELS: Record<string, string> = {
   "/admin": "Tổng quan",
   "/admin/notifications": "Thông báo",
-  "/admin/users": "KYC",
+  "/admin/users": "Người Dùng",
   "/admin/orders": "Đơn hàng",
   "/admin/analytics": "Phân tích",
   "/admin/support": "Hỗ trợ & Chat",
@@ -1050,15 +1050,20 @@ export default function AdminTeamPage() {
 
           {/* Team Table */}
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            {/* Mobile Swipe Hint */}
+            <div className="md:hidden px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+              <span>Danh sách nhân sự</span>
+              <span className="text-primary-600 font-bold">← Vuốt ngang để xem đủ cột →</span>
+            </div>
+            <div className="overflow-x-auto w-full max-w-full overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
+              <table className="w-full min-w-[880px] text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    <th className="py-4 px-6 min-w-[180px]">Quản Trị Viên</th>
+                  <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="py-4 px-6 min-w-[200px]">Quản Trị Viên</th>
                     <th className="py-4 px-4 min-w-[140px]">Cấp Bậc</th>
-                    <th className="py-4 px-4 min-w-[160px]">Quyền Hạn Chính</th>
+                    <th className="py-4 px-4 min-w-[180px]">Quyền Hạn Chính</th>
                     <th className="py-4 px-4 w-[110px]">Trạng Thái</th>
-                    <th className="py-4 px-4 min-w-[130px]">Đăng Nhập Cuối</th>
+                    <th className="py-4 px-4 min-w-[150px]">Đăng Nhập Cuối</th>
                     <th className="py-4 px-6 text-right w-[110px]">Thao Tác</th>
                   </tr>
                 </thead>
@@ -1109,7 +1114,7 @@ export default function AdminTeamPage() {
                           </td>
 
                           {/* Role Badge */}
-                          <td className="py-4 px-4">
+                          <td className="py-4 px-4 whitespace-nowrap">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${roleCfg.badgeClass}`}>
                               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: roleCfg.color }} />
                               {isSuper ? "Admin" : roleCfg.label}
@@ -1117,7 +1122,7 @@ export default function AdminTeamPage() {
                           </td>
 
                           {/* Permissions Summary */}
-                          <td className="py-4 px-4 max-w-xs">
+                          <td className="py-4 px-4 min-w-[180px] max-w-xs">
                             <div className="flex flex-wrap items-center gap-1">
                               {isSuper ? (
                                 <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
@@ -1152,7 +1157,7 @@ export default function AdminTeamPage() {
                           </td>
 
                           {/* Status */}
-                          <td className="py-4 px-4">
+                          <td className="py-4 px-4 whitespace-nowrap">
                             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border ${
                               member.isActive
                                 ? "text-emerald-700 bg-emerald-50 border-emerald-200"
@@ -1163,7 +1168,7 @@ export default function AdminTeamPage() {
                           </td>
 
                           {/* Last Login */}
-                          <td className="py-4 px-4 text-slate-500 text-xs">
+                          <td className="py-4 px-4 text-slate-500 text-xs whitespace-nowrap">
                             {member.lastLoginAt ? (
                               <span className="flex items-center gap-1">
                                 <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -1175,7 +1180,7 @@ export default function AdminTeamPage() {
                           </td>
 
                           {/* Actions */}
-                          <td className="py-4 px-6 text-right">
+                          <td className="py-4 px-6 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => {
