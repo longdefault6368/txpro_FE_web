@@ -24,16 +24,16 @@ interface AdminProfile {
   isActive?: boolean;
 }
 
-type ToastMsg = { type: "success" | "error"; message: string };
+import { useToast } from "@/context/ToastContext";
 
 export default function AdminProfilePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const [profile, setProfile] = useState<AdminProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<ToastMsg | null>(null);
 
   // Profile fields
   const [name, setName] = useState("");
@@ -66,8 +66,11 @@ export default function AdminProfilePage() {
   const [phoneDevOtp, setPhoneDevOtp] = useState<string | null>(null);
 
   const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 4000);
+    if (type === "success") {
+      toast.success(message);
+    } else {
+      toast.error(message);
+    }
   };
 
   // Password OTP Countdown
@@ -510,25 +513,6 @@ export default function AdminProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-12">
-      {/* Toast Notification */}
-      {toast && (
-        <div
-          className={
-            "fixed top-5 right-5 z-[200] flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-semibold border transition-all " +
-            (toast.type === "success"
-              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-              : "bg-red-50 text-red-800 border-red-200")
-          }
-        >
-          {toast.type === "success" ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-          ) : (
-            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-          )}
-          {toast.message}
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center gap-3">
         <button

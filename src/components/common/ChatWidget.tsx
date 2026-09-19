@@ -200,7 +200,7 @@ export default function ChatWidget() {
   };
 
   return (
-    <div id="chatWidget" className="fixed bottom-6 right-6 z-50">
+    <div id="chatWidget" className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-40">
       {/* Chat Window */}
       <div
         id="chatWindow"

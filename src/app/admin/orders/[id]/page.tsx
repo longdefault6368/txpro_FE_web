@@ -7,8 +7,13 @@ import { useRouter } from "next/navigation";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { 
   ArrowLeft, MapPin, Phone, Mail, Clock, CheckCircle, 
-  AlertTriangle, Truck, Info, Shield, User, Loader, DollarSign, Calendar, Star
+  AlertTriangle, Truck, Info, Shield, User, Loader, DollarSign, Calendar, Star,
+  ShieldCheck, CreditCard, Copy, Check, ExternalLink, Banknote, Lock,
+  Camera, FileCheck, FileText, Maximize2, Download, Printer, Eye, CheckCircle2,
+  Image as ImageIcon, X, ZoomIn, RotateCw, RefreshCw, Sliders, StickyNote,
+  UserPlus, Ban, Send, Unlock, ChevronDown, CheckCheck, FileSignature
 } from "lucide-react";
+import { useToast } from "@/context/ToastContext";
 
 interface UserInfo {
   name: string;
@@ -42,6 +47,20 @@ interface Order {
   shipperId: UserInfo;
   driverId?: UserInfo;
   reviews?: OrderReview[];
+  cargoImageUrls?: string[];
+  insurance?: {
+    isRequested?: boolean;
+    declaredValue?: number | null;
+    fee?: number | null;
+  } | null;
+  financialSnapshot?: {
+    orderAmount?: number | null;
+    settlementStatus?: string | null;
+    settlementReference?: string | null;
+    shipperEscrow?: { amount?: number | null; status?: string | null };
+    driverEscrow?: { amount?: number | null; status?: string | null };
+    driverPlatformFee?: { amount?: number | null; status?: string | null };
+  } | null;
   completion?: {
     acceptNote?: string | null;
     estimatedPickupTime?: string | null;
@@ -50,6 +69,33 @@ interface Order {
     shipperConfirmed?: boolean;
     shipperNote?: string | null;
     driverUnselectedAt?: string | null;
+    pickupPhotos?: string[];
+    photos?: string[];
+    signatureUrl?: string | null;
+    receiverName?: string | null;
+    receiverPhone?: string | null;
+    receiverTitle?: string | null;
+  } | null;
+  evidence?: {
+    pickup?: {
+      photos?: string[];
+      gps?: { lat?: number; lng?: number };
+      capturedAt?: string | null;
+      meta?: any;
+    } | null;
+    dropoff?: {
+      photos?: string[];
+      gps?: { lat?: number; lng?: number };
+      capturedAt?: string | null;
+      meta?: any;
+    } | null;
+  } | null;
+  contract?: {
+    _id?: string;
+    contractNumber?: string;
+    hash?: string;
+    status?: string;
+    signedAt?: string;
   } | null;
   cancellationReason?: string | null;
   rejectionReason?: string | null;
@@ -140,86 +186,6 @@ function getVehicleIconSvg(vehicleText?: string | null) {
   `)}`;
 }
 
-const MOCK_ORDERS_DETAIL: Record<string, Order> = {
-  "o-mock-1": {
-    _id: "o-mock-1",
-    orderCode: "ORD-20260709-001",
-    title: "Vận chuyển 20 tấn hạt nhựa PP",
-    status: "in_progress",
-    cargoType: "Hạt nhựa công nghiệp",
-    weight: 20000,
-    volume: 35,
-    paymentMethod: "Ví điện tử",
-    offerPrice: 4500000,
-    pickup: { address: "KCN Cát Lái, Quận 2, TP.HCM" },
-    dropoff: { address: "KCN Sóng Thần, Bình Dương" },
-    shipperId: { name: "Trần Thị Hằng", phone: "0912345678", email: "hang@gmail.com" },
-    driverId: { name: "Nguyễn Văn Tuấn", phone: "0987654321", email: "tuan.driver@gmail.com" },
-    createdAt: "2026-07-09T08:30:00Z"
-  },
-  "o-mock-2": {
-    _id: "o-mock-2",
-    orderCode: "ORD-20260709-002",
-    title: "Vận chuyển thiết bị gia dụng nhà thông minh",
-    status: "delivered",
-    cargoType: "Thiết bị điện tử",
-    weight: 1500,
-    volume: 8,
-    paymentMethod: "Ví điện tử",
-    offerPrice: 3200000,
-    pickup: { address: "Cảng Cát Lái, Quận 2, TP.HCM" },
-    dropoff: { address: "Quận Hoàn Kiếm, Hà Nội" },
-    shipperId: { name: "Lê Văn Hoàng", phone: "0905111222", email: "hoang.le@outlook.com" },
-    driverId: { name: "Phạm Minh Đức", phone: "0977888999", email: "duc.pham@gmail.com" },
-    createdAt: "2026-07-09T06:15:00Z"
-  },
-  "o-mock-3": {
-    _id: "o-mock-3",
-    orderCode: "ORD-20260708-005",
-    title: "Giao nhận 50 thùng hoa quả tươi nhập khẩu",
-    status: "searching_driver",
-    cargoType: "Thực phẩm lạnh",
-    weight: 800,
-    volume: 3,
-    paymentMethod: "Tiền mặt",
-    offerPrice: 900000,
-    pickup: { address: "Chợ đầu mối Thủ Đức, TP.HCM" },
-    dropoff: { address: "Quận 1, TP.HCM" },
-    shipperId: { name: "Nguyễn Minh Thu", phone: "0933444555", email: "thu.nguyen@gmail.com" },
-    createdAt: "2026-07-08T14:00:00Z"
-  },
-  "o-mock-4": {
-    _id: "o-mock-4",
-    orderCode: "ORD-20260708-004",
-    title: "Vận chuyển sắt thép công trình xây dựng",
-    status: "accepted",
-    cargoType: "Sắt thép xây dựng",
-    weight: 15000,
-    volume: 12,
-    paymentMethod: "Ví điện tử",
-    offerPrice: 8500000,
-    pickup: { address: "Nhà máy thép Hòa Phát, Dung Quất" },
-    dropoff: { address: "Quận Nam Từ Liêm, Hà Nội" },
-    shipperId: { name: "Công ty Cổ phần Thép Việt", phone: "0283844999", email: "info@thepviet.com" },
-    driverId: { name: "Vũ Quốc Khánh", phone: "0966777888", email: "khanh.vu@gmail.com" },
-    createdAt: "2026-07-08T09:45:00Z"
-  },
-  "o-mock-5": {
-    _id: "o-mock-5",
-    orderCode: "ORD-20260707-010",
-    title: "Chuyển kho dệt may từ Bình Dương đi Vũng Tàu",
-    status: "cancelled",
-    cargoType: "Hàng may mặc",
-    weight: 5000,
-    volume: 18,
-    paymentMethod: "Ví điện tử",
-    offerPrice: 5000000,
-    pickup: { address: "KCN VSIP 1, Thuận An, Bình Dương" },
-    dropoff: { address: "Thành phố Vũng Tàu, Bà Rịa - Vũng Tàu" },
-    shipperId: { name: "Trương Công Định", phone: "0944555666", email: "dinh.truong@textile.vn" },
-    createdAt: "2026-07-07T16:20:00Z"
-  }
-};
 
 const STATUS_MAP: Record<string, { label: string; color: string; stepIndex: number }> = {
   searching_driver: { label: "Tìm tài xế", color: "text-blue-600 bg-blue-50 border-blue-100", stepIndex: 0 },
@@ -398,6 +364,157 @@ function buildOrderActivityTimeline(order: Order): OrderActivityItem[] {
   }
 
   return timeline;
+}
+
+interface AdminInternalNote {
+  id: string;
+  author: string;
+  role: string;
+  content: string;
+  createdAt: string;
+  type: "info" | "warning" | "action";
+}
+
+interface EpodPhotoItem {
+  id: string;
+  url: string;
+  caption: string;
+  category: "cargo" | "document" | "plate" | "seal";
+  timestamp: string;
+  location: string;
+  gps?: string;
+}
+
+interface OrderEpodDetail {
+  certificateCode: string | null;
+  sha256Hash: string | null;
+  pickupTime: string | null;
+  deliveredTime: string | null;
+  receiverName: string | null;
+  receiverPhone: string | null;
+  receiverTitle: string | null;
+  conditionNote: string | null;
+  signatureUrl: string | null;
+  status: "verified" | "awaiting_receiver" | "in_transit" | "pending";
+  pickupPhotos: EpodPhotoItem[];
+  dropoffPhotos: EpodPhotoItem[];
+  cargoPhotos: EpodPhotoItem[];
+}
+
+function getOrderEpodDetail(order: Order): OrderEpodDetail {
+  const isDelivered = ["delivered", "completed"].includes(order.status);
+  const isCompleted = order.status === "completed";
+  const isInProgress = order.status === "in_progress";
+
+  const pickupTime = order.completion?.pickupArrivedAt || null;
+  const deliveredTime = order.completion?.deliveredAt || order.updatedAt || null;
+
+  // Real certificate code from contract or orderCode
+  const certificateCode = order.contract?.contractNumber || 
+    (order.orderCode ? `EPOD-${order.orderCode}` : null);
+
+  // Real SHA-256 hash from contract or evidence
+  const sha256Hash = order.contract?.hash || 
+    order.evidence?.dropoff?.meta?.hash || 
+    order.evidence?.dropoff?.meta?.sha256 || null;
+
+  // Real pickup photos from evidence or completion
+  const rawPickupPhotos = [
+    ...(Array.isArray(order.evidence?.pickup?.photos) ? order.evidence.pickup.photos : []),
+    ...(Array.isArray(order.completion?.pickupPhotos) ? order.completion.pickupPhotos : []),
+  ].filter((u): u is string => typeof u === "string" && Boolean(u.trim()));
+  const uniquePickupUrls = Array.from(new Set(rawPickupPhotos));
+
+  const pickupPhotos: EpodPhotoItem[] = uniquePickupUrls.map((url, idx) => ({
+    id: `pickup-${idx + 1}`,
+    url,
+    caption: `Ảnh hiện trường bốc hàng #${idx + 1}`,
+    category: idx === 0 ? "cargo" : idx === 1 ? "plate" : "seal",
+    timestamp: formatAdminDateTime(pickupTime || order.createdAt),
+    location: order.pickup?.address || "",
+    gps: order.evidence?.pickup?.gps ? `${order.evidence.pickup.gps.lat}° N, ${order.evidence.pickup.gps.lng}° E` : undefined,
+  }));
+
+  // Real dropoff photos from evidence or completion
+  const rawDropoffPhotos = [
+    ...(Array.isArray(order.evidence?.dropoff?.photos) ? order.evidence.dropoff.photos : []),
+    ...(Array.isArray(order.completion?.photos) ? order.completion.photos : []),
+  ].filter((u): u is string => typeof u === "string" && Boolean(u.trim()));
+  const uniqueDropoffUrls = Array.from(new Set(rawDropoffPhotos));
+
+  const dropoffPhotos: EpodPhotoItem[] = uniqueDropoffUrls.map((url, idx) => ({
+    id: `dropoff-${idx + 1}`,
+    url,
+    caption: `Ảnh hiện trường giao nhận #${idx + 1}`,
+    category: idx === 0 ? "cargo" : idx === 1 ? "document" : "seal",
+    timestamp: formatAdminDateTime(deliveredTime || order.updatedAt || order.createdAt),
+    location: order.dropoff?.address || "",
+    gps: order.evidence?.dropoff?.gps ? `${order.evidence.dropoff.gps.lat}° N, ${order.evidence.dropoff.gps.lng}° E` : undefined,
+  }));
+
+  // Initial cargo photos uploaded by shipper
+  const rawCargoUrls = (Array.isArray(order.cargoImageUrls) ? order.cargoImageUrls : [])
+    .filter((u): u is string => typeof u === "string" && Boolean(u.trim()));
+  const uniqueCargoUrls = Array.from(new Set(rawCargoUrls));
+
+  const cargoPhotos: EpodPhotoItem[] = uniqueCargoUrls.map((url, idx) => ({
+    id: `cargo-${idx + 1}`,
+    url,
+    caption: `Ảnh hàng hóa lúc tạo đơn #${idx + 1}`,
+    category: "cargo",
+    timestamp: formatAdminDateTime(order.createdAt),
+    location: order.pickup?.address || "",
+  }));
+
+  // Real receiver information
+  const receiverName = 
+    order.evidence?.dropoff?.meta?.receiverName || 
+    order.completion?.receiverName || 
+    (order.completion?.shipperConfirmed ? order.shipperId?.name : null) || 
+    null;
+
+  const receiverPhone = 
+    order.evidence?.dropoff?.meta?.receiverPhone || 
+    order.completion?.receiverPhone || 
+    null;
+
+  const receiverTitle = 
+    order.evidence?.dropoff?.meta?.receiverTitle || 
+    null;
+
+  const conditionNote = 
+    order.completion?.shipperNote || 
+    order.evidence?.dropoff?.meta?.note || 
+    null;
+
+  const signatureUrl = 
+    order.completion?.signatureUrl || 
+    order.evidence?.dropoff?.meta?.signatureUrl || 
+    null;
+
+  const status = isCompleted
+    ? "verified"
+    : isDelivered
+      ? "awaiting_receiver"
+      : isInProgress
+        ? "in_transit"
+        : "pending";
+
+  return {
+    certificateCode,
+    sha256Hash,
+    pickupTime: pickupTime ? formatAdminDateTime(pickupTime) : null,
+    deliveredTime: deliveredTime ? formatAdminDateTime(deliveredTime) : null,
+    receiverName,
+    receiverPhone,
+    receiverTitle,
+    conditionNote,
+    signatureUrl,
+    status,
+    pickupPhotos,
+    dropoffPhotos,
+    cargoPhotos,
+  };
 }
 
 function AdminOrderRouteMap({ order }: { order: Order }) {
@@ -614,44 +731,71 @@ function AdminOrderRouteMap({ order }: { order: Order }) {
 export default function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { toast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
+  const [copiedEscrow, setCopiedEscrow] = useState(false);
+
+  // e-POD states
+  const [activeEpodTab, setActiveEpodTab] = useState<"dropoff" | "pickup" | "cargo">("dropoff");
+  const [selectedPhoto, setSelectedPhoto] = useState<EpodPhotoItem | null>(null);
+  const [photoZoom, setPhotoZoom] = useState(1);
+  const [photoRotation, setPhotoRotation] = useState(0);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+
+  // Admin Action Toolbar states
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
+  const [isEscrowModalOpen, setIsEscrowModalOpen] = useState(false);
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+
+  // Modal form states
+  const [targetStatus, setTargetStatus] = useState<Order["status"]>("in_progress");
+  const [statusNote, setStatusNote] = useState("");
+  const [newDriverName, setNewDriverName] = useState("");
+  const [newDriverPhone, setNewDriverPhone] = useState("");
+  const [newDriverVehicle, setNewDriverVehicle] = useState("");
+  const [reassignMode, setReassignMode] = useState<"assign" | "reopen">("assign");
+  const [reassignReason, setReassignReason] = useState("");
+  const [escrowActionType, setEscrowActionType] = useState<"disburse" | "freeze" | "refund">("disburse");
+  const [escrowActionReason, setEscrowActionReason] = useState("");
+  const [adminNotes, setAdminNotes] = useState<AdminInternalNote[]>([]);
+  const [newNoteContent, setNewNoteContent] = useState("");
+  const [newNoteType, setNewNoteType] = useState<"info" | "warning" | "action">("info");
+  const [cancelReasonChoice, setCancelReasonChoice] = useState("Xe hư hỏng / tai nạn kỹ thuật");
+  const [cancelReasonDetail, setCancelReasonDetail] = useState("");
 
   // Load order data and initialize Google Map route
   useEffect(() => {
     const fetchOrderDetail = async () => {
       setLoading(true);
       try {
-        if (id.startsWith("o-mock-")) {
-          setOrder(MOCK_ORDERS_DETAIL[id] || null);
-          setIsOffline(true);
-          setLoading(false);
-          return;
-        }
-
         const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}`);
         if (res.ok) {
           const data = await res.json();
-          if (data.data.order) {
+          if (data.data?.order) {
             setOrder({
               ...data.data.order,
               reviews: data.data.reviews || [],
+              contract: data.data.contract || null,
+              evidence: data.data.evidence || null,
             });
             setIsOffline(false);
           } else {
-            // Check mock values as fallback
-            setOrder(MOCK_ORDERS_DETAIL[id] || null);
-            setIsOffline(true);
+            setOrder(null);
+            setIsOffline(false);
           }
         } else {
-          setOrder(MOCK_ORDERS_DETAIL[id] || null);
-          setIsOffline(true);
+          setOrder(null);
+          setIsOffline(false);
         }
       } catch (err) {
-        console.warn("Backend error, displaying mock details", err);
-        setOrder(MOCK_ORDERS_DETAIL[id] || null);
-        setIsOffline(true);
+        console.warn("Backend error, order not loaded", err);
+        setOrder(null);
+        setIsOffline(false);
       } finally {
         setLoading(false);
       }
@@ -659,6 +803,23 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
     fetchOrderDetail();
   }, [id]);
+
+  // Close modals on Escape key (Must be placed before any conditional returns to obey Rules of Hooks)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedPhoto(null);
+        setIsPrintModalOpen(false);
+        setIsStatusModalOpen(false);
+        setIsReassignModalOpen(false);
+        setIsEscrowModalOpen(false);
+        setIsNotesModalOpen(false);
+        setIsCancelModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   if (loading) {
     return (
@@ -686,6 +847,245 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const orderReviews = order.reviews || [];
   const shouldShowReviews = (order.status === "completed" || order.status === "delivered") && orderReviews.length > 0;
   const activityTimeline = buildOrderActivityTimeline(order);
+
+  const totalPrice = order.offerPrice || (typeof order.budget === "number" ? order.budget : order.budget?.max || 0);
+  const platformFee = Math.round(totalPrice * 0.05);
+  const driverPayout = totalPrice > 0 ? totalPrice - platformFee : 0;
+  const escrowTxCode = `MB-TXE-${order.orderCode || order._id}`;
+
+  const handleCopyEscrow = () => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(escrowTxCode);
+      setCopiedEscrow(true);
+      toast.success("Đã sao chép mã giao dịch ký quỹ MB Bank");
+      setTimeout(() => setCopiedEscrow(false), 2000);
+    }
+  };
+
+  const getEscrowStatus = (status: Order["status"]) => {
+    if (status === "completed") {
+      return {
+        badge: "Đã giải ngân cho tài xế",
+        sub: "Thanh toán tự động giải ngân sau khi nghiệm thu e-POD thành công",
+        color: "text-emerald-700 bg-emerald-50 border-emerald-200",
+        icon: CheckCircle,
+        dotColor: "bg-emerald-500",
+      };
+    }
+    if (status === "in_progress" || status === "delivered" || status === "accepted") {
+      return {
+        badge: "Đã ký quỹ 100% bảo chứng",
+        sub: "Tiền phong tỏa tại MB Bank, bảo vệ quyền lợi hai bên",
+        color: "text-blue-700 bg-blue-50 border-blue-200",
+        icon: ShieldCheck,
+        dotColor: "bg-blue-500 animate-pulse",
+      };
+    }
+    if (status === "cancelled" || status === "rejected") {
+      return {
+        badge: "Đã hoàn cước / Hủy ký quỹ",
+        sub: "Cước phí đã được MB Bank hoàn về tài khoản người gửi",
+        color: "text-rose-700 bg-rose-50 border-rose-200",
+        icon: AlertTriangle,
+        dotColor: "bg-rose-500",
+      };
+    }
+    return {
+      badge: "Chờ nạp ký quỹ",
+      sub: "Đang chờ chủ hàng nạp bảo chứng cước phí",
+      color: "text-amber-700 bg-amber-50 border-amber-200",
+      icon: Clock,
+      dotColor: "bg-amber-500",
+    };
+  };
+
+  const escrowStatus = getEscrowStatus(order.status);
+  const epodDetail = getOrderEpodDetail(order);
+
+  const handleOpenPhoto = (photo: EpodPhotoItem) => {
+    setSelectedPhoto(photo);
+    setPhotoZoom(1);
+    setPhotoRotation(0);
+  };
+
+  const handleClosePhoto = () => {
+    setSelectedPhoto(null);
+    setPhotoZoom(1);
+    setPhotoRotation(0);
+  };
+
+  const handleDownloadPhotos = () => {
+    toast.success("Đang chuẩn bị trọn bộ ảnh e-POD chất lượng cao (.ZIP)...");
+  };
+
+  const handleDownloadSinglePhoto = (photo: EpodPhotoItem) => {
+    toast.success(`Đang tải ảnh: ${photo.caption}`);
+  };
+
+  // Admin Toolbar Action Handlers
+  const handleSyncOrder = () => {
+    setIsSyncing(true);
+    setTimeout(() => {
+      setIsSyncing(false);
+      toast.success("Đã đồng bộ dữ liệu vận đơn & tọa độ GPS mới nhất từ thiết bị tài xế");
+    }, 600);
+  };
+
+  const handleConfirmStatusChange = () => {
+    if (!order) return;
+    setOrder({ ...order, status: targetStatus });
+    const noteContent = `[Điều phối viên - Thao tác hệ thống]: Cập nhật trạng thái sang "${STATUS_MAP[targetStatus]?.label || targetStatus}". ${statusNote ? `Lý do: ${statusNote}` : ""}`;
+    const autoNote: AdminInternalNote = {
+      id: `n-${Date.now()}`,
+      author: "Quản trị viên TMS",
+      role: "Admin điều hành",
+      content: noteContent,
+      createdAt: new Date().toISOString(),
+      type: "action",
+    };
+    setAdminNotes((prev) => [autoNote, ...prev]);
+    toast.success(`Đã cập nhật trạng thái vận đơn sang "${STATUS_MAP[targetStatus]?.label || targetStatus}"`);
+    setStatusNote("");
+    setIsStatusModalOpen(false);
+  };
+
+  const handleConfirmReassignDriver = () => {
+    if (!order) return;
+    if (reassignMode === "reopen") {
+      setOrder({ ...order, driverId: undefined, status: "searching_driver" });
+      const autoNote: AdminInternalNote = {
+        id: `n-${Date.now()}`,
+        author: "Quản trị viên TMS",
+        role: "Admin điều hành",
+        content: `[Điều phối tài xế]: Đưa đơn về tìm kiếm trên sàn. Lý do: ${reassignReason || "Tài xế cũ không thể tiếp tục"}`,
+        createdAt: new Date().toISOString(),
+        type: "warning",
+      };
+      setAdminNotes((prev) => [autoNote, ...prev]);
+      toast.success("Đã đưa vận đơn về trạng thái tìm kiếm tài xế trên sàn");
+    } else {
+      if (!newDriverName.trim()) {
+        toast.warning("Vui lòng nhập họ và tên tài xế để chỉ định");
+        return;
+      }
+      const driverObj: UserInfo = {
+        name: newDriverName.trim(),
+        phone: newDriverPhone.trim() || "---",
+        email: "",
+      };
+      setOrder({
+        ...order,
+        driverId: driverObj,
+        status: "accepted",
+      });
+      const autoNote: AdminInternalNote = {
+        id: `n-${Date.now()}`,
+        author: "Quản trị viên TMS",
+        role: "Admin điều hành",
+        content: `[Điều phối tài xế]: Chỉ định tài xế mới ${driverObj.name}${newDriverPhone ? ` (${newDriverPhone.trim()})` : ""}${newDriverVehicle ? ` - Phương tiện: ${newDriverVehicle.trim()}` : ""}. ${reassignReason ? `Ghi chú: ${reassignReason.trim()}` : ""}`,
+        createdAt: new Date().toISOString(),
+        type: "action",
+      };
+      setAdminNotes((prev) => [autoNote, ...prev]);
+      toast.success(`Đã chỉ định tài xế mới: ${driverObj.name}`);
+    }
+    setNewDriverName("");
+    setNewDriverPhone("");
+    setNewDriverVehicle("");
+    setReassignReason("");
+    setIsReassignModalOpen(false);
+  };
+
+  const handleConfirmEscrowAction = () => {
+    if (!order) return;
+    if (escrowActionType === "disburse") {
+      setOrder({ ...order, status: "completed" });
+      const autoNote: AdminInternalNote = {
+        id: `n-${Date.now()}`,
+        author: "Ban kiểm soát Escrow MB",
+        role: "Kiểm soát tài chính",
+        content: `[Giải ngân MB Bank]: Đã duyệt giải ngân 95% cước phí cho tài xế. ${escrowActionReason ? `Ghi chú: ${escrowActionReason}` : ""}`,
+        createdAt: new Date().toISOString(),
+        type: "action",
+      };
+      setAdminNotes((prev) => [autoNote, ...prev]);
+      toast.success("Đã gửi lệnh giải ngân 95% cước phí qua MB Bank thành công");
+    } else if (escrowActionType === "freeze") {
+      const autoNote: AdminInternalNote = {
+        id: `n-${Date.now()}`,
+        author: "Ban kiểm soát Escrow MB",
+        role: "Kiểm soát tài chính",
+        content: `[Đóng băng ký quỹ]: Đã phong tỏa tài khoản MB Bank do phát sinh tranh chấp. Lý do: ${escrowActionReason || "Yêu cầu từ kiểm soát viên"}`,
+        createdAt: new Date().toISOString(),
+        type: "warning",
+      };
+      setAdminNotes((prev) => [autoNote, ...prev]);
+      toast.warning("Đã đóng băng ký quỹ MB Bank chờ giải quyết tranh chấp");
+    } else {
+      setOrder({ ...order, status: "cancelled" });
+      const autoNote: AdminInternalNote = {
+        id: `n-${Date.now()}`,
+        author: "Ban kiểm soát Escrow MB",
+        role: "Kiểm soát tài chính",
+        content: `[Hoàn cước MB Bank]: Lệnh hoàn cước 100% về tài khoản chủ hàng. Lý do: ${escrowActionReason || "Hủy vận đơn"}`,
+        createdAt: new Date().toISOString(),
+        type: "info",
+      };
+      setAdminNotes((prev) => [autoNote, ...prev]);
+      toast.info("Đã gửi lệnh hoàn cước 100% về tài khoản chủ hàng");
+    }
+    setEscrowActionReason("");
+    setIsEscrowModalOpen(false);
+  };
+
+  const handleAddAdminNote = () => {
+    if (!newNoteContent.trim()) {
+      toast.error("Vui lòng nhập nội dung ghi chú");
+      return;
+    }
+    const note: AdminInternalNote = {
+      id: `n-${Date.now()}`,
+      author: "Quản trị viên TMS",
+      role: "Admin điều hành",
+      content: newNoteContent.trim(),
+      createdAt: new Date().toISOString(),
+      type: newNoteType,
+    };
+    setAdminNotes((prev) => [note, ...prev]);
+    setNewNoteContent("");
+    toast.success("Đã thêm ghi chú nội bộ thành công");
+  };
+
+  const handleConfirmEmergencyCancel = () => {
+    if (!order) return;
+    const fullReason = `${cancelReasonChoice}${cancelReasonDetail ? `. Chi tiết: ${cancelReasonDetail}` : ""}`;
+    setOrder({
+      ...order,
+      status: "cancelled",
+      cancellationReason: fullReason,
+      cancelledByName: "Quản trị viên hệ thống",
+      cancelledByRole: "admin",
+      cancelledAt: new Date().toISOString(),
+    });
+    const autoNote: AdminInternalNote = {
+      id: `n-${Date.now()}`,
+      author: "Quản trị viên TMS",
+      role: "Admin điều hành",
+      content: `[Hủy đơn khẩn cấp]: Vận đơn đã bị hủy bởi Quản trị viên. Lý do: ${fullReason}`,
+      createdAt: new Date().toISOString(),
+      type: "warning",
+    };
+    setAdminNotes((prev) => [autoNote, ...prev]);
+    toast.warning("Vận đơn đã được chuyển sang trạng thái Đã hủy đơn");
+    setCancelReasonDetail("");
+    setIsCancelModalOpen(false);
+  };
+
+  const currentPhotos = activeEpodTab === "dropoff"
+    ? epodDetail.dropoffPhotos
+    : activeEpodTab === "pickup"
+      ? epodDetail.pickupPhotos
+      : epodDetail.cargoPhotos;
 
   return (
     <div className="space-y-6">
@@ -716,6 +1116,124 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold border uppercase tracking-wider ${activeStatus.color}`}>
           {activeStatus.label}
         </span>
+      </div>
+
+      {/* Admin Action Toolbar Bar */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-5 shadow-sm border border-slate-800/80 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+              <Sliders className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm font-bold tracking-wider uppercase text-white">
+                  Bộ Công Cụ Thao Tác Nhanh Quản Trị Viên (TMS Operations)
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-500/40">
+                  ADMIN DISPATCH CONTROL
+                </span>
+              </div>
+              <p className="text-slate-400 text-xs mt-0.5">
+                Can thiệp điều vận thời gian thực, quản trị dòng tiền MB Bank và xử lý ngoại lệ
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons Group */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Sync / Refresh */}
+            <button
+              type="button"
+              onClick={handleSyncOrder}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 active:bg-white/20 text-slate-200 text-xs font-bold transition-all border border-white/10 cursor-pointer disabled:opacity-50"
+              title="Đồng bộ dữ liệu thời gian thực"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-primary-400" : "text-slate-300"}`} />
+              <span>{isSyncing ? "Đang đồng bộ..." : "Làm mới"}</span>
+            </button>
+
+            {/* Status Override */}
+            <button
+              type="button"
+              onClick={() => {
+                setTargetStatus(order.status);
+                setIsStatusModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Chuyển trạng thái</span>
+            </button>
+
+            {/* Reassign Driver */}
+            <button
+              type="button"
+              onClick={() => setIsReassignModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold transition-all border border-white/10 active:scale-95 cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-blue-400" />
+              <span>Điều phối tài xế</span>
+            </button>
+
+            {/* Escrow Actions */}
+            <button
+              type="button"
+              onClick={() => setIsEscrowModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+            >
+              <Lock className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Ký quỹ MB Bank</span>
+            </button>
+
+            {/* Internal Notes */}
+            <button
+              type="button"
+              onClick={() => setIsNotesModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold transition-all border border-white/10 active:scale-95 cursor-pointer relative"
+            >
+              <StickyNote className="w-3.5 h-3.5 text-amber-400" />
+              <span>Ghi chú nội bộ</span>
+              {adminNotes.length > 0 && (
+                <span className="ml-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 font-bold text-[10px] flex items-center justify-center">
+                  {adminNotes.length}
+                </span>
+              )}
+            </button>
+
+            {/* Cancel Order */}
+            <button
+              type="button"
+              onClick={() => setIsCancelModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+            >
+              <Ban className="w-3.5 h-3.5 text-rose-400" />
+              <span>Hủy đơn</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Quick info ribbon */}
+        <div className="pt-3 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-400">
+          <div className="flex items-center gap-4 flex-wrap">
+            <span>Mã phiên can thiệp: <span className="text-slate-200 font-mono font-bold">TMS-SES-{(order._id || "").slice(-6).toUpperCase()}</span></span>
+            <span>•</span>
+            <span>Quyền hạn: <span className="text-emerald-400 font-bold">Full Admin Dispatcher</span></span>
+            {adminNotes.length > 0 ? (
+              <span>Ghi chú mới nhất: <span className="text-slate-200 italic">{adminNotes[0].content.slice(0, 60)}...</span></span>
+            ) : (
+              <span>Ghi chú nội bộ: <span className="text-slate-400 italic">Chưa có ghi chú</span></span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsNotesModalOpen(true)}
+            className="text-indigo-400 hover:text-indigo-300 font-bold transition-colors cursor-pointer"
+          >
+            {adminNotes.length > 0 ? `Xem toàn bộ ${adminNotes.length} ghi chú →` : "Thêm ghi chú nội bộ →"}
+          </button>
+        </div>
       </div>
 
       {/* Main content grid */}
@@ -758,6 +1276,156 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
 
+          {/* Section: MB Bank Escrow Breakdown */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/50 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                      Ký Quỹ & Bảo Chứng Dòng Tiền
+                    </h2>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 tracking-wide">
+                      MB BANK ESCROW
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    Tài khoản trung gian chuyên dụng phong tỏa theo hợp đồng điện tử
+                  </p>
+                </div>
+              </div>
+
+              {/* Dynamic Escrow Status Badge */}
+              <div className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border text-xs font-bold ${escrowStatus.color} self-start sm:self-auto`}>
+                <span className={`w-2 h-2 rounded-full ${escrowStatus.dotColor}`} />
+                <escrowStatus.icon className="w-3.5 h-3.5" />
+                <span>{escrowStatus.badge}</span>
+              </div>
+            </div>
+
+            {/* Escrow Transaction Code & Copy Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50/80 border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 shrink-0">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mã giao dịch ký quỹ MB Bank</p>
+                  <p className="font-mono text-xs font-bold text-slate-800">{escrowTxCode}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyEscrow}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer self-start sm:self-auto"
+              >
+                {copiedEscrow ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-emerald-700">Đã chép</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Sao chép mã</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Financial Breakdown 4-Card Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              {/* Box 1: Tổng cước ký quỹ */}
+              <div className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                  <DollarSign className="w-3 h-3 text-slate-400" /> Tổng Cước Ký Quỹ
+                </span>
+                <p className="text-base font-bold text-slate-900">
+                  {totalPrice > 0 ? `${totalPrice.toLocaleString("vi-VN")} ₫` : "Chưa báo giá"}
+                </p>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  {totalPrice > 0 ? "100% cước vận đơn" : "Đang chờ thỏa thuận"}
+                </p>
+              </div>
+
+              {/* Box 2: Phí dịch vụ sàn */}
+              <div className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                  <Banknote className="w-3 h-3 text-slate-400" /> Phí Nền Tảng (5%)
+                </span>
+                <p className="text-base font-bold text-slate-700">
+                  {totalPrice > 0 ? `${platformFee.toLocaleString("vi-VN")} ₫` : "---"}
+                </p>
+                <p className="text-[11px] text-slate-500 font-medium">Bảo trì kết nối & định vị</p>
+              </div>
+
+              {/* Box 3: Bảo hiểm hàng hóa */}
+              <div className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                  <Shield className="w-3 h-3 text-emerald-500" /> Bảo Hiểm Hàng Hóa
+                </span>
+                {order.insurance?.isRequested ? (
+                  <>
+                    <p className="text-base font-bold text-emerald-600">
+                      {order.insurance.fee ? `${order.insurance.fee.toLocaleString("vi-VN")} ₫` : "Đã kích hoạt"}
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-medium truncate">
+                      Khai báo: {order.insurance.declaredValue ? `${order.insurance.declaredValue.toLocaleString("vi-VN")} ₫` : "Theo thỏa thuận"}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-base font-bold text-slate-500">
+                      Không yêu cầu
+                    </p>
+                    <p className="text-[11px] text-slate-400 font-medium">
+                      Chủ hàng không mua bảo hiểm
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* Box 4: Thực nhận tài xế */}
+              <div className="p-3.5 rounded-2xl border border-emerald-100 bg-emerald-50/60 space-y-1">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
+                  <Banknote className="w-3 h-3 text-emerald-600" /> Thực Nhận Tài Xế (95%)
+                </span>
+                <p className="text-base font-bold text-emerald-700">
+                  {driverPayout > 0 ? `${driverPayout.toLocaleString("vi-VN")} ₫` : "---"}
+                </p>
+                <p className="text-[11px] text-emerald-700 font-medium">Tự động sau e-POD</p>
+              </div>
+            </div>
+
+            {/* Escrow Safety Mechanism Callout & Link */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/90 via-slate-50 to-indigo-50/60 border border-blue-100/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900">
+                    Cơ Chế Bảo Chứng An Toàn Hai Đầu TXEPRO & MB Bank
+                  </p>
+                  <p className="text-slate-600 mt-0.5 leading-relaxed text-[11px]">
+                    Khoản tiền được phong tỏa độc lập tại Ngân hàng Quân Đội (MB Bank). Tài xế an tâm nhận chuyến chắc chắn nhận tiền, chủ hàng an tâm hàng hóa được bảo vệ toàn trình.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/thong-tin/thanh-toan-ky-quy"
+                target="_blank"
+                className="inline-flex items-center gap-1.5 text-blue-700 hover:text-blue-800 font-bold whitespace-nowrap px-3 py-1.5 rounded-xl bg-white/90 hover:bg-white border border-blue-200/80 transition-all text-[11px] shadow-2xs self-end sm:self-auto shrink-0 cursor-pointer"
+              >
+                <span>Xem quy chế MB Bank</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+
           {/* Section 2: Route Addresses */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200/50 shadow-sm space-y-4">
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider pb-3 border-b border-slate-100 flex items-center gap-2">
@@ -777,6 +1445,334 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                 <span className="absolute -left-8 top-0.5 w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-[10px]">VỀ</span>
                 <p className="text-slate-400 font-bold">ĐIỂM GIAO HÀNG (DROPOFF)</p>
                 <p className="text-slate-800 font-bold mt-0.5 text-sm">{order.dropoff.address}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Biên Bản Nghiệm Thu Điện Tử (e-POD) & Ảnh Chụp Thực Tế */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/50 shadow-sm space-y-6">
+            {/* Top Title & Action Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shrink-0">
+                  <FileCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                      Biên Bản Nghiệm Thu Điện Tử (e-POD)
+                    </h2>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 tracking-wide flex items-center gap-1">
+                      <Camera className="w-3 h-3" /> CHỨNG TỪ SỐ HÓA
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    Chứng từ nghiệm thu toàn trình kèm ảnh hiện trường, tọa độ GPS và chữ ký số
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Badge & Action Buttons */}
+              <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold ${
+                  epodDetail.status === "verified"
+                    ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                    : epodDetail.status === "awaiting_receiver"
+                      ? "text-indigo-700 bg-indigo-50 border-indigo-200"
+                      : epodDetail.status === "in_transit"
+                        ? "text-blue-700 bg-blue-50 border-blue-200"
+                        : "text-slate-600 bg-slate-50 border-slate-200"
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${
+                    epodDetail.status === "verified"
+                      ? "bg-emerald-500"
+                      : epodDetail.status === "awaiting_receiver"
+                        ? "bg-indigo-500 animate-pulse"
+                        : epodDetail.status === "in_transit"
+                          ? "bg-blue-500 animate-pulse"
+                          : "bg-slate-400"
+                  }`} />
+                  {epodDetail.status === "verified"
+                    ? "Đã nghiệm thu hợp lệ"
+                    : epodDetail.status === "awaiting_receiver"
+                      ? "Chờ chủ hàng ký duyệt"
+                      : epodDetail.status === "in_transit"
+                        ? "Đã bốc hàng (Đang giao)"
+                        : "Chờ giao nhận"}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setIsPrintModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                  title="Xem và in biên bản e-POD chuẩn A4"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>In e-POD (PDF)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadPhotos}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                  title="Tải gói dữ liệu ảnh gốc"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Tải ảnh (.ZIP)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Checkpoint Switcher Tabs */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/60 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setActiveEpodTab("dropoff")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                    activeEpodTab === "dropoff"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <span>Điểm giao hàng (Dropoff e-POD)</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                    activeEpodTab === "dropoff" ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"
+                  }`}>
+                    {epodDetail.dropoffPhotos.length} ảnh
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveEpodTab("pickup")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                    activeEpodTab === "pickup"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <span>Điểm bốc hàng (Pickup e-POD)</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                    activeEpodTab === "pickup" ? "bg-blue-100 text-blue-800" : "bg-slate-200 text-slate-600"
+                  }`}>
+                    {epodDetail.pickupPhotos.length} ảnh
+                  </span>
+                </button>
+
+                {epodDetail.cargoPhotos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveEpodTab("cargo")}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                      activeEpodTab === "cargo"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    <span>Ảnh hàng ban đầu</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      activeEpodTab === "cargo" ? "bg-purple-100 text-purple-800" : "bg-slate-200 text-slate-600"
+                    }`}>
+                      {epodDetail.cargoPhotos.length} ảnh
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Photo Grid or Empty State */}
+            {currentPhotos.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {currentPhotos.map((photo) => (
+                  <div
+                    key={photo.id}
+                    onClick={() => handleOpenPhoto(photo)}
+                    className="group relative rounded-2xl overflow-hidden aspect-[4/3] bg-slate-900 border border-slate-200/80 shadow-xs cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
+                  >
+                    <img
+                      src={photo.url}
+                      alt={photo.caption}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent pointer-events-none" />
+
+                    {/* Top Category Badge */}
+                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md shadow-2xs ${
+                        photo.category === "cargo"
+                          ? "bg-blue-500/90 text-white"
+                          : photo.category === "document"
+                            ? "bg-purple-500/90 text-white"
+                            : photo.category === "seal"
+                              ? "bg-amber-500/90 text-white"
+                              : "bg-slate-700/90 text-white"
+                      }`}>
+                        {photo.category === "cargo"
+                          ? "Hàng hóa"
+                          : photo.category === "document"
+                            ? "Chứng từ"
+                            : photo.category === "seal"
+                              ? "Kẹp chì Seal"
+                              : "Biển số xe"}
+                      </span>
+                    </div>
+
+                    {/* Top Right Zoom Trigger */}
+                    <div className="absolute top-2.5 right-2.5 w-7 h-7 rounded-lg bg-black/50 text-white/90 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </div>
+
+                    {/* Bottom Caption & GPS Info */}
+                    <div className="absolute bottom-2.5 left-2.5 right-2.5 z-10 space-y-0.5">
+                      <p className="text-white text-xs font-bold truncate drop-shadow-xs">
+                        {photo.caption}
+                      </p>
+                      <div className="flex items-center justify-between text-[10px] text-slate-300">
+                        <span className="truncate">{photo.timestamp}</span>
+                        {photo.gps && (
+                          <span className="flex items-center gap-0.5 text-emerald-400 font-bold shrink-0">
+                            <MapPin className="w-2.5 h-2.5" /> GPS
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 rounded-2xl bg-slate-50/80 border border-slate-200/60 flex flex-col items-center text-center space-y-2.5">
+                {activeEpodTab === "dropoff" && order.status === "in_progress" ? (
+                  <>
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
+                      <Truck className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-800">Phương Tiện Đang Trên Tuyến Vận Chuyển</h4>
+                    <p className="text-slate-500 text-[11px] max-w-md leading-relaxed">
+                      Tài xế đang vận chuyển hàng hóa đến <span className="font-semibold text-slate-700">{order.dropoff.address}</span>. Ảnh hiện trường và biên bản giao nhận sẽ được cập nhật khi đến kho nhận.
+                    </p>
+                  </>
+                ) : activeEpodTab === "dropoff" ? (
+                  <>
+                    <Camera className="w-8 h-8 text-slate-300" />
+                    <h4 className="text-xs font-bold text-slate-700">Chưa có ảnh bàn giao tại điểm trả hàng</h4>
+                    <p className="text-slate-500 text-[11px] max-w-sm">
+                      {order.status === "delivered" || order.status === "completed"
+                        ? "Vận đơn đã hoàn thành nhưng chưa có ảnh chụp nghiệm thu được tải lên."
+                        : "Vận đơn chưa tới giai đoạn giao nhận."}
+                    </p>
+                  </>
+                ) : activeEpodTab === "pickup" ? (
+                  <>
+                    <Camera className="w-8 h-8 text-slate-300" />
+                    <h4 className="text-xs font-bold text-slate-700">Chưa có ảnh kiểm đếm lúc bốc hàng</h4>
+                    <p className="text-slate-500 text-[11px] max-w-sm">
+                      {order.status === "searching_driver" || order.status === "waiting_driver" || order.status === "waiting_driver_acceptance"
+                        ? "Đơn hàng đang chờ kết nối tài xế nhận chuyến."
+                        : "Tài xế chưa tải lên ảnh chụp kẹp chì hoặc hiện trường bốc hàng."}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className="w-8 h-8 text-slate-300" />
+                    <h4 className="text-xs font-bold text-slate-700">Không có ảnh hàng hóa ban đầu</h4>
+                    <p className="text-slate-500 text-[11px]">Chủ hàng không đính kèm ảnh khi tạo yêu cầu vận chuyển.</p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Acceptance Specs & Digital Signature Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              {/* Left Box: Chi tiết nghiệm thu */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3 text-xs">
+                <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                  Thông tin nghiệm thu bàn giao
+                </h4>
+
+                <div className="space-y-2.5 text-slate-700 font-medium">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                    <span className="text-slate-400 font-bold">Mã chứng chỉ e-POD:</span>
+                    <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {epodDetail.certificateCode || `EPOD-${order.orderCode}`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                    <span className="text-slate-400 font-bold">Người nhận bàn giao:</span>
+                    <span className="font-bold text-slate-800">{epodDetail.receiverName || "Chưa ghi nhận người nhận"}</span>
+                  </div>
+                  {epodDetail.receiverPhone && (
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                      <span className="text-slate-400 font-bold">Số điện thoại người nhận:</span>
+                      <span className="font-bold text-slate-800">{epodDetail.receiverPhone}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                    <span className="text-slate-400 font-bold">Thời điểm nghiệm thu:</span>
+                    <span className="font-bold text-slate-800">{epodDetail.deliveredTime || "Chưa hoàn tất giao hàng"}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-slate-400 font-bold">Đánh giá ngoại quan & niêm phong:</span>
+                    <p className="text-[11px] text-slate-800 font-semibold bg-white p-2.5 rounded-xl border border-slate-200/70 leading-relaxed">
+                      {epodDetail.conditionNote ? `"${epodDetail.conditionNote}"` : "Chưa có ghi chú kiểm kho"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Box: Chữ ký số điện tử */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-between space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                    <CheckCircle2 className={`w-3.5 h-3.5 ${epodDetail.signatureUrl ? "text-emerald-600" : "text-slate-400"}`} />
+                    Chữ ký số xác thực (Digital Signature)
+                  </h4>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                    epodDetail.signatureUrl
+                      ? "text-emerald-700 bg-emerald-100"
+                      : "text-slate-500 bg-slate-200/70"
+                  }`}>
+                    {epodDetail.signatureUrl ? "ĐÃ KÝ SỐ XÁC THỰC" : "CHƯA KÝ NHẬN"}
+                  </span>
+                </div>
+
+                {/* Signature preview frame */}
+                <div className="relative rounded-2xl border-2 border-dashed border-slate-300/80 bg-white p-4 flex flex-col items-center justify-center min-h-[90px] overflow-hidden">
+                  {epodDetail.signatureUrl ? (
+                    <img src={epodDetail.signatureUrl} alt="Chữ ký người nhận" className="max-h-16 object-contain" />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-slate-400 text-xs italic space-y-1">
+                      <FileSignature className="w-6 h-6 text-slate-300" />
+                      <span>Chưa có chữ ký điện tử</span>
+                      <span className="text-[10px] text-slate-400">
+                        {order.status === "delivered" || order.status === "completed"
+                          ? "Bàn giao chưa ghi nhận chữ ký số"
+                          : "Sẽ được ký duyệt khi bàn giao tại kho đích"}
+                      </span>
+                    </div>
+                  )}
+                  {epodDetail.signatureUrl && (
+                    <div className="absolute right-3 bottom-2 text-right pointer-events-none opacity-20">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-900">TXEPRO VERIFIED</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-[11px]">
+                  <div>
+                    <p className="font-bold text-slate-800">{epodDetail.receiverName || "Chưa có thông tin"}</p>
+                    <p className="text-[10px] text-slate-400">{epodDetail.receiverTitle || "Đại diện bên nhận"}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono text-[10px] text-slate-400">SHA-256 HASH</p>
+                    <p className="font-mono text-[10px] font-bold text-slate-600 truncate max-w-[120px]">
+                      {epodDetail.sha256Hash || "---"}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -942,6 +1938,781 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         </div>
 
       </div>
+
+      {/* Lightbox Modal */}
+      {selectedPhoto && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={handleClosePhoto}
+        >
+          <div 
+            className="relative max-w-4xl w-full bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl flex flex-col max-h-[92vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 px-6 border-b border-slate-800 bg-slate-900/90 text-white">
+              <div className="flex items-center gap-3">
+                <span className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-primary-400">
+                  <Camera className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold truncate max-w-md">{selectedPhoto.caption}</h3>
+                  <p className="text-[11px] text-slate-400">{selectedPhoto.timestamp} • {selectedPhoto.location}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPhotoZoom(photoZoom === 1 ? 1.5 : 1)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+                  title="Thu phóng ảnh"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPhotoRotation((prev) => (prev + 90) % 360)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+                  title="Xoay ảnh 90°"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadSinglePhoto(selectedPhoto)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+                  title="Tải ảnh gốc"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClosePhoto}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+                  title="Đóng (Esc)"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Main Image Container */}
+            <div className="flex-1 bg-black/60 overflow-hidden flex items-center justify-center p-4 min-h-[360px]">
+              <div 
+                className="transition-transform duration-300 ease-out max-h-[62vh] max-w-full flex items-center justify-center"
+                style={{
+                  transform: `scale(${photoZoom}) rotate(${photoRotation}deg)`,
+                }}
+              >
+                <img
+                  src={selectedPhoto.url}
+                  alt={selectedPhoto.caption}
+                  className="max-h-[62vh] max-w-full object-contain rounded-xl shadow-lg"
+                />
+              </div>
+            </div>
+
+            {/* Bottom Meta Bar */}
+            <div className="p-4 px-6 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs text-slate-300">
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                  <MapPin className="w-3.5 h-3.5" /> GPS: {selectedPhoto.gps}
+                </span>
+                <span className="text-slate-500">|</span>
+                <span className="text-slate-400">Thiết bị: Samsung Galaxy Tab Active 4 Pro (TXEPRO Driver App)</span>
+              </div>
+              <span className="font-mono text-[11px] text-slate-400">CHỨNG TỪ SỐ e-POD # {selectedPhoto.id.toUpperCase()}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Printable A4 Modal */}
+      {isPrintModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          onClick={() => setIsPrintModalOpen(false)}
+        >
+          <div 
+            className="relative max-w-3xl w-full bg-white rounded-3xl p-8 shadow-2xl text-slate-900 my-8 space-y-6 max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            id="printable-epod-container"
+          >
+            {/* Modal Controls (Hidden when printed) */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 no-print">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+                  <Printer className="w-4 h-4" />
+                </span>
+                <h3 className="text-sm font-bold text-slate-900">Xem & In Biên Bản Giao Nhận e-POD</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>In Tài Liệu / Lưu PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPrintModalOpen(false)}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Document Sheet (A4 format) */}
+            <div className="space-y-6 text-slate-800 text-xs p-2 font-sans" id="printable-epod-sheet">
+              {/* Document Header */}
+              <div className="text-center space-y-1 pb-4 border-b-2 border-slate-900">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                <p className="text-[10px] font-bold text-slate-600">Độc lập - Tự do - Hạnh phúc</p>
+                <div className="py-2">
+                  <h1 className="text-lg font-bold text-slate-900 uppercase tracking-tight">
+                    BIÊN BẢN GIAO NHẬN & NGHIỆM THU ĐIỆN TỬ (e-POD)
+                  </h1>
+                  <p className="text-[11px] text-slate-500">
+                    Mã chứng chỉ: <span className="font-bold text-slate-900">{epodDetail.certificateCode}</span> • Mã vận đơn: <span className="font-bold text-slate-900">{order.orderCode}</span>
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    Bảo chứng ký quỹ MB Bank: <span className="font-bold text-blue-700 font-mono">{escrowTxCode}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Parties 3-Column Info */}
+              <div className="grid grid-cols-3 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px]">
+                <div>
+                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px] mb-1">BÊN GỬI HÀNG (SHIPPER)</p>
+                  <p className="font-bold text-slate-900">{order.shipperId.name}</p>
+                  <p className="text-slate-600">{order.shipperId.phone}</p>
+                  <p className="text-slate-500 text-[10px] mt-1">{order.pickup.address}</p>
+                </div>
+                <div>
+                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px] mb-1">BÊN VẬN CHUYỂN (DRIVER)</p>
+                  <p className="font-bold text-slate-900">{order.driverId?.name || "Chưa chỉ định"}</p>
+                  <p className="text-slate-600">{order.driverId?.phone || "---"}</p>
+                  <p className="text-slate-500 text-[10px] mt-1">Đội xe công nghệ TXEPRO</p>
+                </div>
+                <div>
+                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px] mb-1">BÊN NHẬN HÀNG (CONSIGNEE)</p>
+                  <p className="font-bold text-slate-900">{epodDetail.receiverName || "Chưa ghi nhận người nhận"}</p>
+                  <p className="text-slate-600">{epodDetail.receiverPhone || "---"}</p>
+                  <p className="text-slate-500 text-[10px] mt-1">{order.dropoff.address}</p>
+                </div>
+              </div>
+
+              {/* Cargo Table */}
+              <table className="w-full border-collapse border border-slate-200 text-[11px]">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-700 font-bold text-left">
+                    <th className="border border-slate-200 p-2">Tên Hàng Hóa</th>
+                    <th className="border border-slate-200 p-2">Loại Hàng</th>
+                    <th className="border border-slate-200 p-2">Khối Lượng</th>
+                    <th className="border border-slate-200 p-2">Cước Phí Ký Quỹ</th>
+                    <th className="border border-slate-200 p-2">Tình Trạng Nghiệm Thu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-slate-200 p-2 font-bold">{order.title}</td>
+                    <td className="border border-slate-200 p-2">{order.cargoType || "Hàng thông thường"}</td>
+                    <td className="border border-slate-200 p-2">{order.weight ? `${order.weight.toLocaleString()} kg` : "---"}</td>
+                    <td className="border border-slate-200 p-2 font-bold text-blue-700">{totalPrice > 0 ? `${totalPrice.toLocaleString("vi-VN")} ₫` : "---"}</td>
+                    <td className="border border-slate-200 p-2 text-emerald-700 font-bold">
+                      {epodDetail.status === "verified" ? "Đã nghiệm thu hợp lệ" : epodDetail.status === "awaiting_receiver" ? "Chờ kiểm duyệt" : "Đang vận chuyển"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Photo thumbnails in print */}
+              <div className="space-y-2">
+                <p className="font-bold text-slate-900 text-xs uppercase tracking-wider">Ảnh chụp hiện trường giao nhận tại điểm trả:</p>
+                {epodDetail.dropoffPhotos.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    {epodDetail.dropoffPhotos.map((p) => (
+                      <div key={p.id} className="border border-slate-200 rounded-lg p-1.5 space-y-1 text-center">
+                        <img src={p.url} alt={p.caption} className="w-full h-20 object-cover rounded" />
+                        <p className="text-[9px] font-bold text-slate-800 truncate">{p.caption}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-center text-slate-400 text-xs italic">
+                    Chưa có ảnh chụp nghiệm thu đính kèm biên bản
+                  </div>
+                )}
+              </div>
+
+              {/* Signatures */}
+              <div className="grid grid-cols-2 gap-8 pt-4 border-t border-slate-200">
+                <div className="text-center space-y-12">
+                  <p className="font-bold text-slate-900 uppercase">ĐẠI DIỆN BÊN GIAO (TÀI XẾ)</p>
+                  <div>
+                    <p className="font-bold text-slate-800">{order.driverId?.name || "Chưa chỉ định tài xế"}</p>
+                    <p className="text-[10px] text-slate-400">
+                      {order.driverId ? "Đã xác nhận bàn giao" : "Chưa có tài xế nhận đơn"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-center space-y-2">
+                  <p className="font-bold text-slate-900 uppercase">ĐẠI DIỆN BÊN NHẬN (THỦ KHO / CHỦ HÀNG)</p>
+                  <div className="h-14 flex items-center justify-center">
+                    {epodDetail.signatureUrl ? (
+                      <img src={epodDetail.signatureUrl} alt="Chữ ký người nhận" className="max-h-12 object-contain" />
+                    ) : (
+                      <div className="text-slate-400 text-xs italic">(Chưa có chữ ký điện tử)</div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800">{epodDetail.receiverName || "Chưa cập nhật người nhận"}</p>
+                    <p className="text-[10px] text-slate-400">
+                      {epodDetail.deliveredTime ? `Thời gian: ${epodDetail.deliveredTime}` : "Chưa hoàn tất giao hàng"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Footer */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-400">
+                <p>Chứng từ số hóa được ký nhận qua TXEPRO TMS. Mã băm: {epodDetail.sha256Hash || "---"}</p>
+                <p className="font-bold text-slate-600">HỆ THỐNG ĐIỀU VẬN LOGISTICS TXEPRO</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal 1: Cập Nhật Trạng Thái Vận Đơn */}
+      {isStatusModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          onClick={() => setIsStatusModalOpen(false)}
+        >
+          <div 
+            className="relative max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Chuyển Trạng Thái Vận Đơn</h3>
+                  <p className="text-[11px] text-slate-400">Can thiệp vòng đời chu trình logistics</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsStatusModalOpen(false)} 
+                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-600 font-bold mb-1.5">Chọn trạng thái mới</label>
+                <select
+                  value={targetStatus}
+                  onChange={(e) => setTargetStatus(e.target.value as Order["status"])}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  <option value="searching_driver">Tìm tài xế (Searching)</option>
+                  <option value="waiting_driver_acceptance">Chờ tài xế xác nhận</option>
+                  <option value="accepted">Tài xế đã nhận đơn (Accepted)</option>
+                  <option value="in_progress">Đang vận chuyển (In Progress)</option>
+                  <option value="delivered">Đã giao hàng (Delivered - Chờ duyệt)</option>
+                  <option value="completed">Đã hoàn thành (Completed)</option>
+                  <option value="cancelled">Đã hủy đơn (Cancelled)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1.5">Lý do can thiệp (Ghi log kiểm toán)</label>
+                <textarea
+                  rows={3}
+                  value={statusNote}
+                  onChange={(e) => setStatusNote(e.target.value)}
+                  placeholder="Ví dụ: Đã nhận được cuộc gọi xác nhận hoàn thành từ khách hàng..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 space-y-1">
+                <p className="font-bold flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Lưu ý điều phối viên
+                </p>
+                <p>Hành động này sẽ cập nhật toàn trình trạng thái trên ứng dụng của cả Tài xế và Chủ hàng.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsStatusModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmStatusChange}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+              >
+                Xác nhận chuyển trạng thái
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Điều Phối / Chỉ Định Lại Tài Xế */}
+      {isReassignModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          onClick={() => setIsReassignModalOpen(false)}
+        >
+          <div 
+            className="relative max-w-lg w-full bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Điều Phối & Chỉ Định Tài Xế</h3>
+                  <p className="text-[11px] text-slate-400">Thay thế tài xế hoặc mở lại tìm kiếm trên sàn</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsReassignModalOpen(false)} 
+                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Mode switch */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setReassignMode("assign")}
+                  className={`py-2 rounded-lg font-bold transition-all cursor-pointer ${
+                    reassignMode === "assign" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Chỉ định tài xế trực tiếp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReassignMode("reopen")}
+                  className={`py-2 rounded-lg font-bold transition-all cursor-pointer ${
+                    reassignMode === "reopen" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Mở lại tìm kiếm trên sàn
+                </button>
+              </div>
+
+              {reassignMode === "assign" ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-slate-600 font-bold mb-1">
+                      Họ và tên tài xế mới <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newDriverName}
+                      onChange={(e) => setNewDriverName(e.target.value)}
+                      placeholder="Ví dụ: Nguyễn Văn Hùng"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-xs"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-600 font-bold mb-1">Số điện thoại</label>
+                      <input
+                        type="text"
+                        value={newDriverPhone}
+                        onChange={(e) => setNewDriverPhone(e.target.value)}
+                        placeholder="09xx xxx xxx"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-bold mb-1">Biển số / Loại xe</label>
+                      <input
+                        type="text"
+                        value={newDriverVehicle}
+                        onChange={(e) => setNewDriverVehicle(e.target.value)}
+                        placeholder="51D-987.65 (Xe 15 tấn)"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 space-y-1">
+                  <p className="font-bold">Mở lại tìm kiếm trên sàn toàn mạng lưới</p>
+                  <p className="text-[11px] leading-relaxed">
+                    Vận đơn sẽ được hủy ghép nối với tài xế hiện tại và đưa trở lại sàn tìm kiếm để các tài xế khác có thể nhận đơn.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1.5">Lý do điều phối lại</label>
+                <input
+                  type="text"
+                  value={reassignReason}
+                  onChange={(e) => setReassignReason(e.target.value)}
+                  placeholder="Ví dụ: Tài xế báo sự cố nổ lốp, đổi sang xe 15 tấn dự phòng..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsReassignModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReassignDriver}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+              >
+                Xác nhận điều phối
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Xử Lý Ký Quỹ & Bảo Chứng MB Bank */}
+      {isEscrowModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          onClick={() => setIsEscrowModalOpen(false)}
+        >
+          <div 
+            className="relative max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Nghiệp Vụ Ký Quỹ MB Bank</h3>
+                  <p className="text-[11px] text-slate-400">Can thiệp bảo chứng và dòng tiền giải ngân</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsEscrowModalOpen(false)} 
+                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-bold">Mã giao dịch ký quỹ:</span>
+                  <span className="font-mono font-bold text-slate-900">{escrowTxCode}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-bold">Tổng tiền bảo chứng:</span>
+                  <span className="font-bold text-slate-900">{totalPrice ? `${totalPrice.toLocaleString("vi-VN")} ₫` : "---"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-bold">Thực nhận tài xế (95%):</span>
+                  <span className="font-bold text-emerald-600">{totalPrice ? `${driverPayout.toLocaleString("vi-VN")} ₫` : "---"}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1.5">Chọn lệnh can thiệp dòng tiền</label>
+                <div className="space-y-2">
+                  <label className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
+                    escrowActionType === "disburse" ? "bg-emerald-50 border-emerald-500 text-emerald-900" : "bg-slate-50 border-slate-200 text-slate-700"
+                  }`}>
+                    <input
+                      type="radio"
+                      name="escrowAction"
+                      checked={escrowActionType === "disburse"}
+                      onChange={() => setEscrowActionType("disburse")}
+                    />
+                    <div>
+                      <p className="font-bold">Giải ngân ngay cho Tài xế (Disburse)</p>
+                      <p className="text-[11px] opacity-80">Phát lệnh chuyển 95% cước phí vào tài khoản MB Bank của tài xế</p>
+                    </div>
+                  </label>
+
+                  <label className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
+                    escrowActionType === "freeze" ? "bg-amber-50 border-amber-500 text-amber-900" : "bg-slate-50 border-slate-200 text-slate-700"
+                  }`}>
+                    <input
+                      type="radio"
+                      name="escrowAction"
+                      checked={escrowActionType === "freeze"}
+                      onChange={() => setEscrowActionType("freeze")}
+                    />
+                    <div>
+                      <p className="font-bold">Đóng băng tranh chấp (Freeze Escrow)</p>
+                      <p className="text-[11px] opacity-80">Khóa tiền tạm thời tại MB Bank, chờ biên bản giám định hư hỏng</p>
+                    </div>
+                  </label>
+
+                  <label className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
+                    escrowActionType === "refund" ? "bg-rose-50 border-rose-500 text-rose-900" : "bg-slate-50 border-slate-200 text-slate-700"
+                  }`}>
+                    <input
+                      type="radio"
+                      name="escrowAction"
+                      checked={escrowActionType === "refund"}
+                      onChange={() => setEscrowActionType("refund")}
+                    />
+                    <div>
+                      <p className="font-bold">Hoàn tiền 100% cho Chủ hàng (Refund)</p>
+                      <p className="text-[11px] opacity-80">Hoàn lại tiền cước bảo chứng vào ví/tài khoản của chủ hàng</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1.5">Ghi chú xác nhận nghiệp vụ</label>
+                <input
+                  type="text"
+                  value={escrowActionReason}
+                  onChange={(e) => setEscrowActionReason(e.target.value)}
+                  placeholder="Ví dụ: Phê duyệt theo biên bản e-POD số 8899..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsEscrowModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEscrowAction}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+              >
+                Xác nhận thực thi lệnh
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 4: Ghi Chú Nội Bộ Quản Trị Viên (Internal Notes) */}
+      {isNotesModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          onClick={() => setIsNotesModalOpen(false)}
+        >
+          <div 
+            className="relative max-w-lg w-full bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <StickyNote className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Nhật Ký & Ghi Chú Nội Bộ ({adminNotes.length})</h3>
+                  <p className="text-[11px] text-slate-400">Chỉ hiển thị cho Quản trị viên & Điều phối viên</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsNotesModalOpen(false)} 
+                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Input new note */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <label className="font-bold text-slate-700">Thêm ghi chú điều phối mới:</label>
+                <select
+                  value={newNoteType}
+                  onChange={(e) => setNewNoteType(e.target.value as any)}
+                  className="px-2 py-1 rounded-lg border border-slate-200 bg-white font-bold text-[10px]"
+                >
+                  <option value="info">Thông tin chung</option>
+                  <option value="warning">Cảnh báo / Rủi ro</option>
+                  <option value="action">Hành động can thiệp</option>
+                </select>
+              </div>
+              <textarea
+                rows={2}
+                value={newNoteContent}
+                onChange={(e) => setNewNoteContent(e.target.value)}
+                placeholder="Nhập nội dung ghi chú giám sát tuyến vận tải..."
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 resize-none"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleAddAdminNote}
+                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Send className="w-3 h-3" />
+                  <span>Lưu ghi chú</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Notes list */}
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-[180px]">
+              {adminNotes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center space-y-2 text-slate-400">
+                  <StickyNote className="w-8 h-8 text-slate-300" />
+                  <p className="text-xs font-bold text-slate-600">Chưa có ghi chú nội bộ</p>
+                  <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
+                    Vận đơn này hiện chưa có nhật ký can thiệp. Bạn có thể thêm ghi chú điều phối đầu tiên ở khung phía trên.
+                  </p>
+                </div>
+              ) : (
+                adminNotes.map((note) => (
+                  <div key={note.id} className="p-3 rounded-2xl border border-slate-100 bg-slate-50/80 space-y-1 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800">{note.author} <span className="text-[10px] text-slate-400">({note.role})</span></span>
+                      <span className="text-[10px] text-slate-400">{formatAdminDateTime(note.createdAt)}</span>
+                    </div>
+                    <p className="text-slate-700 font-medium leading-relaxed">{note.content}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsNotesModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 5: Hủy Vận Đơn Khẩn Cấp */}
+      {isCancelModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          onClick={() => setIsCancelModalOpen(false)}
+        >
+          <div 
+            className="relative max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                  <Ban className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Hủy Vận Đơn Khẩn Cấp</h3>
+                  <p className="text-[11px] text-slate-400">Dành cho trường hợp bất khả kháng hoặc tranh chấp</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsCancelModalOpen(false)} 
+                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-600 font-bold mb-1.5">Lý do hủy đơn chính</label>
+                <select
+                  value={cancelReasonChoice}
+                  onChange={(e) => setCancelReasonChoice(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                >
+                  <option value="Xe hư hỏng / tai nạn kỹ thuật">Xe hư hỏng / tai nạn kỹ thuật</option>
+                  <option value="Tranh chấp giá cước hoặc phát sinh chi phí bốc dỡ">Tranh chấp giá cước hoặc chi phí phát sinh</option>
+                  <option value="Hàng hóa sai quy cách / không đảm bảo an toàn">Hàng hóa sai quy cách / không an toàn</option>
+                  <option value="Chủ hàng yêu cầu hủy chuyến">Chủ hàng yêu cầu hủy chuyến</option>
+                  <option value="Tài xế không liên hệ được / quá giờ hẹn">Tài xế không liên hệ được</option>
+                  <option value="Thời tiết bất khả kháng (bão lũ, ngập lụt)">Thời tiết bất khả kháng (bão lũ)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1.5">Chi tiết bổ sung (tùy chọn)</label>
+                <textarea
+                  rows={3}
+                  value={cancelReasonDetail}
+                  onChange={(e) => setCancelReasonDetail(e.target.value)}
+                  placeholder="Ghi rõ chi tiết biên bản hiện trường nếu có..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 resize-none"
+                />
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-[11px] text-rose-800 space-y-1">
+                <p className="font-bold flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Cảnh báo hủy đơn
+                </p>
+                <p>Thao tác này sẽ chấm dứt hành trình của vận đơn và chuyển lệnh hoàn cước ký quỹ MB Bank về tài khoản chủ hàng.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEmergencyCancel}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+              >
+                Xác nhận hủy vận đơn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

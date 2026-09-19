@@ -39,6 +39,7 @@ import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { getServerMediaUrl } from "@/utils/media";
+import { useToast } from "@/context/ToastContext";
 
 type UserRole = "admin" | "tai-xe" | "chu-hang";
 type WorkspaceTab = "waiting" | "in_progress" | "history";
@@ -360,6 +361,7 @@ function InfoRow({
 
 function UserProfileContent() {
   const router = useRouter();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -616,9 +618,11 @@ function UserProfileContent() {
 
   const showToast = (success: boolean, msg: string) => {
     if (success) {
+      toast.success(msg);
       setSuccessMsg(msg);
       setTimeout(() => setSuccessMsg(null), 3000);
     } else {
+      toast.error(msg);
       setErrorMsg(msg);
       setTimeout(() => setErrorMsg(null), 4000);
     }

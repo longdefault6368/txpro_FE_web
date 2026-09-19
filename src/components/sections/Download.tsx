@@ -1,4 +1,4 @@
-import { Smartphone, Play, Apple } from "lucide-react";
+import { Download as DownloadIcon, Play, Apple } from "lucide-react";
 
 export default function Download() {
   return (
@@ -9,7 +9,7 @@ export default function Download() {
           data-aos="zoom-y-out"
         >
           <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-5 py-2 rounded-full mb-6 border border-white/20">
-            <Smartphone className="w-5 h-5" />
+            <DownloadIcon className="w-5 h-5" />
             <span className="font-semibold">Ứng Dụng Đã Có Mặt</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold mb-6 leading-relaxed">

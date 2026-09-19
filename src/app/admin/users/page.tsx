@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { useToast } from "@/context/ToastContext";
 import { getServerMediaUrl, normalizePersistedImagePath } from "@/utils/media";
 import { getVehicleCapabilities } from "@/utils/vehicleCapabilities";
 import { 
@@ -309,6 +310,7 @@ const INITIAL_MOCK_USERS: User[] = [
 
 function AdminUsersContent() {
   const router = useRouter();
+  const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   
   // Data State
@@ -577,9 +579,11 @@ function AdminUsersContent() {
   // Toast handler helper
   const showToast = (success: boolean, msg: string) => {
     if (success) {
+      toast.success(msg);
       setSuccessMsg(msg);
       setTimeout(() => setSuccessMsg(null), 3000);
     } else {
+      toast.error(msg);
       setErrorMsg(msg);
       setTimeout(() => setErrorMsg(null), 4000);
     }

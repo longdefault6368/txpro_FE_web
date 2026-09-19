@@ -16,6 +16,7 @@ import { BorderBeam } from "@/components/magicui/border-beam";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { DotPattern } from "@/components/magicui/dot-pattern";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/context/ToastContext";
 
 type LatLng = { lat: number; lng: number };
 
@@ -223,6 +224,7 @@ function SearchableSelect({
 
 export default function ShipperCreateOrderPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   // Locations State
   const [pickupAddress, setPickupAddress] = useState("");
@@ -472,7 +474,9 @@ export default function ShipperCreateOrderPage() {
     const fileList = Array.from(e.target.files);
 
     if (cargoImages.length + fileList.length > 3) {
-      alert("Chỉ được đính kèm tối đa 3 hình ảnh hàng hóa");
+      toast.warning("Chỉ được đính kèm tối đa 3 hình ảnh hàng hóa", {
+        title: "Giới hạn tệp đính kèm",
+      });
       return;
     }
 

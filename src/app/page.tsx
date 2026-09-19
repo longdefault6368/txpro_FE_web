@@ -10,6 +10,7 @@ import Footer from "@/components/common/Footer";
 
 // Section Components
 import Hero from "@/components/sections/Hero";
+import LiveActivityTicker from "@/components/sections/LiveActivityTicker";
 import HowItWorks from "@/components/sections/HowItWorks";
 import Features from "@/components/sections/Features";
 import Savings from "@/components/sections/Savings";
@@ -38,6 +39,7 @@ export default function Home() {
       <Header />
       <main className="overflow-hidden">
         <Hero />
+        <LiveActivityTicker />
         <HowItWorks />
         <Features />
         <Savings />

@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { useToast } from "@/context/ToastContext";
 
 type NotificationCategory = "all" | "users" | "kyc" | "orders" | "support" | "system";
 
@@ -247,6 +248,7 @@ const getTypeConfig = (type: string) => {
 
 export default function AdminNotificationsPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState<AdminNotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
@@ -384,6 +386,9 @@ export default function AdminNotificationsPage() {
     }
     setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
     setSelectedIds([]);
+    toast.success("Đã đánh dấu tất cả thông báo là đã đọc", {
+      title: "Cập nhật thông báo",
+    });
   };
 
   const handleToggleRead = async (item: AdminNotificationItem, e?: React.MouseEvent) => {
@@ -405,6 +410,7 @@ export default function AdminNotificationsPage() {
 
   const handleBatchMarkRead = async () => {
     if (selectedIds.length === 0) return;
+    const count = selectedIds.length;
     for (const id of selectedIds) {
       fetchWithAuth(`${API_BASE}/admin/users/notifications/${id}/read`, { method: "PATCH" }).catch(() => null);
     }
@@ -412,6 +418,7 @@ export default function AdminNotificationsPage() {
       prev.map((n) => (selectedIds.includes(n.id) ? { ...n, read: true } : n))
     );
     setSelectedIds([]);
+    toast.success(`Đã đánh dấu ${count} thông báo đã chọn là đã đọc`);
   };
 
   const handleItemNavigate = (item: AdminNotificationItem, e?: React.MouseEvent) => {

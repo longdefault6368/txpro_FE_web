@@ -3,10 +3,11 @@
 import { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { useToast } from "@/context/ToastContext";
 import { 
   Search, Filter, Truck, CheckCircle, Clock, XCircle, 
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, AlertTriangle, Eye, Loader, SlidersHorizontal,
-  Calendar, RotateCcw
+  Calendar, RotateCcw, Package, ArrowUpRight, Banknote, Download
 } from "lucide-react";
 
 interface UserInfo {
@@ -19,7 +20,20 @@ interface Order {
   _id: string;
   orderCode: string;
   title: string;
-  status: "pending" | "searching_driver" | "matched" | "in_transit" | "delivered" | "cancelled";
+  status:
+    | "pending"
+    | "searching_driver"
+    | "waiting_driver"
+    | "waiting_driver_acceptance"
+    | "matched"
+    | "accepted"
+    | "rejected"
+    | "in_progress"
+    | "in_transit"
+    | "delivered"
+    | "completed"
+    | "cancelled"
+    | string;
   offerPrice?: number;
   budget?: number;
   pickup?: { address: string };
@@ -119,66 +133,6 @@ function getCancelReasonText(order: Order) {
   return note ? `${translatedReason}. Ghi chú: ${note}` : translatedReason;
 }
 
-const INITIAL_MOCK_ORDERS: Order[] = [
-  {
-    _id: "o-mock-1",
-    orderCode: "ORD-20260709-001",
-    title: "Vận chuyển 20 tấn hạt nhựa PP",
-    status: "in_transit",
-    offerPrice: 4500000,
-    pickup: { address: "KCN Cát Lái, Quận 2, TP.HCM" },
-    dropoff: { address: "KCN Sóng Thần, Bình Dương" },
-    shipperId: { name: "Trần Thị Hằng", phone: "0912345678", email: "hang@gmail.com" },
-    driverId: { name: "Nguyễn Văn Tuấn", phone: "0987654321", email: "tuan.driver@gmail.com" },
-    createdAt: "2026-07-09T08:30:00Z"
-  },
-  {
-    _id: "o-mock-2",
-    orderCode: "ORD-20260709-002",
-    title: "Vận chuyển thiết bị gia dụng nhà thông minh",
-    status: "delivered",
-    offerPrice: 3200000,
-    pickup: { address: "Cảng Cát Lái, Quận 2, TP.HCM" },
-    dropoff: { address: "Quận Hoàn Kiếm, Hà Nội" },
-    shipperId: { name: "Lê Văn Hoàng", phone: "0905111222", email: "hoang.le@outlook.com" },
-    driverId: { name: "Phạm Minh Đức", phone: "0977888999", email: "duc.pham@gmail.com" },
-    createdAt: "2026-07-09T06:15:00Z"
-  },
-  {
-    _id: "o-mock-3",
-    orderCode: "ORD-20260708-005",
-    title: "Giao nhận 50 thùng hoa quả tươi nhập khẩu",
-    status: "pending",
-    budget: 900000,
-    pickup: { address: "Chợ đầu mối Thủ Đức, TP.HCM" },
-    dropoff: { address: "Quận 1, TP.HCM" },
-    shipperId: { name: "Nguyễn Minh Thu", phone: "0933444555", email: "thu.nguyen@gmail.com" },
-    createdAt: "2026-07-08T14:00:00Z"
-  },
-  {
-    _id: "o-mock-4",
-    orderCode: "ORD-20260708-004",
-    title: "Vận chuyển sắt thép công trình xây dựng",
-    status: "matched",
-    offerPrice: 8500000,
-    pickup: { address: "Nhà máy thép Hòa Phát, Dung Quất" },
-    dropoff: { address: "Quận Nam Từ Liêm, Hà Nội" },
-    shipperId: { name: "Công ty Cổ phần Thép Việt", phone: "0283844999", email: "info@thepviet.com" },
-    driverId: { name: "Vũ Quốc Khánh", phone: "0966777888", email: "khanh.vu@gmail.com" },
-    createdAt: "2026-07-08T09:45:00Z"
-  },
-  {
-    _id: "o-mock-5",
-    orderCode: "ORD-20260707-010",
-    title: "Chuyển kho dệt may từ Bình Dương đi Vũng Tàu",
-    status: "cancelled",
-    budget: 5000000,
-    pickup: { address: "KCN VSIP 1, Thuận An, Bình Dương" },
-    dropoff: { address: "Thành phố Vũng Tàu, Bà Rịa - Vũng Tàu" },
-    shipperId: { name: "Trương Công Định", phone: "0944555666", email: "dinh.truong@textile.vn" },
-    createdAt: "2026-07-07T16:20:00Z"
-  }
-];
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   searching_driver: { label: "Tìm tài xế", color: "text-blue-600 bg-blue-50 border-blue-100", icon: Loader },
@@ -193,10 +147,12 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: React.Ele
 };
 
 function AdminOrdersContent() {
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
+  const [overviewTotalOrders, setOverviewTotalOrders] = useState<number | null>(null);
  
   // Filters & Search
   const [search, setSearch] = useState("");
@@ -210,6 +166,51 @@ function AdminOrdersContent() {
 
   // Details Modal
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Fetch overview metrics on mount if available
+  useEffect(() => {
+    fetchWithAuth(`${API_BASE}/admin/users/overview`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.data?.metrics?.totalOrders) {
+          setOverviewTotalOrders(data.data.metrics.totalOrders);
+        }
+      })
+      .catch(() => null);
+  }, []);
+
+  // Computed KPI Metrics
+  const totalOrdersCount = overviewTotalOrders || pagination.total || orders.length;
+
+  const inTransitOrdersCount = useMemo(() => {
+    return orders.filter(
+      (o) =>
+        o.status === "in_progress" ||
+        o.status === "in_transit" ||
+        (o.status as any) === "accepted" ||
+        o.status === "matched"
+    ).length;
+  }, [orders]);
+
+  const pendingOrdersCount = useMemo(() => {
+    return orders.filter(
+      (o) =>
+        o.status === "searching_driver" ||
+        (o.status as any) === "waiting_driver" ||
+        (o.status as any) === "waiting_driver_acceptance" ||
+        o.status === "pending"
+    ).length;
+  }, [orders]);
+
+  const totalGmvAmount = useMemo(() => {
+    return orders.reduce((sum, o) => sum + getOrderCost(o), 0);
+  }, [orders]);
+
+  const formatVND = (val: number) => {
+    if (val >= 1000000000) return `${(val / 1000000000).toFixed(2)} tỷ ₫`;
+    if (val >= 1000000) return `${(val / 1000000).toFixed(1)} tr ₫`;
+    return `${val.toLocaleString("vi-VN")} ₫`;
+  };
 
   const applyDatePreset = (preset: string) => {
     setDatePreset(preset);
@@ -299,52 +300,15 @@ function AdminOrdersContent() {
       } else {
         const errData = await res.json().catch(() => ({}));
         console.error("API error:", errData.message || "Failed to fetch orders");
+        setOrders([]);
+        setPagination({ page: 1, limit, total: 0, pages: 1 });
         setIsOffline(false);
       }
     } catch (err: unknown) {
-      console.warn("Backend connection offline, using mock orders fallback", err);
-      setIsOffline(true);
-      
-      // Offline local filter simulation
-      let filtered = [...INITIAL_MOCK_ORDERS];
-      
-      if (search) {
-        const query = search.toLowerCase();
-        filtered = filtered.filter(o => 
-          o.orderCode.toLowerCase().includes(query) ||
-          o.title.toLowerCase().includes(query) ||
-          (o.pickup && o.pickup.address.toLowerCase().includes(query)) ||
-          (o.dropoff && o.dropoff.address.toLowerCase().includes(query))
-        );
-      }
-
-      if (statusFilter) {
-        filtered = filtered.filter(o => o.status === statusFilter);
-      }
-
-      if (startDate || endDate) {
-        const startMs = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
-        const endMs = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
-        filtered = filtered.filter(o => {
-          const itemMs = new Date(o.createdAt).getTime();
-          if (startMs && itemMs < startMs) return false;
-          if (endMs && itemMs > endMs) return false;
-          return true;
-        });
-      }
-
-      const total = filtered.length;
-      const pages = Math.ceil(total / limit) || 1;
-      const startIdx = (currentPage - 1) * limit;
-      const paginated = filtered.slice(startIdx, startIdx + limit);
-
-      setOrders(paginated);
-      setPagination({
-        page: currentPage,
-        limit,
-        total,
-        pages
-      });
+      console.warn("Backend connection error:", err);
+      setOrders([]);
+      setPagination({ page: 1, limit, total: 0, pages: 1 });
+      setIsOffline(false);
     } finally {
       setLoading(false);
     }
@@ -386,6 +350,88 @@ function AdminOrdersContent() {
     }));
   };
 
+  const handleExportCSV = () => {
+    if (sortedOrders.length === 0) {
+      toast.warning("Không có dữ liệu vận đơn nào phù hợp để xuất báo cáo!", {
+        title: "Xuất dữ liệu Excel/CSV",
+      });
+      return;
+    }
+
+    // CSV Headers
+    const headers = [
+      "STT",
+      "Mã Vận Đơn",
+      "Tên Hàng Hóa",
+      "Trạng Thái",
+      "Chi Phí (VNĐ)",
+      "Điểm Bốc Hàng",
+      "Điểm Giao Hàng",
+      "Chủ Hàng",
+      "SĐT Chủ Hàng",
+      "Email Chủ Hàng",
+      "Tài Xế",
+      "SĐT Tài Xế",
+      "Email Tài Xế",
+      "Ngày Tạo",
+      "Lý Do Hủy",
+      "Bên Hủy"
+    ];
+
+    // Helper to safely format CSV cells
+    const formatCell = (val?: string | number | null) => {
+      if (val === undefined || val === null) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = sortedOrders.map((order, idx) => {
+      const statusLabel = STATUS_MAP[order.status]?.label || order.status;
+      const cost = getOrderCost(order);
+      const cancelReason = order.status === "cancelled" ? getCancelReasonText(order) : "";
+      const cancelledBy = order.status === "cancelled" ? getCancelledByDisplay(order) : "";
+
+      return [
+        idx + 1,
+        formatCell(order.orderCode),
+        formatCell(order.title),
+        formatCell(statusLabel),
+        cost,
+        formatCell(order.pickup?.address),
+        formatCell(order.dropoff?.address),
+        formatCell(order.shipperId?.name),
+        formatCell(order.shipperId?.phone),
+        formatCell(order.shipperId?.email),
+        formatCell(order.driverId?.name),
+        formatCell(order.driverId?.phone),
+        formatCell(order.driverId?.email),
+        formatCell(formatDateTime(order.createdAt)),
+        formatCell(cancelReason),
+        formatCell(cancelledBy),
+      ].join(",");
+    });
+
+    // Add UTF-8 BOM (\uFEFF) so Excel opens UTF-8 Vietnamese perfectly
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    link.setAttribute("href", url);
+    link.setAttribute("download", `danh_sach_van_don_txepro_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Đã xuất thành công ${sortedOrders.length} vận đơn sang tệp Excel/CSV!`, {
+      title: "Xuất dữ liệu thành công",
+    });
+  };
+
   const renderSortableHeader = (sortKey: SortKey, label: string) => {
     const isActive = sortConfig?.key === sortKey;
     const direction = isActive ? sortConfig.direction : null;
@@ -416,11 +462,151 @@ function AdminOrdersContent() {
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Danh Sách Vận Đơn</h1>
           <p className="text-slate-400 text-xs mt-1">Giám sát trạng thái di chuyển, lộ trình vận tải và giá trị các đơn đặt xe.</p>
         </div>
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold shadow-xs hover:shadow-md transition-all cursor-pointer flex-shrink-0"
+            title="Tải bảng kê vận đơn định dạng Excel / CSV (chuẩn UTF-8 tiếng Việt)"
+          >
+            <Download className="w-4 h-4" />
+            <span>Xuất Excel / CSV</span>
+            <span className="bg-emerald-700/60 text-emerald-100 text-[10px] px-1.5 py-0.2 rounded-md font-bold">
+              {sortedOrders.length}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* 4 Order KPI Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
+        {[
+          {
+            id: "all",
+            label: "Tổng Vận Đơn",
+            value: totalOrdersCount.toLocaleString(),
+            subValue: "Toàn sàn hệ thống",
+            badge: "Tất cả",
+            trendUp: true,
+            icon: Package,
+            gradient: "from-blue-500 to-indigo-600",
+            bgLight: "bg-blue-50",
+            iconColor: "text-blue-600",
+            isActive: statusFilter === "",
+            hint: "Xem tất cả",
+            onClick: () => {
+              setStatusFilter("");
+              setCurrentPage(1);
+            },
+          },
+          {
+            id: "in_progress",
+            label: "Đang Vận Chuyển",
+            value: inTransitOrdersCount.toLocaleString(),
+            subValue: "Giám sát GPS trực tiếp",
+            badge: "Đang lăn bánh",
+            trendUp: true,
+            icon: Truck,
+            gradient: "from-emerald-500 to-teal-600",
+            bgLight: "bg-emerald-50",
+            iconColor: "text-emerald-600",
+            isActive: statusFilter === "in_progress" || statusFilter === "in_transit",
+            hint: "Lọc xe đang chạy",
+            onClick: () => {
+              setStatusFilter(statusFilter === "in_progress" ? "" : "in_progress");
+              setCurrentPage(1);
+            },
+          },
+          {
+            id: "searching_driver",
+            label: "Đang Chờ Tài Xế",
+            value: pendingOrdersCount.toLocaleString(),
+            subValue: "Cần điều phối nhận chuyến",
+            badge: "Chờ nhận chuyến",
+            trendUp: false,
+            icon: Clock,
+            gradient: "from-amber-500 to-orange-600",
+            bgLight: "bg-amber-50",
+            iconColor: "text-amber-600",
+            isActive: statusFilter === "searching_driver" || statusFilter === "waiting_driver",
+            hint: "Lọc đơn chờ xe",
+            onClick: () => {
+              setStatusFilter(statusFilter === "searching_driver" ? "" : "searching_driver");
+              setCurrentPage(1);
+            },
+          },
+          {
+            id: "gmv",
+            label: "Tổng Cước Phí (GMV)",
+            value: formatVND(totalGmvAmount),
+            subValue: "Bảo chứng ký quỹ MB Bank",
+            badge: "Doanh số",
+            trendUp: true,
+            icon: Banknote,
+            gradient: "from-violet-500 to-purple-600",
+            bgLight: "bg-violet-50",
+            iconColor: "text-violet-600",
+            isActive: sortConfig?.key === "cost",
+            hint: "Xếp theo cước",
+            onClick: () => {
+              handleSort("cost");
+            },
+          },
+        ].map((card) => (
+          <button
+            key={card.id}
+            type="button"
+            onClick={card.onClick}
+            className={`text-left bg-white rounded-2xl border p-4 sm:p-5 lg:p-6 shadow-xs hover:shadow-md transition-all relative overflow-hidden group min-w-0 cursor-pointer ${
+              card.isActive
+                ? "border-primary-500 ring-2 ring-primary-500/20 shadow-primary-500/5 bg-primary-50/10"
+                : "border-slate-200/60 hover:border-slate-300"
+            }`}
+          >
+            <div
+              className={`absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-gradient-to-br ${card.gradient} opacity-5 rounded-bl-[60px] group-hover:opacity-10 transition-opacity pointer-events-none`}
+            />
+            <div className="flex items-start justify-between gap-2 mb-3 sm:mb-4">
+              <div
+                className={`w-10 h-10 sm:w-11 sm:h-11 ${card.bgLight} rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105`}
+              >
+                <card.icon className={`w-5 h-5 ${card.iconColor}`} />
+              </div>
+              <div
+                className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${
+                  card.isActive
+                    ? "bg-primary-600 text-white"
+                    : card.trendUp
+                    ? "text-emerald-700 bg-emerald-50"
+                    : "text-amber-700 bg-amber-50"
+                }`}
+              >
+                {card.isActive && <span>✓ Đang chọn</span>}
+                {!card.isActive && card.trendUp && (
+                  <ArrowUpRight className="w-3 h-3 flex-shrink-0" />
+                )}
+                {!card.isActive && <span>{card.badge}</span>}
+              </div>
+            </div>
+            <p className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight truncate">
+              {card.value}
+            </p>
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-xs font-semibold text-slate-500 truncate">{card.label}</p>
+              <span className="text-[11px] font-bold text-slate-400 group-hover:text-primary-600 transition-colors">
+                {card.hint} →
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 font-medium mt-1 truncate">
+              {card.subValue}
+            </p>
+          </button>
+        ))}
       </div>
 
       {/* Filters Bar */}
