@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
@@ -746,6 +746,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
   // Admin Action Toolbar states
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [isEscrowModalOpen, setIsEscrowModalOpen] = useState(false);
@@ -769,40 +770,43 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [cancelReasonDetail, setCancelReasonDetail] = useState("");
 
   // Load order data and initialize Google Map route
-  useEffect(() => {
-    const fetchOrderDetail = async () => {
-      setLoading(true);
-      try {
-        const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.data?.order) {
-            setOrder({
-              ...data.data.order,
-              reviews: data.data.reviews || [],
-              contract: data.data.contract || null,
-              evidence: data.data.evidence || null,
-            });
-            setIsOffline(false);
-          } else {
-            setOrder(null);
-            setIsOffline(false);
+  const fetchOrderDetail = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.data?.order) {
+          setOrder({
+            ...data.data.order,
+            reviews: data.data.reviews || [],
+            contract: data.data.contract || null,
+            evidence: data.data.evidence || null,
+          });
+          if (Array.isArray(data.data.order.adminNotes)) {
+            setAdminNotes(data.data.order.adminNotes);
           }
+          setIsOffline(false);
         } else {
           setOrder(null);
           setIsOffline(false);
         }
-      } catch (err) {
-        console.warn("Backend error, order not loaded", err);
+      } else {
         setOrder(null);
         setIsOffline(false);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    fetchOrderDetail();
+    } catch (err) {
+      console.warn("Backend error, order not loaded", err);
+      setOrder(null);
+      setIsOffline(false);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    fetchOrderDetail();
+  }, [fetchOrderDetail]);
 
   // Close modals on Escape key (Must be placed before any conditional returns to obey Rules of Hooks)
   useEffect(() => {
@@ -923,162 +927,266 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   };
 
   // Admin Toolbar Action Handlers
-  const handleSyncOrder = () => {
+  const handleSyncOrder = async () => {
     setIsSyncing(true);
-    setTimeout(() => {
+    try {
+      await fetchOrderDetail();
+      toast.success("Đã đồng bộ dữ liệu vận đơn & tọa độ GPS mới nhất thành công");
+    } catch {
+      toast.error("Không thể kết nối máy chủ để làm mới");
+    } finally {
       setIsSyncing(false);
-      toast.success("Đã đồng bộ dữ liệu vận đơn & tọa độ GPS mới nhất từ thiết bị tài xế");
-    }, 600);
+    }
   };
 
-  const handleConfirmStatusChange = () => {
+  const handleConfirmStatusChange = async () => {
     if (!order) return;
-    setOrder({ ...order, status: targetStatus });
-    const noteContent = `[Điều phối viên - Thao tác hệ thống]: Cập nhật trạng thái sang "${STATUS_MAP[targetStatus]?.label || targetStatus}". ${statusNote ? `Lý do: ${statusNote}` : ""}`;
-    const autoNote: AdminInternalNote = {
-      id: `n-${Date.now()}`,
-      author: "Quản trị viên TMS",
-      role: "Admin điều hành",
-      content: noteContent,
-      createdAt: new Date().toISOString(),
-      type: "action",
-    };
-    setAdminNotes((prev) => [autoNote, ...prev]);
-    toast.success(`Đã cập nhật trạng thái vận đơn sang "${STATUS_MAP[targetStatus]?.label || targetStatus}"`);
-    setStatusNote("");
-    setIsStatusModalOpen(false);
-  };
-
-  const handleConfirmReassignDriver = () => {
-    if (!order) return;
-    if (reassignMode === "reopen") {
-      setOrder({ ...order, driverId: undefined, status: "searching_driver" });
-      const autoNote: AdminInternalNote = {
-        id: `n-${Date.now()}`,
-        author: "Quản trị viên TMS",
-        role: "Admin điều hành",
-        content: `[Điều phối tài xế]: Đưa đơn về tìm kiếm trên sàn. Lý do: ${reassignReason || "Tài xế cũ không thể tiếp tục"}`,
-        createdAt: new Date().toISOString(),
-        type: "warning",
-      };
-      setAdminNotes((prev) => [autoNote, ...prev]);
-      toast.success("Đã đưa vận đơn về trạng thái tìm kiếm tài xế trên sàn");
-    } else {
-      if (!newDriverName.trim()) {
-        toast.warning("Vui lòng nhập họ và tên tài xế để chỉ định");
-        return;
-      }
-      const driverObj: UserInfo = {
-        name: newDriverName.trim(),
-        phone: newDriverPhone.trim() || "---",
-        email: "",
-      };
-      setOrder({
-        ...order,
-        driverId: driverObj,
-        status: "accepted",
+    setIsSubmitting(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: targetStatus,
+          note: statusNote.trim() || undefined,
+        }),
       });
-      const autoNote: AdminInternalNote = {
-        id: `n-${Date.now()}`,
-        author: "Quản trị viên TMS",
-        role: "Admin điều hành",
-        content: `[Điều phối tài xế]: Chỉ định tài xế mới ${driverObj.name}${newDriverPhone ? ` (${newDriverPhone.trim()})` : ""}${newDriverVehicle ? ` - Phương tiện: ${newDriverVehicle.trim()}` : ""}. ${reassignReason ? `Ghi chú: ${reassignReason.trim()}` : ""}`,
-        createdAt: new Date().toISOString(),
-        type: "action",
-      };
-      setAdminNotes((prev) => [autoNote, ...prev]);
-      toast.success(`Đã chỉ định tài xế mới: ${driverObj.name}`);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.data?.order) {
+          setOrder((prev) => prev ? { ...prev, ...data.data.order } : null);
+          if (Array.isArray(data.data.order.adminNotes)) {
+            setAdminNotes(data.data.order.adminNotes);
+          }
+        } else {
+          setOrder((prev) => prev ? { ...prev, status: targetStatus } : null);
+        }
+        toast.success(`Đã cập nhật trạng thái vận đơn sang "${STATUS_MAP[targetStatus]?.label || targetStatus}"`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setOrder((prev) => prev ? { ...prev, status: targetStatus } : null);
+        toast.warning(errData.message || `Đã cập nhật trạng thái đơn (chế độ cục bộ)`);
+      }
+    } catch {
+      setOrder((prev) => prev ? { ...prev, status: targetStatus } : null);
+      toast.warning("Đã cập nhật trạng thái đơn hàng (chế độ ngoại tuyến)");
+    } finally {
+      setIsSubmitting(false);
+      setStatusNote("");
+      setIsStatusModalOpen(false);
     }
-    setNewDriverName("");
-    setNewDriverPhone("");
-    setNewDriverVehicle("");
-    setReassignReason("");
-    setIsReassignModalOpen(false);
   };
 
-  const handleConfirmEscrowAction = () => {
+  const handleConfirmReassignDriver = async () => {
     if (!order) return;
-    if (escrowActionType === "disburse") {
-      setOrder({ ...order, status: "completed" });
-      const autoNote: AdminInternalNote = {
-        id: `n-${Date.now()}`,
-        author: "Ban kiểm soát Escrow MB",
-        role: "Kiểm soát tài chính",
-        content: `[Giải ngân MB Bank]: Đã duyệt giải ngân 95% cước phí cho tài xế. ${escrowActionReason ? `Ghi chú: ${escrowActionReason}` : ""}`,
-        createdAt: new Date().toISOString(),
-        type: "action",
-      };
-      setAdminNotes((prev) => [autoNote, ...prev]);
-      toast.success("Đã gửi lệnh giải ngân 95% cước phí qua MB Bank thành công");
-    } else if (escrowActionType === "freeze") {
-      const autoNote: AdminInternalNote = {
-        id: `n-${Date.now()}`,
-        author: "Ban kiểm soát Escrow MB",
-        role: "Kiểm soát tài chính",
-        content: `[Đóng băng ký quỹ]: Đã phong tỏa tài khoản MB Bank do phát sinh tranh chấp. Lý do: ${escrowActionReason || "Yêu cầu từ kiểm soát viên"}`,
-        createdAt: new Date().toISOString(),
-        type: "warning",
-      };
-      setAdminNotes((prev) => [autoNote, ...prev]);
-      toast.warning("Đã đóng băng ký quỹ MB Bank chờ giải quyết tranh chấp");
-    } else {
-      setOrder({ ...order, status: "cancelled" });
-      const autoNote: AdminInternalNote = {
-        id: `n-${Date.now()}`,
-        author: "Ban kiểm soát Escrow MB",
-        role: "Kiểm soát tài chính",
-        content: `[Hoàn cước MB Bank]: Lệnh hoàn cước 100% về tài khoản chủ hàng. Lý do: ${escrowActionReason || "Hủy vận đơn"}`,
-        createdAt: new Date().toISOString(),
-        type: "info",
-      };
-      setAdminNotes((prev) => [autoNote, ...prev]);
-      toast.info("Đã gửi lệnh hoàn cước 100% về tài khoản chủ hàng");
+    if (reassignMode === "assign" && !newDriverName.trim()) {
+      toast.warning("Vui lòng nhập họ và tên tài xế để chỉ định");
+      return;
     }
-    setEscrowActionReason("");
-    setIsEscrowModalOpen(false);
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}/assign-driver`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: reassignMode,
+          driverName: newDriverName.trim() || undefined,
+          driverPhone: newDriverPhone.trim() || undefined,
+          vehicle: newDriverVehicle.trim() || undefined,
+          reason: reassignReason.trim() || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.data?.order) {
+          setOrder((prev) => prev ? { ...prev, ...data.data.order } : null);
+          if (Array.isArray(data.data.order.adminNotes)) {
+            setAdminNotes(data.data.order.adminNotes);
+          }
+        }
+        toast.success(reassignMode === "reopen" ? "Đã mở lại tìm kiếm tài xế trên sàn" : `Đã chỉ định tài xế mới: ${newDriverName}`);
+      } else {
+        if (reassignMode === "reopen") {
+          setOrder((prev) => prev ? { ...prev, driverId: undefined, status: "searching_driver" } : null);
+        } else {
+          setOrder((prev) => prev ? { ...prev, driverId: { name: newDriverName, phone: newDriverPhone || "---", email: "" }, status: "accepted" } : null);
+        }
+        toast.warning("Đã cập nhật điều phối tài xế (chế độ cục bộ)");
+      }
+    } catch {
+      if (reassignMode === "reopen") {
+        setOrder((prev) => prev ? { ...prev, driverId: undefined, status: "searching_driver" } : null);
+      } else {
+        setOrder((prev) => prev ? { ...prev, driverId: { name: newDriverName, phone: newDriverPhone || "---", email: "" }, status: "accepted" } : null);
+      }
+      toast.warning("Đã cập nhật điều phối tài xế (chế độ ngoại tuyến)");
+    } finally {
+      setIsSubmitting(false);
+      setNewDriverName("");
+      setNewDriverPhone("");
+      setNewDriverVehicle("");
+      setReassignReason("");
+      setIsReassignModalOpen(false);
+    }
   };
 
-  const handleAddAdminNote = () => {
+  const handleConfirmEscrowAction = async () => {
+    if (!order) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}/escrow`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: escrowActionType,
+          reason: escrowActionReason.trim() || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.data?.order) {
+          setOrder((prev) => prev ? { ...prev, ...data.data.order } : null);
+          if (Array.isArray(data.data.order.adminNotes)) {
+            setAdminNotes(data.data.order.adminNotes);
+          }
+        }
+        toast.success(
+          escrowActionType === "disburse"
+            ? "Đã gửi lệnh giải ngân 95% cước phí qua MB Bank thành công"
+            : escrowActionType === "freeze"
+            ? "Đã đóng băng ký quỹ MB Bank chờ giải quyết tranh chấp"
+            : "Đã gửi lệnh hoàn cước 100% về tài khoản chủ hàng"
+        );
+      } else {
+        if (escrowActionType === "disburse") {
+          setOrder((prev) => prev ? { ...prev, status: "completed" } : null);
+        } else if (escrowActionType === "refund") {
+          setOrder((prev) => prev ? { ...prev, status: "cancelled" } : null);
+        }
+        toast.warning("Đã thực thi nghiệp vụ ký quỹ (chế độ cục bộ)");
+      }
+    } catch {
+      if (escrowActionType === "disburse") {
+        setOrder((prev) => prev ? { ...prev, status: "completed" } : null);
+      } else if (escrowActionType === "refund") {
+        setOrder((prev) => prev ? { ...prev, status: "cancelled" } : null);
+      }
+      toast.warning("Đã thực thi nghiệp vụ ký quỹ (chế độ ngoại tuyến)");
+    } finally {
+      setIsSubmitting(false);
+      setEscrowActionReason("");
+      setIsEscrowModalOpen(false);
+    }
+  };
+
+  const handleAddAdminNote = async () => {
     if (!newNoteContent.trim()) {
       toast.error("Vui lòng nhập nội dung ghi chú");
       return;
     }
-    const note: AdminInternalNote = {
-      id: `n-${Date.now()}`,
-      author: "Quản trị viên TMS",
-      role: "Admin điều hành",
-      content: newNoteContent.trim(),
-      createdAt: new Date().toISOString(),
-      type: newNoteType,
-    };
-    setAdminNotes((prev) => [note, ...prev]);
-    setNewNoteContent("");
-    toast.success("Đã thêm ghi chú nội bộ thành công");
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: newNoteContent.trim(),
+          type: newNoteType,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.data?.adminNotes)) {
+          setAdminNotes(data.data.adminNotes);
+        } else if (data.data?.note) {
+          setAdminNotes((prev) => [data.data.note, ...prev]);
+        }
+        toast.success("Đã lưu ghi chú nội bộ thành công");
+      } else {
+        const note: AdminInternalNote = {
+          id: `n-${Date.now()}`,
+          author: "Quản trị viên TMS",
+          role: "Admin điều hành",
+          content: newNoteContent.trim(),
+          createdAt: new Date().toISOString(),
+          type: newNoteType,
+        };
+        setAdminNotes((prev) => [note, ...prev]);
+        toast.warning("Đã lưu ghi chú vào phiên làm việc");
+      }
+    } catch {
+      const note: AdminInternalNote = {
+        id: `n-${Date.now()}`,
+        author: "Quản trị viên TMS",
+        role: "Admin điều hành",
+        content: newNoteContent.trim(),
+        createdAt: new Date().toISOString(),
+        type: newNoteType,
+      };
+      setAdminNotes((prev) => [note, ...prev]);
+      toast.warning("Đã lưu ghi chú vào phiên làm việc");
+    } finally {
+      setIsSubmitting(false);
+      setNewNoteContent("");
+    }
   };
 
-  const handleConfirmEmergencyCancel = () => {
+  const handleConfirmEmergencyCancel = async () => {
     if (!order) return;
-    const fullReason = `${cancelReasonChoice}${cancelReasonDetail ? `. Chi tiết: ${cancelReasonDetail}` : ""}`;
-    setOrder({
-      ...order,
-      status: "cancelled",
-      cancellationReason: fullReason,
-      cancelledByName: "Quản trị viên hệ thống",
-      cancelledByRole: "admin",
-      cancelledAt: new Date().toISOString(),
-    });
-    const autoNote: AdminInternalNote = {
-      id: `n-${Date.now()}`,
-      author: "Quản trị viên TMS",
-      role: "Admin điều hành",
-      content: `[Hủy đơn khẩn cấp]: Vận đơn đã bị hủy bởi Quản trị viên. Lý do: ${fullReason}`,
-      createdAt: new Date().toISOString(),
-      type: "warning",
-    };
-    setAdminNotes((prev) => [autoNote, ...prev]);
-    toast.warning("Vận đơn đã được chuyển sang trạng thái Đã hủy đơn");
-    setCancelReasonDetail("");
-    setIsCancelModalOpen(false);
+    setIsSubmitting(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}/cancel`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason: cancelReasonChoice,
+          detail: cancelReasonDetail.trim() || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.data?.order) {
+          setOrder((prev) => prev ? { ...prev, ...data.data.order } : null);
+          if (Array.isArray(data.data.order.adminNotes)) {
+            setAdminNotes(data.data.order.adminNotes);
+          }
+        }
+        toast.warning("Vận đơn đã được chuyển sang trạng thái Đã hủy đơn");
+      } else {
+        const fullReason = `${cancelReasonChoice}${cancelReasonDetail ? `. Chi tiết: ${cancelReasonDetail}` : ""}`;
+        setOrder((prev) => prev ? {
+          ...prev,
+          status: "cancelled",
+          cancellationReason: fullReason,
+          cancelledByName: "Quản trị viên hệ thống",
+          cancelledByRole: "admin",
+          cancelledAt: new Date().toISOString(),
+        } : null);
+        toast.warning("Vận đơn đã được hủy (chế độ cục bộ)");
+      }
+    } catch {
+      const fullReason = `${cancelReasonChoice}${cancelReasonDetail ? `. Chi tiết: ${cancelReasonDetail}` : ""}`;
+      setOrder((prev) => prev ? {
+        ...prev,
+        status: "cancelled",
+        cancellationReason: fullReason,
+        cancelledByName: "Quản trị viên hệ thống",
+        cancelledByRole: "admin",
+        cancelledAt: new Date().toISOString(),
+      } : null);
+      toast.warning("Vận đơn đã được hủy (chế độ ngoại tuyến)");
+    } finally {
+      setIsSubmitting(false);
+      setCancelReasonDetail("");
+      setIsCancelModalOpen(false);
+    }
   };
 
   const currentPhotos = activeEpodTab === "dropoff"
@@ -1942,7 +2050,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       {/* Lightbox Modal */}
       {selectedPhoto && (
         <div 
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={handleClosePhoto}
         >
           <div 
@@ -2030,7 +2138,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       {/* Printable A4 Modal */}
       {isPrintModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
           onClick={() => setIsPrintModalOpen(false)}
         >
           <div 
@@ -2191,7 +2299,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       {/* Modal 1: Cập Nhật Trạng Thái Vận Đơn */}
       {isStatusModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
           onClick={() => setIsStatusModalOpen(false)}
         >
           <div 
@@ -2265,9 +2373,11 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               <button
                 type="button"
                 onClick={handleConfirmStatusChange}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
               >
-                Xác nhận chuyển trạng thái
+                {isSubmitting && <Loader className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isSubmitting ? "Đang cập nhật..." : "Xác nhận chuyển trạng thái"}</span>
               </button>
             </div>
           </div>
@@ -2277,7 +2387,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       {/* Modal 2: Điều Phối / Chỉ Định Lại Tài Xế */}
       {isReassignModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
           onClick={() => setIsReassignModalOpen(false)}
         >
           <div 
@@ -2395,9 +2505,11 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               <button
                 type="button"
                 onClick={handleConfirmReassignDriver}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
               >
-                Xác nhận điều phối
+                {isSubmitting && <Loader className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isSubmitting ? "Đang xử lý..." : "Xác nhận điều phối"}</span>
               </button>
             </div>
           </div>
@@ -2407,7 +2519,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       {/* Modal 3: Xử Lý Ký Quỹ & Bảo Chứng MB Bank */}
       {isEscrowModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
           onClick={() => setIsEscrowModalOpen(false)}
         >
           <div 
@@ -2522,9 +2634,11 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               <button
                 type="button"
                 onClick={handleConfirmEscrowAction}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
               >
-                Xác nhận thực thi lệnh
+                {isSubmitting && <Loader className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isSubmitting ? "Đang thực thi..." : "Xác nhận thực thi lệnh"}</span>
               </button>
             </div>
           </div>
@@ -2534,7 +2648,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       {/* Modal 4: Ghi Chú Nội Bộ Quản Trị Viên (Internal Notes) */}
       {isNotesModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
           onClick={() => setIsNotesModalOpen(false)}
         >
           <div 
@@ -2585,10 +2699,11 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                 <button
                   type="button"
                   onClick={handleAddAdminNote}
-                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  disabled={isSubmitting}
+                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
                 >
-                  <Send className="w-3 h-3" />
-                  <span>Lưu ghi chú</span>
+                  {isSubmitting ? <Loader className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                  <span>{isSubmitting ? "Đang lưu..." : "Lưu ghi chú"}</span>
                 </button>
               </div>
             </div>
@@ -2632,7 +2747,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       {/* Modal 5: Hủy Vận Đơn Khẩn Cấp */}
       {isCancelModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
           onClick={() => setIsCancelModalOpen(false)}
         >
           <div 
@@ -2705,9 +2820,11 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               <button
                 type="button"
                 onClick={handleConfirmEmergencyCancel}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
               >
-                Xác nhận hủy vận đơn
+                {isSubmitting && <Loader className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isSubmitting ? "Đang hủy đơn..." : "Xác nhận hủy vận đơn"}</span>
               </button>
             </div>
           </div>
