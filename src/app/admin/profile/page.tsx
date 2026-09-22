@@ -145,28 +145,10 @@ export default function AdminProfilePage() {
       const formData = new FormData();
       formData.append("image", file);
 
-      const isLocalhost =
-        typeof window !== "undefined" &&
-        (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-
-      const primaryUrl = isLocalhost
-        ? "http://localhost:5000/api/v1/auth/profile/avatar"
-        : `${API_BASE}/auth/profile/avatar`;
-
-      let res = await fetchWithAuth(primaryUrl, {
+      const res = await fetchWithAuth(`${API_BASE}/auth/profile/avatar`, {
         method: "POST",
         body: formData,
       });
-
-      if (!res.ok && isLocalhost) {
-        try {
-          const fallbackRes = await fetchWithAuth(`${API_BASE}/auth/profile/avatar`, {
-            method: "POST",
-            body: formData,
-          });
-          if (fallbackRes.ok) res = fallbackRes;
-        } catch {}
-      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));

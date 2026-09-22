@@ -247,29 +247,6 @@ function AdminSupportContent() {
         }
       }
 
-      // Tier 3: Direct fallback to local backend (http://localhost:5000) if still 404
-      if (res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/support/chats/${chatId}/messages`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: content, content, messageType: "text" }),
-          });
-          if (localRes.ok) {
-            res = localRes;
-          } else {
-            const localCommonRes = await fetchWithAuth(`http://localhost:5000/api/v1/common/chats/${chatId}/messages`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ content, messageType: "text" }),
-            });
-            if (localCommonRes.ok) res = localCommonRes;
-          }
-        } catch {
-          // ignore
-        }
-      }
-
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
         throw new Error(errJson?.message || `Lỗi máy chủ (${res.status})`);
@@ -325,13 +302,7 @@ function AdminSupportContent() {
       ...(statusFilter ? { status: statusFilter } : {}),
     });
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets?${query.toString()}`);
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/support/tickets?${query.toString()}`);
-          if (localRes.ok) res = localRes;
-        } catch {}
-      }
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets?${query.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch support tickets");
       const data = await res.json();
       const nextTickets = data.data?.tickets || [];
@@ -379,13 +350,7 @@ function AdminSupportContent() {
       ...(search ? { search } : {}),
     });
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/support/chats?${query.toString()}`);
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/support/chats?${query.toString()}`);
-          if (localRes.ok) res = localRes;
-        } catch {}
-      }
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/chats?${query.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch support chats");
       const data = await res.json();
       const nextChats: ChatRow[] = data.data?.chats || [];
@@ -459,13 +424,7 @@ function AdminSupportContent() {
     if (tab !== "tickets") setTab("tickets");
     setDetailLoading(true);
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets/${ticketId}`);
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/support/tickets/${ticketId}`);
-          if (localRes.ok) res = localRes;
-        } catch {}
-      }
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets/${ticketId}`);
       if (!res.ok) throw new Error("Failed to fetch ticket detail");
       const data = await res.json();
       setSelectedTicket(data.data.ticket);
@@ -483,12 +442,6 @@ function AdminSupportContent() {
     if (showLoading) setDetailLoading(true);
     try {
       let res = await fetchWithAuth(`${API_BASE}/admin/users/support/chats/${chatId}`);
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/support/chats/${chatId}`);
-          if (localRes.ok) res = localRes;
-        } catch {}
-      }
       if (!res.ok && res.status === 404) {
         // Fallback to common chat detail endpoint
         try {
@@ -551,21 +504,11 @@ function AdminSupportContent() {
     if (!selectedTicket || !replyMessage.trim()) return;
     setSendingReply(true);
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets/${selectedTicket._id}/reply`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets/${selectedTicket._id}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: replyMessage.trim(), status: "in_progress" }),
       });
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/support/tickets/${selectedTicket._id}/reply`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: replyMessage.trim(), status: "in_progress" }),
-          });
-          if (localRes.ok) res = localRes;
-        } catch {}
-      }
       if (!res.ok) throw new Error("Failed to reply ticket");
       const data = await res.json();
       setSelectedTicket(data.data.ticket);

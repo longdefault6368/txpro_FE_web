@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
+import { MONGODB_URI } from "@/config/env";
 
 let cachedClient: MongoClient | null = null;
 let cachedDb: any = null;
 
-const MONGODB_URI = "mongodb+srv://datthanh1131_db_user:snw0EiDbHI9xdy3I@local.kfcuelc.mongodb.net/txepro?retryWrites=true&w=majority";
-
 async function connectToDatabase() {
+  if (!MONGODB_URI) {
+    throw new Error("MONGODB_URI is not configured in environment");
+  }
   if (cachedClient && cachedDb) {
     return { client: cachedClient, db: cachedDb };
   }

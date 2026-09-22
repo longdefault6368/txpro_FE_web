@@ -275,13 +275,7 @@ export default function AdminTeamPage() {
   const fetchTeam = async () => {
     setLoading(true);
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/team`);
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth("http://localhost:5000/api/v1/admin/users/team");
-          if (localRes.ok) res = localRes;
-        } catch { }
-      }
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/team`);
 
       let teamList: any[] = [];
       if (res.ok) {
@@ -398,13 +392,7 @@ export default function AdminTeamPage() {
   const fetchRolePermissions = async () => {
     setLoadingRolePerms(true);
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/roles/permissions`);
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth("http://localhost:5000/api/v1/admin/users/roles/permissions");
-          if (localRes.ok) res = localRes;
-        } catch { }
-      }
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/roles/permissions`);
 
       if (res.ok) {
         const data = await res.json();
@@ -501,22 +489,11 @@ export default function AdminTeamPage() {
     setSavingRole(roleKey);
     const permissions = rolePermsMap[roleKey] || [];
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/roles/permissions`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/roles/permissions`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: roleKey, permissions }),
       });
-
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth("http://localhost:5000/api/v1/admin/users/roles/permissions", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ role: roleKey, permissions }),
-          });
-          if (localRes.ok) res = localRes;
-        } catch { }
-      }
 
       const updatedMap = {
         ...rolePermsMap,
@@ -571,22 +548,11 @@ export default function AdminTeamPage() {
         permissions: ["/admin"],
       };
 
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/roles`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/roles`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth("http://localhost:5000/api/v1/admin/users/roles", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (localRes.ok) res = localRes;
-        } catch { }
-      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
@@ -632,22 +598,11 @@ export default function AdminTeamPage() {
         color: editRoleForm.color,
       };
 
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/roles/${roleToEdit.key}`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/roles/${roleToEdit.key}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/roles/${roleToEdit.key}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (localRes.ok) res = localRes;
-        } catch { }
-      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
@@ -679,18 +634,9 @@ export default function AdminTeamPage() {
 
     setSubmitting(true);
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/roles/${roleToDelete.key}`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/roles/${roleToDelete.key}`, {
         method: "DELETE",
       });
-
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/roles/${roleToDelete.key}`, {
-            method: "DELETE",
-          });
-          if (localRes.ok) res = localRes;
-        } catch { }
-      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
@@ -736,22 +682,11 @@ export default function AdminTeamPage() {
         isActive: true,
       };
 
-      let res = await fetchWithAuth(`${API_BASE}/admin/users`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth("http://localhost:5000/api/v1/admin/users", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (localRes.ok) res = localRes;
-        } catch { }
-      }
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
@@ -812,22 +747,11 @@ export default function AdminTeamPage() {
         adminRole: targetAdminRole,
         adminPermissions: targetPermissions,
       };
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/${selectedMember._id}/admin-role`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${selectedMember._id}/admin-role`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/${selectedMember._id}/admin-role`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (localRes.ok) res = localRes;
-        } catch { }
-      }
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
@@ -869,22 +793,11 @@ export default function AdminTeamPage() {
     if (!window.confirm(confirmText)) return;
 
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/${member._id}/status`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${member._id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: nextStatus }),
       });
-
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/${member._id}/status`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ isActive: nextStatus }),
-          });
-          if (localRes.ok) res = localRes;
-        } catch { }
-      }
 
       if (res.ok) {
         // If deactivating, also reset their sessions
@@ -913,18 +826,9 @@ export default function AdminTeamPage() {
 
     setSubmitting(true);
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/${memberToDelete._id}`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${memberToDelete._id}`, {
         method: "DELETE",
       });
-
-      if (!res.ok && res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/${memberToDelete._id}`, {
-            method: "DELETE",
-          });
-          if (localRes.ok) res = localRes;
-        } catch { }
-      }
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);

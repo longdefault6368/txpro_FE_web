@@ -1183,13 +1183,7 @@ function AdminUsersContent() {
         return;
       }
 
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/${userId}/vehicles`);
-      if (res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/${userId}/vehicles`);
-          if (localRes.ok) res = localRes;
-        } catch (e) {}
-      }
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${userId}/vehicles`);
 
       if (res.ok) {
         const data = await res.json();
@@ -1471,26 +1465,12 @@ function AdminUsersContent() {
       const url = isEdit
         ? `${API_BASE}/admin/users/${currentUser._id}/vehicles/${editingVehicle._id}`
         : `${API_BASE}/admin/users/${currentUser._id}/vehicles`;
-      const localUrl = isEdit
-        ? `http://localhost:5000/api/v1/admin/users/${currentUser._id}/vehicles/${editingVehicle._id}`
-        : `http://localhost:5000/api/v1/admin/users/${currentUser._id}/vehicles`;
 
-      let res = await fetchWithAuth(url, {
+      const res = await fetchWithAuth(url, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      if (res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(localUrl, {
-            method: isEdit ? "PUT" : "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (localRes.ok) res = localRes;
-        } catch (e) {}
-      }
 
       if (res.ok) {
         showToast(true, isEdit ? "Cập nhật phương tiện thành công" : "Thêm phương tiện thành công");
@@ -1539,14 +1519,7 @@ function AdminUsersContent() {
 
     try {
       const url = `${API_BASE}/admin/users/${currentUser._id}/vehicles/${vehicleId}`;
-      const localUrl = `http://localhost:5000/api/v1/admin/users/${currentUser._id}/vehicles/${vehicleId}`;
-      let res = await fetchWithAuth(url, { method: "DELETE" });
-      if (res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-        try {
-          const localRes = await fetchWithAuth(localUrl, { method: "DELETE" });
-          if (localRes.ok) res = localRes;
-        } catch (e) {}
-      }
+      const res = await fetchWithAuth(url, { method: "DELETE" });
 
       const updated = userVehicles.filter(v => v._id !== vehicleId);
       setUserVehicles(updated);
@@ -1573,56 +1546,23 @@ function AdminUsersContent() {
       const form = new FormData();
       form.append("file", file);
 
-      const isLocalhost = typeof window !== "undefined" && 
-        (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-
-      const primaryUrl = isLocalhost 
-        ? "http://localhost:5000/api/v1/common/upload" 
-        : `${API_BASE}/common/upload`;
-      const fallbackUrl = isLocalhost 
-        ? `${API_BASE}/common/upload` 
-        : "http://localhost:5000/api/v1/common/upload";
-
-      let res = await fetchWithAuth(primaryUrl, {
+      const uploadUrl = `${API_BASE}/common/upload`;
+      const res = await fetchWithAuth(uploadUrl, {
         method: "POST",
         body: form,
       });
-
-      if (!res.ok) {
-        try {
-          const fallbackRes = await fetchWithAuth(fallbackUrl, {
-            method: "POST",
-            body: form,
-          });
-          if (fallbackRes.ok) res = fallbackRes;
-        } catch (e) {}
-      }
 
       if (res.ok) {
         const data = await res.json();
         const uploadedUrl = data.data?.url || data.url;
         if (uploadedUrl) {
           const normalized = normalizePersistedImagePath(uploadedUrl);
-
-          const updateUrl = isLocalhost
-            ? `http://localhost:5000/api/v1/admin/users/${currentUser._id}`
-            : `${API_BASE}/admin/users/${currentUser._id}`;
-
-          let updateRes = await fetchWithAuth(updateUrl, {
+          const updateUrl = `${API_BASE}/admin/users/${currentUser._id}`;
+          await fetchWithAuth(updateUrl, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ avatar: normalized }),
           });
-
-          if (!updateRes.ok && isLocalhost) {
-            try {
-              updateRes = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ avatar: normalized }),
-              });
-            } catch (e) {}
-          }
 
           setCurrentUser((prev) => (prev ? { ...prev, avatar: normalized } : null));
           setUsers((prev) =>
@@ -1654,31 +1594,11 @@ function AdminUsersContent() {
       const form = new FormData();
       form.append("file", file);
 
-      // On localhost, prioritize local backend on port 5000 so the uploaded file is saved locally and instantly accessible to mobile
-      const isLocalhost = typeof window !== "undefined" && 
-        (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-
-      const primaryUrl = isLocalhost 
-        ? "http://localhost:5000/api/v1/common/upload" 
-        : `${API_BASE}/common/upload`;
-      const fallbackUrl = isLocalhost 
-        ? `${API_BASE}/common/upload` 
-        : "http://localhost:5000/api/v1/common/upload";
-
-      let res = await fetchWithAuth(primaryUrl, {
+      const uploadUrl = `${API_BASE}/common/upload`;
+      const res = await fetchWithAuth(uploadUrl, {
         method: "POST",
         body: form,
       });
-
-      if (!res.ok) {
-        try {
-          const fallbackRes = await fetchWithAuth(fallbackUrl, {
-            method: "POST",
-            body: form,
-          });
-          if (fallbackRes.ok) res = fallbackRes;
-        } catch (e) {}
-      }
 
       if (res.ok) {
         const data = await res.json();
@@ -2083,19 +2003,7 @@ function AdminUsersContent() {
           }
         ]);
       } else {
-        let res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/chat`);
-
-        // Fallback: If remote API returns 404 (not deployed yet), try local backend
-        if (res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-          try {
-            const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/${user._id}/chat`);
-            if (localRes.ok) {
-              res = localRes;
-            }
-          } catch (e) {
-            // ignore local error
-          }
-        }
+        const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/chat`);
 
         if (res.ok) {
           const data = await res.json();
@@ -2141,31 +2049,13 @@ function AdminUsersContent() {
         setMessageInput("");
         showToast(true, "Đã gửi tin nhắn (Offline Mode)");
       } else {
-        let res = await fetchWithAuth(`${API_BASE}/admin/users/${chatTargetUser._id}/chat/messages`, {
+        const res = await fetchWithAuth(`${API_BASE}/admin/users/${chatTargetUser._id}/chat/messages`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({ content })
         });
-
-        // Fallback: If remote API returns 404 (route not deployed on remote cloud yet), try local backend
-        if (res.status === 404 && API_BASE.includes("api.txepro.vn")) {
-          try {
-            const localRes = await fetchWithAuth(`http://localhost:5000/api/v1/admin/users/${chatTargetUser._id}/chat/messages`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({ content })
-            });
-            if (localRes.ok) {
-              res = localRes;
-            }
-          } catch (localErr) {
-            // ignore
-          }
-        }
 
         if (res.ok) {
           const data = await res.json();

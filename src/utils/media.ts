@@ -1,22 +1,16 @@
-import { API_BASE_URL } from "./api";
+import { API_BASE_URL } from "@/config/env";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 const trimLeadingSlash = (value: string) => value.replace(/^\/+/, "");
 
 export const getActiveMediaOrigin = () => {
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return "http://localhost:5000";
-    }
-  }
-  return API_BASE_URL || "https://api.txepro.vn";
+  return API_BASE_URL;
 };
 
 /**
  * Normalizes an image path for saving into the database.
- * Converts local or remote absolute upload URLs (e.g. http://localhost:5000/uploads/... or https://api.txepro.vn/uploads/...)
- * into relative paths (e.g. /uploads/...) so that both Web and Mobile app resolve them to their active environment.
+ * Converts local or remote absolute upload URLs into relative paths (e.g. /uploads/...)
+ * so that both Web and Mobile app resolve them via their active environment.
  */
 export const normalizePersistedImagePath = (path?: string | null): string => {
   if (!path) return "";
@@ -53,21 +47,11 @@ export const getServerMediaUrl = (path?: string | null) => {
     return value;
   }
 
-  const activeOrigin = trimTrailingSlash(getActiveMediaOrigin());
-
-  // If already a full URL
+  // If already a full URL (external CDN, Cloudinary, S3, etc.)
   if (/^https?:\/\//i.test(value)) {
-    // If running on localhost and URL points to api.txepro.vn/uploads/, redirect to local backend
-    if (typeof window !== "undefined") {
-      const hostname = window.location.hostname;
-      if (hostname === "localhost" || hostname === "127.0.0.1") {
-        if (value.includes("api.txepro.vn/uploads/")) {
-          return value.replace(/https?:\/\/api\.txepro\.vn/, "http://localhost:5000");
-        }
-      }
-    }
     return value;
   }
 
+  const activeOrigin = trimTrailingSlash(getActiveMediaOrigin());
   return `${activeOrigin}/${trimLeadingSlash(value)}`;
 };

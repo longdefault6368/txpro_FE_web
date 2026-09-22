@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { fetchWithAuth, API_BASE, API_FALLBACK } from "@/utils/api";
 import { useToast } from "@/context/ToastContext";
 import {
   Users, Truck, Package, ShoppingCart, TrendingUp, AlertCircle,
@@ -242,25 +242,8 @@ function AdminDashboardContent() {
       ]);
 
       if (overviewRes.status === "fulfilled" && overviewRes.value.ok) {
-        let resJson = await overviewRes.value.json();
-        let data = resJson.data || {};
-
-        // Fallback: If cloud response is missing rich analytics (trends, corridors, map markers)
-        // because cloud runs older backend code, fetch from local backend on port 5000
-        if ((!data.trends || !data.topCorridors || data.topCorridors.length === 0 || !data.mapData) && typeof window !== "undefined") {
-          try {
-            const localRes = await fetchWithAuth("http://localhost:5000/api/v1/admin/users/overview");
-            if (localRes.ok) {
-              const localJson = await localRes.json();
-              if (localJson.data && (localJson.data.trends || localJson.data.topCorridors)) {
-                data = localJson.data;
-              }
-            }
-          } catch {
-            // keep existing data
-          }
-        }
-
+        const resJson = await overviewRes.value.json();
+        const data = resJson.data || {};
         setMetrics(data.metrics || null);
         setStatusBreakdown(data.statusBreakdown || null);
         setTopCorridors(data.topCorridors || []);
@@ -269,25 +252,25 @@ function AdminDashboardContent() {
         setMapData(data.mapData || null);
         setIsOffline(false);
       } else {
-        // If overview request failed (e.g. cloud 401 or offline), try local backend directly
-        try {
-          const localRes = await fetchWithAuth("http://localhost:5000/api/v1/admin/users/overview");
-          if (localRes.ok) {
-            const localJson = await localRes.json();
-            const data = localJson.data || {};
-            setMetrics(data.metrics || null);
-            setStatusBreakdown(data.statusBreakdown || null);
-            setTopCorridors(data.topCorridors || []);
-            setTrends(data.trends || null);
-            setRecentOrders(data.recentOrders || []);
-            setMapData(data.mapData || null);
-            setIsOffline(false);
-          } else {
-            setIsOffline(true);
-          }
-        } catch {
-          setIsOffline(true);
+        // If primary overview request failed and a fallback API is configured in environment, try fallback
+        if (API_FALLBACK) {
+          try {
+            const fallbackRes = await fetchWithAuth(`${API_FALLBACK}/admin/users/overview`);
+            if (fallbackRes.ok) {
+              const resJson = await fallbackRes.json();
+              const data = resJson.data || {};
+              setMetrics(data.metrics || null);
+              setStatusBreakdown(data.statusBreakdown || null);
+              setTopCorridors(data.topCorridors || []);
+              setTrends(data.trends || null);
+              setRecentOrders(data.recentOrders || []);
+              setMapData(data.mapData || null);
+              setIsOffline(false);
+              return;
+            }
+          } catch {}
         }
+        setIsOffline(true);
       }
 
       if (notifRes.status === "fulfilled" && notifRes.value.ok) {
