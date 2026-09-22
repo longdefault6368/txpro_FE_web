@@ -59,6 +59,14 @@ interface Order {
   cargoType?: string;
   weight?: number;
   adminNotes?: AdminInternalNote[];
+  activeIncident?: {
+    id: string;
+    type: string;
+    status: string;
+    reporterRole: "driver" | "shipper" | "system" | "admin" | string;
+    description?: string | null;
+    createdAt?: string;
+  } | null;
   createdAt: string;
 }
 
@@ -147,16 +155,95 @@ function getCancelReasonText(order: Order) {
 }
 
 
-const STATUS_MAP: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  searching_driver: { label: "Tìm tài xế", color: "text-blue-600 bg-blue-50 border-blue-100", icon: Loader },
-  waiting_driver: { label: "Đang chờ tài xế", color: "text-amber-600 bg-amber-50 border-amber-100", icon: Clock },
-  waiting_driver_acceptance: { label: "Chờ tài xế nhận", color: "text-purple-600 bg-purple-50 border-purple-100", icon: Clock },
-  accepted: { label: "Đã nhận đơn", color: "text-indigo-600 bg-indigo-50 border-indigo-100", icon: CheckCircle },
-  rejected: { label: "Đã từ chối", color: "text-rose-600 bg-rose-50 border-rose-100", icon: XCircle },
-  in_progress: { label: "Đang vận chuyển", color: "text-primary-600 bg-primary-50 border-primary-100", icon: Truck },
-  delivered: { label: "Đã giao hàng", color: "text-emerald-600 bg-emerald-50 border-emerald-100", icon: CheckCircle },
-  completed: { label: "Đã hoàn thành", color: "text-emerald-700 bg-emerald-100 border-emerald-200", icon: CheckCircle },
-  cancelled: { label: "Đã hủy đơn", color: "text-red-600 bg-red-50 border-red-100", icon: XCircle },
+export const INCIDENT_TYPE_LABELS: Record<string, string> = {
+  cargo_mismatch: "Hàng sai tải / Sai quy cách",
+  inaccessible_pickup: "Điểm lấy hàng không vào được / Cấm tải",
+  unreachable_shipper: "Không liên hệ được chủ hàng",
+  force_majeure: "Sự cố bất khả kháng / Thiên tai",
+  refused_delivery: "Người nhận từ chối nhận hàng",
+  unsafe_pickup: "Điểm bốc hàng không an toàn",
+  other: "Sự cố phát sinh khác",
+};
+
+export const INCIDENT_STATUS_LABELS: Record<string, string> = {
+  open: "Mới gửi (Chờ xem xét)",
+  pending_review: "Đang phân giải tranh chấp",
+  confirmed: "Đã xác nhận có sự cố",
+  resolved: "Đã xử lý thỏa đáng",
+  dismissed: "Đã bác bỏ khiếu nại",
+  cancelled: "Đã hủy",
+};
+
+export interface StatusConfig {
+  label: string;
+  detail: string;
+  color: string;
+  icon: React.ElementType;
+  animate?: boolean;
+}
+
+const STATUS_MAP: Record<string, StatusConfig> = {
+  searching_driver: {
+    label: "Đang tìm tài xế",
+    detail: "Đang quét và phát tín hiệu tìm xe rỗng xung quanh",
+    color: "text-amber-800 bg-amber-50 border-amber-200",
+    icon: Loader,
+    animate: true,
+  },
+  waiting_driver: {
+    label: "Chờ tài xế xác nhận",
+    detail: "Đã ghép chuyến, chờ tài xế xác nhận cuốc xe",
+    color: "text-purple-800 bg-purple-50 border-purple-200",
+    icon: Clock,
+  },
+  waiting_driver_acceptance: {
+    label: "Chờ tài xế xác nhận",
+    detail: "Đang chờ tài xế bấm chấp nhận cuốc xe",
+    color: "text-purple-800 bg-purple-50 border-purple-200",
+    icon: Clock,
+  },
+  accepted: {
+    label: "Đã tìm được tài xế",
+    detail: "Tài xế đã nhận đơn, đang di chuyển đến điểm bốc hàng",
+    color: "text-indigo-800 bg-indigo-50 border-indigo-200",
+    icon: CheckCircle,
+  },
+  rejected: {
+    label: "Tài xế từ chối nhận",
+    detail: "Tài xế từ chối, hệ thống đang tìm xe thay thế",
+    color: "text-rose-800 bg-rose-50 border-rose-200",
+    icon: XCircle,
+  },
+  in_progress: {
+    label: "Tài xế đang di chuyển",
+    detail: "Đang trên lộ trình vận chuyển hàng đến điểm trả",
+    color: "text-blue-800 bg-blue-50 border-blue-200",
+    icon: Truck,
+  },
+  in_transit: {
+    label: "Tài xế đang di chuyển",
+    detail: "Xe đang lăn bánh chở hàng trên tuyến",
+    color: "text-blue-800 bg-blue-50 border-blue-200",
+    icon: Truck,
+  },
+  delivered: {
+    label: "Đã giao hàng (Chờ chủ hàng xác nhận)",
+    detail: "Đã hạ hàng tại điểm trả, chờ chủ hàng nghiệm thu",
+    color: "text-teal-800 bg-teal-50 border-teal-200",
+    icon: CheckCircle,
+  },
+  completed: {
+    label: "Đã hoàn thành",
+    detail: "Chủ hàng đã xác nhận, đối soát cọc & cước xong 100%",
+    color: "text-emerald-900 bg-emerald-100 border-emerald-300 font-extrabold",
+    icon: CheckCircle,
+  },
+  cancelled: {
+    label: "Đã hủy vận đơn",
+    detail: "Chuyến xe đã bị hủy trên hệ thống",
+    color: "text-red-800 bg-red-50 border-red-200",
+    icon: XCircle,
+  },
 };
 
 function AdminOrdersContent() {
@@ -198,6 +285,7 @@ function AdminOrdersContent() {
   const [newNoteType, setNewNoteType] = useState<"info" | "warning" | "action">("info");
   const [cancelReasonChoice, setCancelReasonChoice] = useState("Xe hư hỏng / tai nạn kỹ thuật");
   const [cancelReasonDetail, setCancelReasonDetail] = useState("");
+  const [releaseDriverChoice, setReleaseDriverChoice] = useState(true);
 
   const handleOpenOrderDetail = async (order: Order) => {
     setSelectedOrder(order);
@@ -455,6 +543,8 @@ function AdminOrdersContent() {
         body: JSON.stringify({
           reason: cancelReasonChoice,
           detail: cancelReasonDetail.trim() || undefined,
+          releaseDriver: releaseDriverChoice,
+          refundEscrow: true,
         }),
       });
 
@@ -466,7 +556,11 @@ function AdminOrdersContent() {
         if (Array.isArray(updated.adminNotes)) {
           setAdminNotes(updated.adminNotes);
         }
-        toast.warning("Vận đơn đã được chuyển sang trạng thái Đã hủy đơn");
+        if (data.data?.driverFreed) {
+          toast.success("Vận đơn đã hủy & ĐÃ GIẢI PHÓNG TÀI XẾ để nhận chuyến mới!");
+        } else {
+          toast.warning("Vận đơn đã được chuyển sang trạng thái Đã hủy đơn");
+        }
       } else {
         const fullReason = `${cancelReasonChoice}${cancelReasonDetail ? `. Chi tiết: ${cancelReasonDetail}` : ""}`;
         const updated = {
@@ -972,15 +1066,15 @@ function AdminOrdersContent() {
               className="appearance-none w-full pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
             >
               <option value="">Tất cả Trạng thái</option>
-              <option value="searching_driver">Tìm tài xế</option>
-              <option value="waiting_driver">Đang chờ tài xế</option>
-              <option value="waiting_driver_acceptance">Chờ tài xế nhận</option>
-              <option value="accepted">Đã nhận đơn</option>
-              <option value="rejected">Đã từ chối</option>
-              <option value="in_progress">Đang vận chuyển</option>
-              <option value="delivered">Đã giao hàng</option>
+              <option value="has_incident">⚠️ Có sự cố đang báo cáo (Chủ hàng / Tài xế)</option>
+              <option value="searching_driver">Đang tìm tài xế</option>
+              <option value="waiting_driver">Chờ tài xế xác nhận</option>
+              <option value="accepted">Đã tìm được tài xế</option>
+              <option value="in_progress">Tài xế đang di chuyển</option>
+              <option value="delivered">Đã giao hàng (Chờ chủ hàng xác nhận)</option>
               <option value="completed">Đã hoàn thành</option>
-              <option value="cancelled">Đã hủy đơn</option>
+              <option value="rejected">Tài xế từ chối nhận</option>
+              <option value="cancelled">Đã hủy vận đơn</option>
             </select>
             <Filter className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -1176,19 +1270,63 @@ function AdminOrdersContent() {
                         </td>
 
                         {/* Status */}
-                        <td className="py-4.5 px-6 whitespace-nowrap">
+                        <td className="py-4.5 px-6 min-w-[220px]">
                           <div className="space-y-1.5">
-                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${statusInfo.color}`}>
-                              <StatusIcon className="w-3.5 h-3.5" />
-                              {statusInfo.label}
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border ${statusInfo.color}`}>
+                              <StatusIcon className={`w-3.5 h-3.5 shrink-0 ${statusInfo.animate ? "animate-spin text-amber-600" : ""}`} />
+                              <span>{statusInfo.label}</span>
                             </span>
+                            <p className="text-[11px] font-medium text-slate-500 leading-snug">
+                              {statusInfo.detail}
+                            </p>
+
+                            {/* Active Incident Alert: Tài xế hoặc Chủ hàng đang báo cáo sự cố */}
+                            {order.activeIncident && (
+                              <div className={`p-2.5 rounded-xl border text-xs shadow-2xs mt-1.5 ${
+                                order.activeIncident.reporterRole === "driver"
+                                  ? "bg-amber-50/90 border-amber-300 text-amber-950"
+                                  : "bg-rose-50/90 border-rose-300 text-rose-950"
+                              }`}>
+                                <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                                  <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${
+                                    order.activeIncident.reporterRole === "driver" ? "text-amber-600 animate-pulse" : "text-rose-600 animate-pulse"
+                                  }`} />
+                                  <span className={order.activeIncident.reporterRole === "driver" ? "text-amber-900" : "text-rose-900"}>
+                                    {order.activeIncident.reporterRole === "driver"
+                                      ? "⚠️ Tài xế đang báo cáo sự cố"
+                                      : "⚠️ Chủ hàng đang báo cáo sự cố"}
+                                  </span>
+                                </div>
+                                <p className="font-bold text-[11px] mt-1 text-slate-800">
+                                  {INCIDENT_TYPE_LABELS[order.activeIncident.type] || order.activeIncident.type}
+                                </p>
+                                {order.activeIncident.description && (
+                                  <p className="text-[10px] text-slate-600 mt-0.5 line-clamp-2 italic font-normal">
+                                    "{order.activeIncident.description}"
+                                  </p>
+                                )}
+                                <div className="mt-1.5 flex items-center justify-between pt-1 border-t border-slate-200/70">
+                                  <span className="text-[10px] font-semibold text-slate-500">
+                                    {INCIDENT_STATUS_LABELS[order.activeIncident.status] || order.activeIncident.status}
+                                  </span>
+                                  <Link
+                                    href={`/admin/incidents?id=${order.activeIncident.id}`}
+                                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-0.5 ml-auto"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Xử lý ngay →
+                                  </Link>
+                                </div>
+                              </div>
+                            )}
+
                             {cancelReason && (
-                              <p className="max-w-48 text-[11px] font-semibold leading-5 text-red-600 whitespace-normal">
+                              <p className="max-w-xs text-[11px] font-semibold leading-relaxed text-red-600 whitespace-normal">
                                 Lý do: {cancelReason}
                               </p>
                             )}
                             {cancelledBy && (
-                              <p className="max-w-48 text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-normal">
+                              <p className="max-w-xs text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-normal">
                                 Bên hủy: {cancelledBy}
                               </p>
                             )}
@@ -1296,6 +1434,48 @@ function AdminOrdersContent() {
             </div>
 
             <div className="overflow-y-auto space-y-5 flex-1 pr-1">
+              {/* Active Incident Warning in TMS Modal */}
+              {selectedOrder.activeIncident && (
+                <div className={`rounded-2xl p-4 border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs ${
+                  selectedOrder.activeIncident.reporterRole === "driver"
+                    ? "bg-amber-50 border-amber-300 text-amber-950"
+                    : "bg-rose-50 border-rose-300 text-rose-950"
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2.5 rounded-xl shrink-0 ${
+                      selectedOrder.activeIncident.reporterRole === "driver" ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"
+                    }`}>
+                      <AlertTriangle className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-xs uppercase tracking-wider">
+                          {selectedOrder.activeIncident.reporterRole === "driver" ? "⚠️ TÀI XẾ BÁO CÁO SỰ CỐ" : "⚠️ CHỦ HÀNG BÁO CÁO SỰ CỐ"}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/80 border border-slate-200">
+                          {INCIDENT_STATUS_LABELS[selectedOrder.activeIncident.status] || selectedOrder.activeIncident.status}
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold text-slate-800 mt-1">
+                        {INCIDENT_TYPE_LABELS[selectedOrder.activeIncident.type] || selectedOrder.activeIncident.type}
+                      </p>
+                      {selectedOrder.activeIncident.description && (
+                        <p className="text-xs text-slate-600 mt-0.5 italic">
+                          "{selectedOrder.activeIncident.description}"
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/admin/incidents?id=${selectedOrder.activeIncident.id}`}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shrink-0 shadow-sm"
+                  >
+                    <span>Mở Trung Tâm Xử Lý Sự Cố</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              )}
+
               {/* TMS OPERATIONS TOOLBAR */}
               <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-4 shadow-sm border border-slate-800 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1420,13 +1600,13 @@ function AdminOrdersContent() {
                         onChange={(e) => setTargetStatus(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs"
                       >
-                        <option value="searching_driver">Tìm tài xế (Searching)</option>
-                        <option value="waiting_driver_acceptance">Chờ tài xế xác nhận</option>
-                        <option value="accepted">Tài xế đã nhận đơn (Accepted)</option>
-                        <option value="in_progress">Đang vận chuyển (In Progress)</option>
-                        <option value="delivered">Đã giao hàng (Delivered - Chờ duyệt)</option>
-                        <option value="completed">Đã hoàn thành (Completed)</option>
-                        <option value="cancelled">Đã hủy đơn (Cancelled)</option>
+                        <option value="searching_driver">Đang tìm tài xế (Quét xe xung quanh)</option>
+                        <option value="waiting_driver_acceptance">Chờ tài xế xác nhận cuốc xe</option>
+                        <option value="accepted">Đã tìm được tài xế (Đang đến điểm bốc)</option>
+                        <option value="in_progress">Tài xế đang di chuyển (Vận chuyển hàng)</option>
+                        <option value="delivered">Đã giao hàng (Chờ chủ hàng xác nhận nghiệm thu)</option>
+                        <option value="completed">Đã hoàn thành (Chủ hàng đã xác nhận & đối soát xong)</option>
+                        <option value="cancelled">Đã hủy vận đơn</option>
                       </select>
                     </div>
                     <div>
@@ -1743,6 +1923,26 @@ function AdminOrdersContent() {
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/20"
                     />
                   </div>
+                  {selectedOrder.driverId && (
+                    <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/80 space-y-1">
+                      <label className="flex items-start gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={releaseDriverChoice}
+                          onChange={(e) => setReleaseDriverChoice(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <div className="text-[11px] leading-tight">
+                          <span className="font-bold text-blue-950 block">
+                            Giải phóng tài xế ({selectedOrder.driverId.name || "Tài xế"})
+                          </span>
+                          <span className="text-slate-600 block mt-0.5">
+                            Tự động xóa cờ bận đơn, khôi phục tin đăng tìm hàng và mở cọc 3% để tài xế nổ đơn mới ngay.
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+                  )}
                   <div className="flex items-center justify-end gap-2 pt-1">
                     <button
                       type="button"

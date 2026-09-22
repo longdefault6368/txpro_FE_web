@@ -43,6 +43,7 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { getServerMediaUrl } from "@/utils/media";
 import {
   AdminRole,
   ADMIN_ROLE_CONFIG,
@@ -149,6 +150,51 @@ const MODULE_CATEGORY_INFO: Record<string, { label: string; badge: string }> = {
   finance: { label: "Tài chính", badge: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
   system: { label: "Hệ thống", badge: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
 };
+
+function TeamMemberAvatar({
+  avatar,
+  name,
+}: {
+  avatar?: string | null;
+  name: string;
+}) {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [avatar]);
+
+  const rawUrl = avatar ? (getServerMediaUrl(avatar) || avatar) : null;
+  const hasValidAvatar = !!rawUrl && !imgError;
+
+  const initials = useMemo(() => {
+    if (!name || !name.trim()) return "AD";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return parts[0].substring(0, 2).toUpperCase();
+  }, [name]);
+
+  if (hasValidAvatar) {
+    return (
+      <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-100 shadow-sm flex-shrink-0 flex items-center justify-center">
+        <img
+          src={rawUrl}
+          alt={name}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0 select-none">
+      <span>{initials}</span>
+    </div>
+  );
+}
 
 export default function AdminTeamPage() {
   const [activeTab, setActiveTab] = useState<"team" | "roles">("team");
@@ -1100,9 +1146,7 @@ export default function AdminTeamPage() {
                           {/* Name & Contact */}
                           <td className="py-4 px-6">
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
-                                {member.name.split(" ").pop()?.substring(0, 2).toUpperCase() || "AD"}
-                              </div>
+                              <TeamMemberAvatar avatar={member.avatar} name={member.name} />
                               <div className="min-w-0">
                                 <p className="font-bold text-slate-900 text-sm truncate">{member.name}</p>
                                 <p className="text-slate-500 text-[11px] flex flex-col gap-0.5 mt-0.5">

@@ -53,14 +53,14 @@ export const ADMIN_ROLE_CONFIG: Record<AdminRole, {
     shortLabel: "Vận Hành",
     badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
     color: "#2563eb",
-    allowedPaths: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/analytics", "/admin/support", "/admin/contacts"],
+    allowedPaths: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts"],
   },
   dispatcher: {
     label: "Điều Phối Viên",
     shortLabel: "Điều Phối",
     badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
     color: "#d97706",
-    allowedPaths: ["/admin", "/admin/orders", "/admin/notifications", "/admin/support"],
+    allowedPaths: ["/admin", "/admin/orders", "/admin/incidents", "/admin/notifications", "/admin/support"],
   },
   kyc_officer: {
     label: "Chuyên Viên eKYC",
@@ -74,7 +74,7 @@ export const ADMIN_ROLE_CONFIG: Record<AdminRole, {
     shortLabel: "CSKH",
     badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-200",
     color: "#16a34a",
-    allowedPaths: ["/admin/support", "/admin/notifications", "/admin/contacts"],
+    allowedPaths: ["/admin/support", "/admin/incidents", "/admin/notifications", "/admin/contacts"],
   },
   accountant: {
     label: "Kế Toán & Đối Soát",
@@ -123,6 +123,13 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
     category: "operations",
   },
   {
+    id: "incidents",
+    name: "Xử Lý Tranh Chấp & Sự Cố",
+    description: "Giải quyết tranh chấp hợp đồng, sự cố giao nhận hàng & đối soát xử lý cọc 3%",
+    path: "/admin/incidents",
+    category: "operations",
+  },
+  {
     id: "analytics",
     name: "Phân Tích & Doanh Thu",
     description: "Biểu đồ tài chính, tăng trưởng cước phí và đối soát",
@@ -168,10 +175,10 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
   super_admin: ["*"],
-  operations: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/analytics", "/admin/support", "/admin/contacts"],
-  dispatcher: ["/admin", "/admin/notifications", "/admin/orders", "/admin/support"],
+  operations: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts"],
+  dispatcher: ["/admin", "/admin/notifications", "/admin/orders", "/admin/incidents", "/admin/support"],
   kyc_officer: ["/admin/notifications", "/admin/users"],
-  cskh: ["/admin/notifications", "/admin/support", "/admin/contacts"],
+  cskh: ["/admin/notifications", "/admin/incidents", "/admin/support", "/admin/contacts"],
   accountant: ["/admin/notifications", "/admin/orders", "/admin/analytics"],
 };
 
@@ -210,12 +217,60 @@ const NAV_ITEMS: NavItem[] = [
       { href: "/admin/orders/shippers", label: "Chủ hàng" },
     ],
   },
+  { href: "/admin/incidents", icon: ShieldAlert, label: "Xử Lý Tranh Chấp", roles: ["super_admin", "operations", "dispatcher", "cskh"] },
   { href: "/admin/analytics", icon: BarChart3, label: "Phân Tích", roles: ["super_admin", "operations", "accountant"] },
   { href: "/admin/support", icon: Headset, label: "Hỗ trợ & Live Chat", roles: ["super_admin", "operations", "dispatcher", "cskh"] },
   { href: "/admin/contacts", icon: Mail, label: "Liên Hệ Website", roles: ["super_admin", "operations", "cskh"] },
   { href: "/admin/logs", icon: TerminalSquare, label: "Log hệ thống", roles: ["super_admin"] },
   { href: "/admin/settings", icon: Settings, label: "Cài Đặt", roles: ["super_admin"] },
 ];
+
+function AdminAvatar({
+  avatar,
+  name,
+  className = "w-8 h-8 text-xs",
+}: {
+  avatar?: string | null;
+  name?: string | null;
+  className?: string;
+}) {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [avatar]);
+
+  const rawUrl = avatar ? (getServerMediaUrl(avatar) || avatar) : null;
+  const hasValidAvatar = !!rawUrl && !imgError;
+
+  const initials = useMemo(() => {
+    if (!name || !name.trim()) return "AD";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return parts[0].substring(0, 2).toUpperCase();
+  }, [name]);
+
+  if (hasValidAvatar) {
+    return (
+      <div className={`${className} rounded-full overflow-hidden bg-slate-100 flex-shrink-0 shadow-inner ring-1 ring-white/10 flex items-center justify-center`}>
+        <img
+          src={rawUrl}
+          alt={name || "Avatar"}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${className} rounded-full bg-primary-600 text-white font-bold flex items-center justify-center flex-shrink-0 shadow-inner ring-1 ring-white/10 select-none`}>
+      <span>{initials}</span>
+    </div>
+  );
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -563,19 +618,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-800/80 transition-colors group cursor-pointer"
             title="Xem thông tin tài khoản"
           >
-            <div className="w-9 h-9 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-inner overflow-hidden flex-shrink-0 relative">
-              <span>{session?.name?.split(" ").pop()?.substring(0, 2).toUpperCase() || "AD"}</span>
-              {session?.avatar && (
-                <img
-                  src={getServerMediaUrl(session.avatar) || session.avatar}
-                  alt={session?.name || "Avatar"}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              )}
-            </div>
+            <AdminAvatar avatar={session?.avatar} name={session?.name} className="w-9 h-9 text-xs" />
             <div className="flex-1 min-w-0">
               <p className="text-white text-xs font-bold truncate group-hover:text-primary-400 transition-colors">
                 {session?.name || "Admin"}
@@ -733,19 +776,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 }`}
                 title="Tài khoản của tôi"
               >
-                <div className="w-7 h-7 rounded-full bg-primary-600 text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0 shadow-inner overflow-hidden relative">
-                  <span>{session?.name?.split(" ").pop()?.substring(0, 2).toUpperCase() || "AD"}</span>
-                  {session?.avatar && (
-                    <img
-                      src={getServerMediaUrl(session.avatar) || session.avatar}
-                      alt={session?.name || "Avatar"}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  )}
-                </div>
+                <AdminAvatar avatar={session?.avatar} name={session?.name} className="w-7 h-7 text-[11px]" />
                 <span className="text-xs font-bold text-slate-700 truncate max-w-[100px] hidden sm:block">
                   {session?.name || "Admin"}
                 </span>
@@ -764,19 +795,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     {/* Header */}
                     <div className="px-4 py-3 bg-gradient-to-r from-slate-900 to-slate-800">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-inner overflow-hidden relative">
-                          <span>{session?.name?.split(" ").pop()?.substring(0, 2).toUpperCase() || "AD"}</span>
-                          {session?.avatar && (
-                            <img
-                              src={getServerMediaUrl(session.avatar) || session.avatar}
-                              alt={session?.name || "Avatar"}
-                              className="absolute inset-0 w-full h-full object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = "none";
-                              }}
-                            />
-                          )}
-                        </div>
+                        <AdminAvatar avatar={session?.avatar} name={session?.name} className="w-10 h-10 text-sm" />
                         <div className="min-w-0">
                           <p className="text-white text-xs font-bold truncate">{session?.name || "Admin"}</p>
                           <p className="text-slate-400 text-[10px] truncate mt-0.5">{session?.email || ""}</p>

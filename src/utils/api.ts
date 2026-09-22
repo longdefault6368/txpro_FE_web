@@ -2,21 +2,41 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "https://api.txe
 export const API_BASE = `${API_BASE_URL}/api/v1`;
 
 /**
- * Execute fetch with automatic localhost:5000 fallback when developing locally
+ * Execute fetch with automatic localhost:5000 prioritization when developing locally
  */
 export const executeFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+  const isLocalClient =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+  // In local development, prioritize local backend (http://localhost:5000) for API requests
+  // because local backend runs the latest features, controllers, and active database queries.
+  if (
+    isLocalClient &&
+    (url.startsWith(API_BASE) || url.startsWith("https://api.txepro.vn/api/v1")) &&
+    !url.includes("localhost:5000")
+  ) {
+    const targetPath = url.includes("/api/v1") ? url.substring(url.indexOf("/api/v1")) : url;
+    const localUrl = `http://localhost:5000${targetPath}`;
+    try {
+      const localRes = await fetch(localUrl, options);
+      // If local server responded with anything other than 404, use it
+      if (localRes.status !== 404) {
+        return localRes;
+      }
+    } catch {
+      // Local backend not reachable on port 5000, fall through to remote fetch
+    }
+  }
+
   let res: Response;
   try {
     res = await fetch(url, options);
   } catch (netErr) {
     // If running on localhost and remote fetch fails (e.g. network/SSL error), try local backend
-    if (
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
-      url.startsWith(API_BASE) &&
-      !url.includes("localhost:5000")
-    ) {
-      const localUrl = url.replace(API_BASE, "http://localhost:5000/api/v1");
+    if (isLocalClient && !url.includes("localhost:5000")) {
+      const targetPath = url.includes("/api/v1") ? url.substring(url.indexOf("/api/v1")) : url;
+      const localUrl = `http://localhost:5000${targetPath}`;
       res = await fetch(localUrl, options);
     } else {
       throw netErr;
@@ -26,13 +46,12 @@ export const executeFetch = async (url: string, options: RequestInit = {}): Prom
   // If cloud API returns 404 (endpoint not deployed on cloud yet), retry with local backend
   if (
     res.status === 404 &&
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
-    url.startsWith(API_BASE) &&
+    isLocalClient &&
     !url.includes("localhost:5000")
   ) {
     try {
-      const localUrl = url.replace(API_BASE, "http://localhost:5000/api/v1");
+      const targetPath = url.includes("/api/v1") ? url.substring(url.indexOf("/api/v1")) : url;
+      const localUrl = `http://localhost:5000${targetPath}`;
       const localRes = await fetch(localUrl, options);
       if (localRes.status !== 404) {
         return localRes;

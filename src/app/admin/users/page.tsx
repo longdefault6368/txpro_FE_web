@@ -2635,7 +2635,17 @@ function AdminUsersContent() {
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 bg-primary-50 text-primary-600 rounded-full font-bold flex items-center justify-center text-xs shadow-inner overflow-hidden ring-1 ring-slate-100 flex-shrink-0">
                                 {avatarUrl ? (
-                                  <img src={avatarUrl} alt={user.name || user.phone || "Người dùng"} className="h-full w-full object-cover" />
+                                  <img
+                                    src={avatarUrl}
+                                    alt={user.name || user.phone || "Người dùng"}
+                                    className="h-full w-full object-cover"
+                                    onError={(e) => {
+                                      const parent = (e.target as HTMLElement).parentElement;
+                                      if (parent) {
+                                        parent.textContent = getUserInitials(user);
+                                      }
+                                    }}
+                                  />
                                 ) : (
                                   getUserInitials(user)
                                 )}
@@ -4476,6 +4486,12 @@ function AdminUsersContent() {
                       src={getUserAvatarUrl(chatTargetUser)!}
                       alt={chatTargetUser.name || "Người dùng"}
                       className="h-full w-full object-cover"
+                      onError={(e) => {
+                        const parent = (e.target as HTMLElement).parentElement;
+                        if (parent) {
+                          parent.textContent = getUserInitials(chatTargetUser);
+                        }
+                      }}
                     />
                   ) : (
                     getUserInitials(chatTargetUser)
@@ -4594,6 +4610,12 @@ function AdminUsersContent() {
                       src={getUserAvatarUrl(selectedUserForOrders)!}
                       alt={selectedUserForOrders.name || "Người dùng"}
                       className="h-full w-full object-cover"
+                      onError={(e) => {
+                        const parent = (e.target as HTMLElement).parentElement;
+                        if (parent) {
+                          parent.textContent = getUserInitials(selectedUserForOrders);
+                        }
+                      }}
                     />
                   ) : (
                     getUserInitials(selectedUserForOrders)

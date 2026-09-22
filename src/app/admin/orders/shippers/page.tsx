@@ -297,15 +297,15 @@ const STATUS_MAP: Record<
   string,
   { label: string; color: string; dotColor: string; bg: string; icon: React.ElementType }
 > = {
-  searching_driver: { label: "Tìm tài xế", color: "text-blue-700 bg-blue-50 border-blue-200", dotColor: "#2563eb", bg: "bg-blue-50", icon: Loader },
-  waiting_driver: { label: "Chờ tài xế", color: "text-amber-700 bg-amber-50 border-amber-200", dotColor: "#d97706", bg: "bg-amber-50", icon: Clock },
-  waiting_driver_acceptance: { label: "Chờ tài xế nhận", color: "text-purple-700 bg-purple-50 border-purple-200", dotColor: "#9333ea", bg: "bg-purple-50", icon: Clock },
-  accepted: { label: "Đã nhận đơn", color: "text-indigo-700 bg-indigo-50 border-indigo-200", dotColor: "#4f46e5", bg: "bg-indigo-50", icon: CheckCircle },
-  rejected: { label: "Đã từ chối", color: "text-rose-700 bg-rose-50 border-rose-200", dotColor: "#e11d48", bg: "bg-rose-50", icon: XCircle },
-  in_progress: { label: "Đang vận chuyển", color: "text-cyan-700 bg-cyan-50 border-cyan-200", dotColor: "#0891b2", bg: "bg-cyan-50", icon: Truck },
-  delivered: { label: "Đã giao hàng", color: "text-emerald-700 bg-emerald-50 border-emerald-200", dotColor: "#059669", bg: "bg-emerald-50", icon: CheckCircle },
-  completed: { label: "Đã hoàn thành", color: "text-emerald-800 bg-emerald-100 border-emerald-300", dotColor: "#10b981", bg: "bg-emerald-100", icon: CheckCircle },
-  cancelled: { label: "Đã hủy đơn", color: "text-red-700 bg-red-50 border-red-200", dotColor: "#dc2626", bg: "bg-red-50", icon: XCircle },
+  searching_driver: { label: "Đang tìm tài xế", color: "text-amber-800 bg-amber-50 border-amber-200", dotColor: "#d97706", bg: "bg-amber-50", icon: Loader },
+  waiting_driver: { label: "Chờ tài xế xác nhận", color: "text-purple-800 bg-purple-50 border-purple-200", dotColor: "#9333ea", bg: "bg-purple-50", icon: Clock },
+  waiting_driver_acceptance: { label: "Chờ tài xế xác nhận", color: "text-purple-800 bg-purple-50 border-purple-200", dotColor: "#9333ea", bg: "bg-purple-50", icon: Clock },
+  accepted: { label: "Đã tìm được tài xế", color: "text-indigo-800 bg-indigo-50 border-indigo-200", dotColor: "#4f46e5", bg: "bg-indigo-50", icon: CheckCircle },
+  rejected: { label: "Tài xế từ chối nhận", color: "text-rose-800 bg-rose-50 border-rose-200", dotColor: "#e11d48", bg: "bg-rose-50", icon: XCircle },
+  in_progress: { label: "Tài xế đang di chuyển", color: "text-blue-800 bg-blue-50 border-blue-200", dotColor: "#2563eb", bg: "bg-blue-50", icon: Truck },
+  delivered: { label: "Đã giao hàng (Chờ chủ hàng xác nhận)", color: "text-teal-800 bg-teal-50 border-teal-200", dotColor: "#0d9488", bg: "bg-teal-50", icon: CheckCircle },
+  completed: { label: "Đã hoàn thành", color: "text-emerald-900 bg-emerald-100 border-emerald-300 font-extrabold", dotColor: "#10b981", bg: "bg-emerald-100", icon: CheckCircle },
+  cancelled: { label: "Đã hủy vận đơn", color: "text-red-800 bg-red-50 border-red-200", dotColor: "#dc2626", bg: "bg-red-50", icon: XCircle },
 };
 
 type TimeGranularity = "day" | "month" | "year" | "all" | "custom";

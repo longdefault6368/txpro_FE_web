@@ -543,7 +543,12 @@ export default function AdminProfilePage() {
           <div className="relative inline-block mb-4">
             <div className="w-20 h-20 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-primary-600 flex items-center justify-center text-white font-bold text-2xl relative group">
               {avatarPreview ? (
-                <img src={avatarPreview} alt="Ảnh đại diện" className="w-full h-full object-cover" />
+                <img
+                  src={avatarPreview}
+                  alt="Ảnh đại diện"
+                  className="w-full h-full object-cover"
+                  onError={() => setAvatarPreview(null)}
+                />
               ) : (
                 <span>{initials}</span>
               )}
