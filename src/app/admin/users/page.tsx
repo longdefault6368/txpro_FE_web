@@ -366,169 +366,6 @@ const getOrderStatusBadge = (status: string) => {
   };
 };
 
-const generateMockOrdersForUser = (user: User): UserOrderSummary[] => {
-  const isDriver = user.role === "tai-xe";
-  if (isDriver) {
-    return [
-      {
-        _id: `ord-drv-${user._id}-1`,
-        orderCode: "TXP-88291",
-        title: "Vận chuyển linh kiện điện tử",
-        cargoType: "Hàng thiết bị điện tử",
-        vehicleType: "Xe tải thùng kín 5 tấn",
-        pickup: { address: "KCN Bắc Thăng Long, Đông Anh, Hà Nội", province: "Hà Nội" },
-        dropoff: { address: "KCN Đình Vũ, Hải An, Hải Phòng", province: "Hải Phòng" },
-        offerPrice: 4800000,
-        paymentMethod: "wallet",
-        status: "completed",
-        createdAt: "2026-09-18T08:30:00Z",
-      },
-      {
-        _id: `ord-drv-${user._id}-2`,
-        orderCode: "TXP-88210",
-        title: "Chuyển vật liệu xây dựng công trình",
-        cargoType: "Vật liệu xây dựng",
-        vehicleType: "Xe tải thùng bạt 8 tấn",
-        pickup: { address: "Kho VLXD Hà Đông, Hà Nội", province: "Hà Nội" },
-        dropoff: { address: "Khu đô thị Ecopark, Văn Giang, Hưng Yên", province: "Hưng Yên" },
-        offerPrice: 3200000,
-        paymentMethod: "cash",
-        status: "completed",
-        createdAt: "2026-09-16T14:15:00Z",
-      },
-      {
-        _id: `ord-drv-${user._id}-3`,
-        orderCode: "TXP-88155",
-        title: "Vận chuyển nông sản xuất khẩu",
-        cargoType: "Hàng thực phẩm / nông sản",
-        vehicleType: "Xe tải đông lạnh 5 tấn",
-        pickup: { address: "Chợ đầu mối Long Biên, Hà Nội", province: "Hà Nội" },
-        dropoff: { address: "Cửa khẩu Hữu Nghị, Đồng Đăng, Lạng Sơn", province: "Lạng Sơn" },
-        offerPrice: 6500000,
-        paymentMethod: "wallet",
-        status: "in_progress",
-        createdAt: "2026-09-19T06:45:00Z",
-      },
-      {
-        _id: `ord-drv-${user._id}-4`,
-        orderCode: "TXP-87980",
-        title: "Giao đồ nội thất biệt thự",
-        cargoType: "Đồ gia dụng / nội thất",
-        vehicleType: "Xe tải thùng kín 2.5 tấn",
-        pickup: { address: "Showroom Nội Thất Cầu Giấy, Hà Nội", province: "Hà Nội" },
-        dropoff: { address: "Vinhome Marina, Lê Chân, Hải Phòng", province: "Hải Phòng" },
-        offerPrice: 3800000,
-        paymentMethod: "cash",
-        status: "completed",
-        createdAt: "2026-09-12T10:00:00Z",
-      },
-      {
-        _id: `ord-drv-${user._id}-5`,
-        orderCode: "TXP-87720",
-        title: "Chở máy móc thiết bị nhà xưởng",
-        cargoType: "Máy móc & thiết bị",
-        vehicleType: "Xe tải cẩu 10 tấn",
-        pickup: { address: "KCN Quang Minh, Mê Linh, Hà Nội", province: "Hà Nội" },
-        dropoff: { address: "KCN Phố Nối A, Yên Mỹ, Hưng Yên", province: "Hưng Yên" },
-        offerPrice: 5900000,
-        paymentMethod: "wallet",
-        status: "completed",
-        createdAt: "2026-09-08T09:20:00Z",
-      },
-    ];
-  } else {
-    return [
-      {
-        _id: `ord-shp-${user._id}-1`,
-        orderCode: "TXP-99102",
-        title: "Chở pallet bao bì công nghiệp",
-        cargoType: "Đồ gia dụng / nội thất",
-        vehicleType: "Xe tải thùng kín 5 tấn",
-        pickup: { address: "Nhà máy KCN Tân Bình, Tân Phú, TP.HCM", province: "TP.HCM" },
-        dropoff: { address: "Kho ICD Sóng Thần, Dĩ An, Bình Dương", province: "Bình Dương" },
-        offerPrice: 2800000,
-        paymentMethod: "wallet",
-        status: "completed",
-        createdAt: "2026-09-17T11:20:00Z",
-      },
-      {
-        _id: `ord-shp-${user._id}-2`,
-        orderCode: "TXP-99044",
-        title: "Giao hàng tiêu dùng chuỗi siêu thị",
-        cargoType: "Hàng thực phẩm / nông sản",
-        vehicleType: "Xe tải thùng bạt 3.5 tấn",
-        pickup: { address: "Tổng kho Hóc Môn, TP.HCM", province: "TP.HCM" },
-        dropoff: { address: "KDC Chánh Nghĩa, Thủ Dầu Một, Bình Dương", province: "Bình Dương" },
-        offerPrice: 2400000,
-        paymentMethod: "wallet",
-        status: "completed",
-        createdAt: "2026-09-15T09:30:00Z",
-      },
-      {
-        _id: `ord-shp-${user._id}-3`,
-        orderCode: "TXP-98920",
-        title: "Vận chuyển hạt nhựa nguyên sinh",
-        cargoType: "Hàng hóa lỏng",
-        vehicleType: "Xe tải thùng bạt 10 tấn",
-        pickup: { address: "Cảng Cát Lái, TP. Thủ Đức, TP.HCM", province: "TP.HCM" },
-        dropoff: { address: "KCN Long Thành, Đồng Nai", province: "Đồng Nai" },
-        offerPrice: 5200000,
-        paymentMethod: "wallet",
-        status: "in_progress",
-        createdAt: "2026-09-19T13:00:00Z",
-      },
-      {
-        _id: `ord-shp-${user._id}-4`,
-        orderCode: "TXP-98715",
-        title: "Giao thiết bị phụ tùng cơ khí",
-        cargoType: "Máy móc & thiết bị",
-        vehicleType: "Xe tải thùng kín 5 tấn",
-        pickup: { address: "Khu chế xuất Tân Thuận, Quận 7, TP.HCM", province: "TP.HCM" },
-        dropoff: { address: "KCN Amata, Biên Hòa, Đồng Nai", province: "Đồng Nai" },
-        offerPrice: 4100000,
-        paymentMethod: "cash",
-        status: "completed",
-        createdAt: "2026-09-10T08:15:00Z",
-      },
-    ];
-  }
-};
-
-const MOCK_USER_ORDER_STATS: Record<string, UserOrderStat> = {
-  "u-mock-1": {
-    orderCount: 18,
-    completedCount: 16,
-    activeCount: 2,
-    cancelledCount: 0,
-    totalAmount: 58500000,
-    completedAmount: 52000000,
-  },
-  "u-mock-2": {
-    orderCount: 14,
-    completedCount: 12,
-    activeCount: 2,
-    cancelledCount: 0,
-    totalAmount: 48600000,
-    completedAmount: 42100000,
-  },
-  "u-mock-3": {
-    orderCount: 8,
-    completedCount: 6,
-    activeCount: 1,
-    cancelledCount: 1,
-    totalAmount: 24200000,
-    completedAmount: 18500000,
-  },
-  "u-mock-5": {
-    orderCount: 5,
-    completedCount: 4,
-    activeCount: 1,
-    cancelledCount: 0,
-    totalAmount: 19500000,
-    completedAmount: 15800000,
-  },
-};
-
 const getUserAvatarUrl = (user: User) => getServerMediaUrl(user.avatar || user.portraitImage);
 
 const getUserInitials = (user: User) => {
@@ -540,65 +377,6 @@ const getUserInitials = (user: User) => {
     ?.substring(0, 2)
     .toUpperCase() || "US";
 };
-
-// Initial Mock data for offline fallback
-const INITIAL_MOCK_USERS: User[] = [
-  {
-    _id: "u-mock-1",
-    name: "Nguyễn Văn Hùng",
-    phone: "0912345678",
-    email: "hung.nguyen@txepro.vn",
-    role: "tai-xe",
-    isActive: true,
-    kycStatus: "verified",
-    language: "vi",
-    createdAt: "2026-07-01T08:30:00Z"
-  },
-  {
-    _id: "u-mock-2",
-    name: "Trần Thị Mai",
-    phone: "0987654321",
-    email: "mai.tran@gmail.com",
-    role: "chu-hang",
-    isActive: true,
-    kycStatus: "verified",
-    language: "vi",
-    createdAt: "2026-07-02T10:15:00Z"
-  },
-  {
-    _id: "u-mock-3",
-    name: "Lê Minh Tuấn",
-    phone: "0905123456",
-    email: "tuan.le@outlook.com",
-    role: "tai-xe",
-    isActive: false,
-    kycStatus: "pending_review",
-    language: "vi",
-    createdAt: "2026-07-05T14:22:00Z"
-  },
-  {
-    _id: "u-mock-4",
-    name: "Admin TXEPRO",
-    phone: "0333444555",
-    email: "admin@txepro.vn",
-    role: "admin",
-    isActive: true,
-    kycStatus: "verified",
-    language: "vi",
-    createdAt: "2026-06-20T09:00:00Z"
-  },
-  {
-    _id: "u-mock-5",
-    name: "Phạm Quốc Bảo",
-    phone: "0977888999",
-    email: "bao.pham@gmail.com",
-    role: "chu-hang",
-    isActive: true,
-    kycStatus: "draft",
-    language: "en",
-    createdAt: "2026-07-06T11:05:00Z"
-  }
-];
 
 function AdminUsersContent() {
   const router = useRouter();
@@ -625,8 +403,7 @@ function AdminUsersContent() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
 
-  // User Orders & Financial Statistics State
-  const [userOrderStatsMap, setUserOrderStatsMap] = useState<Record<string, UserOrderStat>>(MOCK_USER_ORDER_STATS);
+  const [userOrderStatsMap, setUserOrderStatsMap] = useState<Record<string, UserOrderStat>>({});
   const [systemOrderStats, setSystemOrderStats] = useState<SystemOverviewStats>({
     totalUsers: 0,
     totalDrivers: 0,
@@ -835,48 +612,15 @@ function AdminUsersContent() {
         errorResponseMsg = errData.message || "Không thể tải danh sách người dùng từ hệ thống.";
       }
     } catch (err: any) {
-      console.warn("Backend offline or connection error, using local fallback state", err);
-      setIsOffline(true);
-      responseOk = true;
-      
-      // Offline fallback state management (filtering & search simulated locally)
-      let filtered = INITIAL_MOCK_USERS.filter((user) => user.role !== "admin");
-      
-      if (search) {
-        const searchLower = search.toLowerCase();
-        filtered = filtered.filter(u => 
-          u.name.toLowerCase().includes(searchLower) ||
-          (u.email && u.email.toLowerCase().includes(searchLower)) ||
-          (u.phone && u.phone.includes(searchLower))
-        );
-      }
-      
-      if (roleFilter) {
-        filtered = filtered.filter(u => u.role === roleFilter);
-      }
-      
-      if (statusFilter) {
-        const activeRequired = statusFilter === "active";
-        filtered = filtered.filter(u => u.isActive === activeRequired);
-      }
-
-      if (kycFilter) {
-        filtered = filtered.filter(u => u.kycStatus === kycFilter);
-      }
-
-      const limit = pageSize;
-      const total = filtered.length;
-      const pages = Math.ceil(total / limit) || 1;
-      const startIdx = (currentPage - 1) * limit;
-      const paginatedUsers = filtered.slice(startIdx, startIdx + limit);
-
-      setUsers(paginatedUsers);
+      console.warn("Backend connection error:", err);
+      setUsers([]);
       setPagination({
         page: currentPage,
-        limit,
-        total,
-        pages
+        limit: pageSize,
+        total: 0,
+        pages: 1
       });
+      errorResponseMsg = "Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại dịch vụ backend.";
     } finally {
       setLoading(false);
       if (!responseOk && errorResponseMsg) {
@@ -885,7 +629,7 @@ function AdminUsersContent() {
     }
   };
 
-  // Fetch Order and Financial Statistics
+  // Fetch Order and Financial Statistics (Real aggregation from backend)
   const fetchOrderStats = async () => {
     setLoadingOrderStats(true);
     try {
@@ -901,10 +645,10 @@ function AdminUsersContent() {
         console.warn("Could not fetch overview metrics:", err);
       }
 
-      // 2. Fetch recent orders for aggregation (limit: 100 max per Joi schema)
+      // 2. Fetch recent orders for aggregation (limit: 500)
       let ordersList: any[] = [];
       try {
-        const resOrders = await fetchWithAuth(`${API_BASE}/admin/users/orders?limit=100`);
+        const resOrders = await fetchWithAuth(`${API_BASE}/admin/users/orders?limit=500`);
         if (resOrders.ok) {
           const json = await resOrders.json();
           ordersList = json.data?.orders || json.orders || [];
@@ -913,8 +657,8 @@ function AdminUsersContent() {
         console.warn("Could not fetch orders list:", err);
       }
 
-      // 3. Compute stats
-      const statsMap: Record<string, UserOrderStat> = { ...MOCK_USER_ORDER_STATS };
+      // 3. Compute stats strictly from real data
+      const statsMap: Record<string, UserOrderStat> = {};
       let totalGMV = 0;
       let completedTurnover = 0;
       let completedOrdersCount = 0;
@@ -990,13 +734,13 @@ function AdminUsersContent() {
 
       setUserOrderStatsMap(statsMap);
 
-      const totalUsersCount = overviewData?.totalUsers ?? (users.length || 5);
+      const totalUsersCount = overviewData?.totalUsers ?? users.length;
       const totalDriversCount = overviewData?.totalDrivers ?? users.filter(u => u.role === "tai-xe").length;
       const totalShippersCount = overviewData?.totalShippers ?? users.filter(u => u.role === "chu-hang").length;
-      const totalOrdersCount = overviewData?.totalOrders ?? (ordersList.length || 45);
+      const totalOrdersCount = overviewData?.totalOrders ?? ordersList.length;
 
-      const finalGMV = totalGMV > 0 ? totalGMV : 148500000;
-      const finalCompletedTurnover = completedTurnover > 0 ? completedTurnover : 124600000;
+      const finalGMV = totalGMV;
+      const finalCompletedTurnover = completedTurnover;
       const finalEstimatedFee = Math.round(finalCompletedTurnover * 0.1);
 
       setSystemOrderStats({
@@ -1007,8 +751,8 @@ function AdminUsersContent() {
         totalGMV: finalGMV,
         completedTurnover: finalCompletedTurnover,
         estimatedFee: finalEstimatedFee,
-        completedOrdersCount: completedOrdersCount || 38,
-        activeOrdersCount: activeOrdersCount || 5,
+        completedOrdersCount: completedOrdersCount,
+        activeOrdersCount: activeOrdersCount,
       });
     } catch (e) {
       console.warn("Error fetching order stats:", e);
@@ -1030,15 +774,13 @@ function AdminUsersContent() {
       if (res.ok) {
         const json = await res.json();
         const orders = json.data?.orders || json.orders || [];
-        if (orders.length > 0) {
-          setUserOrdersList(orders);
-          return;
-        }
+        setUserOrdersList(orders);
+      } else {
+        setUserOrdersList([]);
       }
-      setUserOrdersList(generateMockOrdersForUser(user));
     } catch (err) {
-      console.warn("Could not fetch user orders, fallback to mock:", err);
-      setUserOrdersList(generateMockOrdersForUser(user));
+      console.warn("Could not fetch user orders:", err);
+      setUserOrdersList([]);
     } finally {
       setLoadingUserOrders(false);
     }
@@ -1072,41 +814,21 @@ function AdminUsersContent() {
     if (!formData.password) return showToast(false, "Vui lòng nhập Mật khẩu ban đầu");
 
     try {
-      if (isOffline) {
-        // Offline Simulation
-        const newUser: User = {
-          _id: "u-mock-" + Date.now(),
-          name: formData.name,
-          phone: formData.phone,
-          email: formData.email,
-          role: formData.role,
-          isActive: formData.isActive,
-          kycStatus: "draft",
-          language: formData.language,
-          createdAt: new Date().toISOString()
-        };
-        INITIAL_MOCK_USERS.unshift(newUser);
-        showToast(true, "Tạo tài khoản thành công (Offline Mode)");
+      const res = await fetchWithAuth(`${API_BASE}/admin/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (res.ok) {
+        showToast(true, "Tạo tài khoản thành công");
         setShowAddModal(false);
         fetchUsers();
       } else {
-        // Backend live call
-        const res = await fetchWithAuth(`${API_BASE}/admin/users`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(formData)
-        });
-
-        if (res.ok) {
-          showToast(true, "Tạo tài khoản thành công");
-          setShowAddModal(false);
-          fetchUsers();
-        } else {
-          const data = await res.json();
-          throw new Error(data.message || "Lỗi tạo tài khoản");
-        }
+        const data = await res.json();
+        throw new Error(data.message || "Lỗi tạo tài khoản");
       }
     } catch (err: any) {
       showToast(false, err.message);
@@ -1149,61 +871,20 @@ function AdminUsersContent() {
     }
   };
 
-  // Load vehicles for a driver
+  // Load vehicles for a driver (real data from API)
   const loadUserVehicles = async (userId: string) => {
     setLoadingVehicles(true);
     try {
-      if (isOffline) {
-        const mockSaved = localStorage.getItem(`txepro_user_vehicles_${userId}`);
-        if (mockSaved) {
-          setUserVehicles(JSON.parse(mockSaved));
-        } else {
-          const sample: VehicleItem = {
-            _id: `mock-veh-${userId}-1`,
-            driverId: userId,
-            type: "xe-tai-thung-bat",
-            vehicleTypeParent: "xe-tai",
-            vehicleTypeChild: "Thùng bạt tiêu chuẩn",
-            brand: "Hyundai",
-            model: "Mighty EX8 GTL",
-            ownerName: currentUser?.name || "Tài Xế",
-            plateNumber: "29C-789.68",
-            capacity: 5,
-            dimensions: { length: 5.8, width: 2.1, height: 2.3 },
-            operatingProvinceName: "Hà Nội",
-            status: "active",
-            licenseImages: [
-              "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600&auto=format&fit=crop&q=80"
-            ],
-            createdAt: new Date().toISOString()
-          };
-          setUserVehicles([sample]);
-          localStorage.setItem(`txepro_user_vehicles_${userId}`, JSON.stringify([sample]));
-        }
-        return;
-      }
-
       const res = await fetchWithAuth(`${API_BASE}/admin/users/${userId}/vehicles`);
-
       if (res.ok) {
         const data = await res.json();
         setUserVehicles(data.data?.vehicles || []);
       } else {
-        const mockSaved = localStorage.getItem(`txepro_user_vehicles_${userId}`);
-        if (mockSaved) {
-          setUserVehicles(JSON.parse(mockSaved));
-        } else {
-          setUserVehicles([]);
-        }
+        setUserVehicles([]);
       }
     } catch (err) {
       console.warn("Could not load user vehicles", err);
-      const mockSaved = localStorage.getItem(`txepro_user_vehicles_${userId}`);
-      if (mockSaved) {
-        setUserVehicles(JSON.parse(mockSaved));
-      } else {
-        setUserVehicles([]);
-      }
+      setUserVehicles([]);
     } finally {
       setLoadingVehicles(false);
     }
@@ -1477,36 +1158,11 @@ function AdminUsersContent() {
         await loadUserVehicles(currentUser._id);
         setShowVehicleModal(false);
       } else {
-        const newVeh: VehicleItem = {
-          _id: editingVehicle ? editingVehicle._id : `veh-${Date.now()}`,
-          driverId: currentUser._id,
-          ...payload,
-          createdAt: editingVehicle?.createdAt || new Date().toISOString(),
-        };
-        const updatedList = editingVehicle
-          ? userVehicles.map(v => v._id === editingVehicle._id ? newVeh : v)
-          : [newVeh, ...userVehicles];
-        setUserVehicles(updatedList);
-        localStorage.setItem(`txepro_user_vehicles_${currentUser._id}`, JSON.stringify(updatedList));
-        showToast(true, isEdit ? "Đã lưu thông tin xe" : "Đã thêm xe vào danh sách");
-        setShowVehicleModal(false);
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || "Không thể lưu phương tiện");
       }
     } catch (err: any) {
-      console.warn("Save vehicle offline fallback", err);
-      const isEdit = !!editingVehicle;
-      const newVeh: VehicleItem = {
-        _id: editingVehicle ? editingVehicle._id : `veh-${Date.now()}`,
-        driverId: currentUser._id,
-        ...payload,
-        createdAt: editingVehicle?.createdAt || new Date().toISOString(),
-      };
-      const updatedList = editingVehicle
-        ? userVehicles.map(v => v._id === editingVehicle._id ? newVeh : v)
-        : [newVeh, ...userVehicles];
-      setUserVehicles(updatedList);
-      localStorage.setItem(`txepro_user_vehicles_${currentUser._id}`, JSON.stringify(updatedList));
-      showToast(true, isEdit ? "Đã lưu thông tin xe" : "Đã thêm xe vào danh sách");
-      setShowVehicleModal(false);
+      showToast(false, err.message || "Lỗi lưu phương tiện");
     } finally {
       setSavingVehicle(false);
     }
@@ -1521,16 +1177,15 @@ function AdminUsersContent() {
       const url = `${API_BASE}/admin/users/${currentUser._id}/vehicles/${vehicleId}`;
       const res = await fetchWithAuth(url, { method: "DELETE" });
 
-      const updated = userVehicles.filter(v => v._id !== vehicleId);
-      setUserVehicles(updated);
-      localStorage.setItem(`txepro_user_vehicles_${currentUser._id}`, JSON.stringify(updated));
-      showToast(true, "Đã xóa phương tiện thành công");
-    } catch (err) {
-      console.warn("Delete vehicle local fallback", err);
-      const updated = userVehicles.filter(v => v._id !== vehicleId);
-      setUserVehicles(updated);
-      localStorage.setItem(`txepro_user_vehicles_${currentUser._id}`, JSON.stringify(updated));
-      showToast(true, "Đã xóa phương tiện thành công");
+      if (res.ok) {
+        await loadUserVehicles(currentUser._id);
+        showToast(true, "Đã xóa phương tiện thành công");
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || "Không thể xóa phương tiện");
+      }
+    } catch (err: any) {
+      showToast(false, err.message || "Lỗi xóa phương tiện");
     }
   };
 
@@ -1683,80 +1338,7 @@ function AdminUsersContent() {
     setKycDetails(null);
 
     try {
-      if (isOffline) {
-        // Offline demo preview
-        const mockIdentity = {
-          fullName: user.name,
-          idNumber: "07909400" + (user._id.replace(/\D/g, "").slice(-4) || "8888"),
-          dateOfBirth: "18/08/1992",
-          gender: "Nam",
-          nationality: "VN",
-          permanentAddress: "Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-          issueDate: "15/05/2021",
-          expiryDate: "18/08/2032"
-        };
-
-        const makeCardSvg = (title: string, subtitle: string, headerColor: string) => {
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380">
-            <rect width="600" height="380" rx="16" fill="${headerColor}"/>
-            <rect x="16" y="16" width="568" height="348" rx="12" fill="#ffffff" fill-opacity="0.96"/>
-            <rect x="36" y="32" width="70" height="50" rx="8" fill="#e2e8f0"/>
-            <text x="71" y="62" font-family="sans-serif" font-size="11" font-weight="bold" fill="#64748b" text-anchor="middle">TXEPRO</text>
-            <text x="125" y="52" font-family="sans-serif" font-size="17" font-weight="bold" fill="#0f172a">${title}</text>
-            <text x="125" y="74" font-family="sans-serif" font-size="12" fill="#64748b">${subtitle}</text>
-            <line x1="36" y1="98" x2="564" y2="98" stroke="#e2e8f0" stroke-width="1.5"/>
-            <rect x="36" y="120" width="115" height="150" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-dasharray="4"/>
-            <text x="93" y="200" font-family="sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">Ảnh chụp</text>
-            <text x="175" y="145" font-family="sans-serif" font-size="13" font-weight="bold" fill="#334155">Họ và tên: <tspan fill="#0f172a">${user.name}</tspan></text>
-            <text x="175" y="178" font-family="sans-serif" font-size="13" font-weight="bold" fill="#334155">Số giấy tờ: <tspan fill="#0f172a">${mockIdentity.idNumber}</tspan></text>
-            <text x="175" y="211" font-family="sans-serif" font-size="13" font-weight="bold" fill="#334155">Ngày sinh: <tspan fill="#0f172a">${mockIdentity.dateOfBirth}</tspan></text>
-            <text x="175" y="244" font-family="sans-serif" font-size="13" font-weight="bold" fill="#334155">Nơi thường trú: <tspan fill="#0f172a">Quận 1, TP. Hồ Chí Minh</tspan></text>
-            <rect x="36" y="295" width="528" height="42" rx="8" fill="#f1f5f9"/>
-            <text x="300" y="321" font-family="sans-serif" font-size="11" font-weight="bold" fill="#475569" text-anchor="middle">GIẤY TỜ XÁC MINH EKYC HỢP LỆ - HỆ THỐNG TXEPRO</text>
-          </svg>`;
-          return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-        };
-
-        const docs: KycDocumentItem[] = [
-          {
-            type: "cccdFront",
-            label: "CCCD Mặt trước",
-            url: makeCardSvg("CĂN CƯỚC CÔNG DÂN", "Mặt trước (Thông tin nhân thân)", "#2563eb"),
-            status: "ready"
-          },
-          {
-            type: "cccdBack",
-            label: "CCCD Mặt sau",
-            url: makeCardSvg("CĂN CƯỚC CÔNG DÂN", "Mặt sau (Đặc điểm nhận dạng)", "#475569"),
-            status: "ready"
-          },
-          {
-            type: "portrait",
-            label: "Ảnh chân dung (Selfie)",
-            url: user.avatar || user.portraitImage || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80",
-            status: "ready"
-          }
-        ];
-
-        if (user.role === "tai-xe") {
-          docs.push({
-            type: "gplxFront",
-            label: "Bằng lái xe (GPLX)",
-            url: makeCardSvg("GIẤY PHÉP LÁI XE", "Hạng C / FC - Xe Tải", "#059669"),
-            status: "ready"
-          });
-        }
-
-        setKycDetails({
-          submissionId: "mock-sub-1",
-          status: user.kycStatus,
-          role: user.role,
-          submittedAt: user.createdAt,
-          identity: mockIdentity,
-          documents: docs
-        });
-        return;
-      }
+      // Live Backend fetch
 
       // Live Backend fetch
       // 1. Fetch Kyc Submissions
@@ -1898,80 +1480,62 @@ function AdminUsersContent() {
     if (!currentUser) return;
 
     try {
-      if (isOffline) {
-        // Offline simulation
-        const idx = INITIAL_MOCK_USERS.findIndex(u => u._id === currentUser._id);
-        if (idx !== -1) {
-          INITIAL_MOCK_USERS[idx] = {
-            ...INITIAL_MOCK_USERS[idx],
-            name: formData.name,
-            role: formData.role,
-            language: formData.language,
-            kycStatus: formData.kycStatus,
-            isActive: formData.kycStatus === "verified" ? true : INITIAL_MOCK_USERS[idx].isActive
-          };
-        }
-        showToast(true, "Cập nhật thành công (Offline Mode)");
-        handleCloseEditModal();
-        fetchUsers();
-      } else {
-        // 1. Update Profile (Name, Language)
-        const res = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}`, {
-          method: "PUT",
+      // 1. Update Profile (Name, Language)
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          language: formData.language
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Lỗi cập nhật người dùng");
+      }
+
+      // 2. If Role changed, update role
+      if (formData.role !== currentUser.role) {
+        const roleRes = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}/role`, {
+          method: "PATCH",
           headers: {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            name: formData.name,
-            language: formData.language
+            role: formData.role
           })
         });
 
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.message || "Lỗi cập nhật người dùng");
+        if (!roleRes.ok) {
+          const roleErr = await roleRes.json().catch(() => ({}));
+          throw new Error(roleErr.message || "Lỗi cập nhật vai trò người dùng");
         }
-
-        // 2. If Role changed, update role
-        if (formData.role !== currentUser.role) {
-          const roleRes = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}/role`, {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              role: formData.role
-            })
-          });
-
-          if (!roleRes.ok) {
-            const roleErr = await roleRes.json().catch(() => ({}));
-            throw new Error(roleErr.message || "Lỗi cập nhật vai trò người dùng");
-          }
-        }
-
-        // 3. If KYC status changed, update KYC status
-        if (formData.kycStatus !== currentUser.kycStatus) {
-          const kycRes = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}/kyc-status`, {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              kycStatus: formData.kycStatus
-            })
-          });
-
-          if (!kycRes.ok) {
-            const kycErr = await kycRes.json().catch(() => ({}));
-            throw new Error(kycErr.message || "Lỗi cập nhật trạng thái KYC");
-          }
-        }
-
-        showToast(true, "Cập nhật thông tin thành công");
-        handleCloseEditModal();
-        fetchUsers();
       }
+
+      // 3. If KYC status changed, update KYC status
+      if (formData.kycStatus !== currentUser.kycStatus) {
+        const kycRes = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}/kyc-status`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            kycStatus: formData.kycStatus
+          })
+        });
+
+        if (!kycRes.ok) {
+          const kycErr = await kycRes.json().catch(() => ({}));
+          throw new Error(kycErr.message || "Lỗi cập nhật trạng thái KYC");
+        }
+      }
+
+      showToast(true, "Cập nhật thông tin thành công");
+      handleCloseEditModal();
+      fetchUsers();
     } catch (err: any) {
       showToast(false, err.message);
     }
@@ -1993,32 +1557,12 @@ function AdminUsersContent() {
     setChatMessages([]);
 
     try {
-      if (isOffline) {
-        setChatMessages([
-          {
-            _id: `mock-msg-${user._id}`,
-            senderId: { _id: user._id, name: user.name || "Người dùng", role: user.role },
-            content: `Chào Admin, tôi là ${user.name || "người dùng"}. Tôi cần hỗ trợ về tài khoản.`,
-            createdAt: new Date(Date.now() - 3600000).toISOString(),
-          }
-        ]);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/chat`);
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages(data.data.messages || []);
       } else {
-        const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/chat`);
-
-        if (res.ok) {
-          const data = await res.json();
-          setChatMessages(data.data.messages || []);
-        } else {
-          // If 404 on server, create an initial greeting so admin can chat immediately
-          setChatMessages([
-            {
-              _id: `init-${user._id}`,
-              senderId: { _id: user._id, name: user.name || "Người dùng", role: user.role },
-              content: `Chào Quản trị viên, tôi là ${user.name || "người dùng"} (${user.phone || user.email || ""}).`,
-              createdAt: new Date(Date.now() - 1800000).toISOString(),
-            }
-          ]);
-        }
+        setChatMessages([]);
       }
     } catch (err) {
       console.warn("Could not load chat messages", err);
@@ -2037,46 +1581,21 @@ function AdminUsersContent() {
     setSendingMessage(true);
 
     try {
-      if (isOffline) {
-        const newMsg = {
-          _id: `mock-admin-${Date.now()}`,
-          senderId: { _id: "admin-id", name: "Admin TXEPRO", role: "admin" },
-          content,
-          createdAt: new Date().toISOString(),
-          isSelf: true
-        };
-        setChatMessages((prev) => [...prev, newMsg]);
-        setMessageInput("");
-        showToast(true, "Đã gửi tin nhắn (Offline Mode)");
-      } else {
-        const res = await fetchWithAuth(`${API_BASE}/admin/users/${chatTargetUser._id}/chat/messages`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ content })
-        });
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${chatTargetUser._id}/chat/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ content })
+      });
 
-        if (res.ok) {
-          const data = await res.json();
-          setChatMessages((prev) => [...prev, data.data.message]);
-          setMessageInput("");
-        } else if (res.status === 404) {
-          // If route not deployed on production server yet, preserve UI message locally
-          const fallbackMsg = {
-            _id: `mock-admin-${Date.now()}`,
-            senderId: { _id: "admin-id", name: "Admin TXEPRO", role: "admin" },
-            content,
-            createdAt: new Date().toISOString(),
-            isSelf: true
-          };
-          setChatMessages((prev) => [...prev, fallbackMsg]);
-          setMessageInput("");
-          showToast(true, "Đã gửi tin nhắn (Lưu cục bộ - Đang chờ máy chủ production triển khai route)");
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.message || "Không thể gửi tin nhắn");
-        }
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages((prev) => [...prev, data.data.message]);
+        setMessageInput("");
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Không thể gửi tin nhắn");
       }
     } catch (err: any) {
       showToast(false, err.message || "Lỗi gửi tin nhắn");
@@ -2093,35 +1612,24 @@ function AdminUsersContent() {
     return senderId !== chatTargetUser?._id;
   };
 
-
-
   // Toggle user active status
   const handleToggleStatus = async (user: User) => {
     const nextActiveState = !user.isActive;
     try {
-      if (isOffline) {
-        const idx = INITIAL_MOCK_USERS.findIndex(u => u._id === user._id);
-        if (idx !== -1) {
-          INITIAL_MOCK_USERS[idx].isActive = nextActiveState;
-        }
-        showToast(true, `Đã cập nhật trạng thái hoạt động (Offline Mode)`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ isActive: nextActiveState })
+      });
+
+      if (res.ok) {
+        showToast(true, `Cập nhật trạng thái thành công`);
         fetchUsers();
       } else {
-        const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/status`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ isActive: nextActiveState })
-        });
-
-        if (res.ok) {
-          showToast(true, `Cập nhật trạng thái thành công`);
-          fetchUsers();
-        } else {
-          const data = await res.json();
-          throw new Error(data.message || "Lỗi cập nhật trạng thái");
-        }
+        const data = await res.json();
+        throw new Error(data.message || "Lỗi cập nhật trạng thái");
       }
     } catch (err: any) {
       showToast(false, err.message);
@@ -2132,29 +1640,20 @@ function AdminUsersContent() {
   const handleChangeRole = async (user: User, newRole: ManagedUserRole) => {
     if (user.role === newRole) return;
     try {
-      if (isOffline) {
-        const idx = INITIAL_MOCK_USERS.findIndex(u => u._id === user._id);
-        if (idx !== -1) {
-          INITIAL_MOCK_USERS[idx].role = newRole;
-        }
-        showToast(true, `Đã đổi quyền sang ${newRole} (Offline Mode)`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/role`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ role: newRole })
+      });
+
+      if (res.ok) {
+        showToast(true, `Đổi vai trò thành công`);
         fetchUsers();
       } else {
-        const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/role`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ role: newRole })
-        });
-
-        if (res.ok) {
-          showToast(true, `Đổi vai trò thành công`);
-          fetchUsers();
-        } else {
-          const data = await res.json();
-          throw new Error(data.message || "Lỗi cập nhật vai trò");
-        }
+        const data = await res.json();
+        throw new Error(data.message || "Lỗi cập nhật vai trò");
       }
     } catch (err: any) {
       showToast(false, err.message);
@@ -2166,25 +1665,16 @@ function AdminUsersContent() {
     if (!window.confirm("Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản này?")) return;
 
     try {
-      if (isOffline) {
-        const idx = INITIAL_MOCK_USERS.findIndex(u => u._id === id);
-        if (idx !== -1) {
-          INITIAL_MOCK_USERS.splice(idx, 1);
-        }
-        showToast(true, "Đã xóa tài khoản thành công (Offline Mode)");
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${id}`, {
+        method: "DELETE"
+      });
+
+      if (res.ok) {
+        showToast(true, "Đã xóa tài khoản thành công");
         fetchUsers();
       } else {
-        const res = await fetchWithAuth(`${API_BASE}/admin/users/${id}`, {
-          method: "DELETE"
-        });
-
-        if (res.ok) {
-          showToast(true, "Đã xóa tài khoản thành công");
-          fetchUsers();
-        } else {
-          const data = await res.json();
-          throw new Error(data.message || "Không thể xóa tài khoản");
-        }
+        const data = await res.json();
+        throw new Error(data.message || "Không thể xóa tài khoản");
       }
     } catch (err: any) {
       showToast(false, err.message);
@@ -2200,27 +1690,21 @@ function AdminUsersContent() {
     }
 
     try {
-      if (isOffline) {
-        showToast(true, `Đã reset mật khẩu tài khoản ${currentUser.name} thành công (Offline Mode)`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}/password`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ newPassword: newPassword })
+      });
+
+      if (res.ok) {
+        showToast(true, `Đã reset mật khẩu của ${currentUser.name}`);
         setShowPasswordModal(false);
         setNewPassword("");
       } else {
-        const res = await fetchWithAuth(`${API_BASE}/admin/users/${currentUser._id}/password`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ newPassword: newPassword })
-        });
-
-        if (res.ok) {
-          showToast(true, `Đã reset mật khẩu của ${currentUser.name}`);
-          setShowPasswordModal(false);
-          setNewPassword("");
-        } else {
-          const data = await res.json();
-          throw new Error(data.message || "Lỗi đổi mật khẩu");
-        }
+        const data = await res.json();
+        throw new Error(data.message || "Lỗi đổi mật khẩu");
       }
     } catch (err: any) {
       showToast(false, err.message);
@@ -2571,15 +2055,22 @@ function AdminUsersContent() {
                           {/* Orders & Money Activity */}
                           <td className="py-4.5 px-6 whitespace-nowrap">
                             {(() => {
-                              const userStats = userOrderStatsMap[user._id] || {
-                                orderCount: user.role === "chu-hang" ? 3 : 5,
-                                completedCount: user.role === "chu-hang" ? 2 : 4,
-                                activeCount: 1,
-                                cancelledCount: 0,
-                                totalAmount: user.role === "chu-hang" ? 12500000 : 18200000,
-                                completedAmount: user.role === "chu-hang" ? 9500000 : 15400000,
-                              };
+                              const userStats = userOrderStatsMap[user._id];
                               const isShipper = user.role === "chu-hang";
+                              if (!userStats || userStats.orderCount === 0) {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenUserOrdersModal(user)}
+                                    className="group text-left p-2 -m-2 rounded-xl hover:bg-slate-100/80 transition-all cursor-pointer block"
+                                    title="Nhấn để xem chi tiết lịch sử đơn hàng"
+                                  >
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-50 text-slate-400 border border-slate-200 group-hover:bg-slate-100">
+                                      Chưa có dữ liệu
+                                    </span>
+                                  </button>
+                                );
+                              }
                               return (
                                 <button
                                   type="button"
@@ -4729,8 +4220,12 @@ function AdminUsersContent() {
                     return (
                       <div className="text-center py-14 px-4 text-slate-400 space-y-2">
                         <PackageOpen className="w-10 h-10 mx-auto text-slate-300" />
-                        <p className="font-bold text-slate-700 text-sm">Chưa có đơn hàng nào phù hợp</p>
-                        <p className="text-xs text-slate-400">Không tìm thấy bản ghi đơn theo bộ lọc hiện tại.</p>
+                        <p className="font-bold text-slate-700 text-sm">Chưa có dữ liệu đơn hàng & giao dịch</p>
+                        <p className="text-xs text-slate-400">
+                          {userOrdersList.length === 0
+                            ? "Người dùng này chưa phát sinh đơn hàng hoặc giao dịch nào trên hệ thống."
+                            : "Không tìm thấy bản ghi đơn theo bộ lọc hiện tại."}
+                        </p>
                       </div>
                     );
                   }

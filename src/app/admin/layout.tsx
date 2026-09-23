@@ -27,6 +27,7 @@ import {
   User,
   ChevronDown,
   Mail,
+  Newspaper,
   type LucideIcon
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
@@ -53,7 +54,7 @@ export const ADMIN_ROLE_CONFIG: Record<AdminRole, {
     shortLabel: "Vận Hành",
     badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
     color: "#2563eb",
-    allowedPaths: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts"],
+    allowedPaths: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts", "/admin/news"],
   },
   dispatcher: {
     label: "Điều Phối Viên",
@@ -151,6 +152,13 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
     category: "support",
   },
   {
+    id: "news",
+    name: "Tin Tức & Ưu Đãi",
+    description: "Đăng tin tức, hướng dẫn và ưu đãi hiển thị trên app tài xế và chủ hàng",
+    path: "/admin/news",
+    category: "operations",
+  },
+  {
     id: "logs",
     name: "Nhật Ký Hệ Thống",
     description: "Tra cứu log truy cập, audit trail và sự kiện máy chủ",
@@ -175,7 +183,7 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
   super_admin: ["*"],
-  operations: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts"],
+  operations: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts", "/admin/news"],
   dispatcher: ["/admin", "/admin/notifications", "/admin/orders", "/admin/incidents", "/admin/support"],
   kyc_officer: ["/admin/notifications", "/admin/users"],
   cskh: ["/admin/notifications", "/admin/incidents", "/admin/support", "/admin/contacts"],
@@ -221,6 +229,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/analytics", icon: BarChart3, label: "Phân Tích", roles: ["super_admin", "operations", "accountant"] },
   { href: "/admin/support", icon: Headset, label: "Hỗ trợ & Live Chat", roles: ["super_admin", "operations", "dispatcher", "cskh"] },
   { href: "/admin/contacts", icon: Mail, label: "Liên Hệ Website", roles: ["super_admin", "operations", "cskh"] },
+  { href: "/admin/news", icon: Newspaper, label: "Tin Tức & Ưu Đãi", roles: ["super_admin", "operations"] },
   { href: "/admin/logs", icon: TerminalSquare, label: "Log hệ thống", roles: ["super_admin"] },
   { href: "/admin/settings", icon: Settings, label: "Cài Đặt", roles: ["super_admin"] },
 ];
