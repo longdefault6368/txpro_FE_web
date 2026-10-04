@@ -13,7 +13,7 @@ import {
   MessageSquare, Send, Eye, ZoomIn, FileText, CheckCircle2, XCircle, Clock, ExternalLink, RefreshCw, Layers,
   Truck, Plus, Car, MapPin, Box, Upload, Info, Camera,
   TrendingUp, BarChart3, DollarSign, Receipt, Coins, CreditCard, Users, PackageCheck, Package,
-  ArrowUpRight, ArrowDownRight, Sparkles, Navigation, ArrowRight, PackageOpen
+  ArrowUpRight, ArrowDownRight, Sparkles, Navigation, ArrowRight, PackageOpen, Wallet
 } from "lucide-react";
 // Interfaces
 interface VehicleItem {
@@ -197,6 +197,12 @@ interface User {
   kycStatus: "draft" | "pending" | "pending_review" | "verified" | "rejected";
   language: string;
   createdAt: string;
+  wallet?: {
+    mainBalance?: number;
+    promoBalance?: number;
+    lockedBalance?: number;
+    currency?: string;
+  };
 }
 
 interface KycDocumentItem {
@@ -396,11 +402,20 @@ function AdminUsersContent() {
   const [kycFilter, setKycFilter] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(10);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   // UI Modals
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showWalletGiftModal, setShowWalletGiftModal] = useState(false);
+  const [walletGiftUser, setWalletGiftUser] = useState<User | null>(null);
+  const [walletGiftAmount, setWalletGiftAmount] = useState("");
+  const [walletGiftReason, setWalletGiftReason] = useState("Admin tặng tiền hỗ trợ");
+  const [walletGifting, setWalletGifting] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
 
   const [userOrderStatsMap, setUserOrderStatsMap] = useState<Record<string, UserOrderStat>>({});
@@ -526,6 +541,7 @@ function AdminUsersContent() {
         } else {
           setIsAdmin(false);
         }
+        setSessionUserId(session.id || session._id || null);
       } catch (e) {
         setIsAdmin(false);
       }
@@ -603,8 +619,14 @@ function AdminUsersContent() {
 
       if (res.ok) {
         const data = await res.json();
-        setUsers(data.data.users.filter((user: User) => user.role !== "admin"));
-        setPagination(data.data.pagination);
+        const members = (data.data.users || []).filter((user: User) => user.role !== "admin");
+        const pagination = data.data.pagination || { page: currentPage, limit: pageSize, total: 0, pages: 1 };
+        const hiddenAdminCount = (data.data.users || []).length - members.length;
+        setUsers(members);
+        setPagination({
+          ...pagination,
+          total: Math.max(0, Number(pagination.total || 0) - hiddenAdminCount),
+        });
         setIsOffline(false);
         responseOk = true;
       } else {
@@ -792,6 +814,48 @@ function AdminUsersContent() {
       fetchOrderStats();
     }
   }, [isAdmin, currentPage, pageSize, search, roleFilter, statusFilter, kycFilter, token]);
+
+  useEffect(() => {
+    setSelectedUserIds([]);
+  }, [search, roleFilter, statusFilter, kycFilter]);
+
+  const isProtectedUser = (user: User) =>
+    user.role === "admin" || user._id === sessionUserId;
+
+  const selectableUsers = useMemo(
+    () => users.filter((user) => !isProtectedUser(user)),
+    [users, sessionUserId]
+  );
+
+  const selectedOnPage = useMemo(
+    () => selectableUsers.filter((user) => selectedUserIds.includes(user._id)),
+    [selectableUsers, selectedUserIds]
+  );
+
+  const allPageSelected =
+    selectableUsers.length > 0 && selectedOnPage.length === selectableUsers.length;
+  const somePageSelected = selectedOnPage.length > 0 && !allPageSelected;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected;
+    }
+  }, [somePageSelected]);
+
+  const toggleUserSelection = (id: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = selectableUsers.map((user) => user._id);
+    if (allPageSelected) {
+      setSelectedUserIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+      return;
+    }
+    setSelectedUserIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+  };
 
   // Toast handler helper
   const showToast = (success: boolean, msg: string) => {
@@ -1671,6 +1735,7 @@ function AdminUsersContent() {
 
       if (res.ok) {
         showToast(true, "Đã xóa tài khoản thành công");
+        setSelectedUserIds((prev) => prev.filter((item) => item !== id));
         fetchUsers();
       } else {
         const data = await res.json();
@@ -1678,6 +1743,127 @@ function AdminUsersContent() {
       }
     } catch (err: any) {
       showToast(false, err.message);
+    }
+  };
+
+  const handleBulkDeleteUsers = async () => {
+    if (selectedUserIds.length === 0) return;
+    if (
+      !window.confirm(
+        `Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedUserIds.length} tài khoản đã chọn?`
+      )
+    ) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(
+        selectedUserIds.map((id) =>
+          fetchWithAuth(`${API_BASE}/admin/users/${id}`, { method: "DELETE" })
+        )
+      );
+
+      let deleted = 0;
+      let failed = 0;
+      for (const result of results) {
+        if (result.status === "fulfilled" && result.value.ok) {
+          deleted += 1;
+        } else {
+          failed += 1;
+        }
+      }
+
+      if (deleted > 0 && failed === 0) {
+        showToast(true, `Đã xóa ${deleted} tài khoản`);
+      } else if (deleted > 0) {
+        showToast(true, `Đã xóa ${deleted} tài khoản, ${failed} tài khoản không xóa được`);
+      } else {
+        showToast(false, "Không thể xóa các tài khoản đã chọn");
+      }
+
+      setSelectedUserIds([]);
+      fetchUsers();
+    } catch (err: any) {
+      showToast(false, err.message || "Lỗi xóa hàng loạt");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const parseGiftAmount = (raw: string) => {
+    const amount = Number(String(raw).replace(/[^\d]/g, ""));
+    return Number.isFinite(amount) ? amount : 0;
+  };
+
+  const openWalletGiftModal = async (user: User) => {
+    setWalletGiftUser(user);
+    setWalletGiftAmount("");
+    setWalletGiftReason("Admin tặng tiền hỗ trợ");
+    setShowWalletGiftModal(true);
+    if (user.wallet) return;
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/wallet`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const wallet = data.data?.wallet || data.wallet;
+      if (!wallet) return;
+      setWalletGiftUser((current) =>
+        current && current._id === user._id ? { ...current, wallet } : current
+      );
+      setUsers((prev) =>
+        prev.map((item) => (item._id === user._id ? { ...item, wallet } : item))
+      );
+    } catch {
+      // Keep the popup usable with 0 ₫ when the wallet snapshot is unavailable.
+    }
+  };
+
+  const handleGiftWalletSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!walletGiftUser) return;
+    const amount = parseGiftAmount(walletGiftAmount);
+    const reason = walletGiftReason.trim();
+    if (amount < 1000) {
+      return showToast(false, "Số tiền tặng tối thiểu là 1.000 ₫");
+    }
+    if (amount > 50000000) {
+      return showToast(false, "Số tiền tặng tối đa là 50.000.000 ₫ mỗi lần");
+    }
+    if (reason.length < 3) {
+      return showToast(false, "Vui lòng nhập lý do tặng tiền");
+    }
+
+    setWalletGifting(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${walletGiftUser._id}/wallet/gift`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || "Không thể tặng tiền vào ví");
+      }
+      const nextWallet = data.data?.wallet || data.wallet;
+      setUsers((prev) =>
+        prev.map((item) =>
+          item._id === walletGiftUser._id
+            ? { ...item, wallet: nextWallet || {
+                ...item.wallet,
+                mainBalance: Number(item.wallet?.mainBalance || 0) + amount,
+              } }
+            : item
+        )
+      );
+      showToast(true, `Đã tặng ${formatCurrency(amount, true)} cho ${walletGiftUser.name || walletGiftUser.phone}`);
+      setShowWalletGiftModal(false);
+      setWalletGiftUser(null);
+      setWalletGiftAmount("");
+    } catch (err: any) {
+      showToast(false, err.message || "Lỗi tặng tiền");
+    } finally {
+      setWalletGifting(false);
     }
   };
 
@@ -1741,24 +1927,37 @@ function AdminUsersContent() {
               Quản lý phân quyền, kiểm tra trạng thái hoạt động và bảo mật tài khoản thành viên hệ thống.
             </p>
           </div>
-          <button
-            onClick={() => {
-              setFormData({
-                name: "",
-                phone: "",
-                email: "",
-                password: "",
-                role: "chu-hang",
-                isActive: true,
-                language: "vi",
-                kycStatus: "draft"
-              });
-              setShowAddModal(true);
-            }}
-            className="btn-primary py-3 px-5 text-xs font-bold flex items-center gap-2 rounded-2xl shadow-lg shadow-primary-200 transition-all hover:scale-[1.01]"
-          >
-            <UserPlus className="w-4 h-4" /> Thêm Người Dùng
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {selectedUserIds.length > 0 && (
+              <button
+                type="button"
+                onClick={handleBulkDeleteUsers}
+                disabled={bulkDeleting}
+                className="py-3 px-5 text-xs font-bold flex items-center gap-2 rounded-2xl bg-red-600 text-white shadow-lg shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-60"
+              >
+                <Trash2 className="w-4 h-4" />
+                {bulkDeleting ? "Đang xóa..." : `Xóa hàng loạt (${selectedUserIds.length})`}
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setFormData({
+                  name: "",
+                  phone: "",
+                  email: "",
+                  password: "",
+                  role: "chu-hang",
+                  isActive: true,
+                  language: "vi",
+                  kycStatus: "draft"
+                });
+                setShowAddModal(true);
+              }}
+              className="btn-primary py-3 px-5 text-xs font-bold flex items-center gap-2 rounded-2xl shadow-lg shadow-primary-200 transition-all hover:scale-[1.01]"
+            >
+              <UserPlus className="w-4 h-4" /> Thêm Người Dùng
+            </button>
+          </div>
         </div>
 
         {/* 5 Top-Level KPI Summary Cards */}
@@ -1985,12 +2184,42 @@ function AdminUsersContent() {
                   </span>
                 </div>
 
+                {selectedUserIds.length > 0 && (
+                  <div className="px-4 md:px-6 py-3 bg-red-50 border-b border-red-100 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs font-semibold text-red-700">
+                      Đã chọn {selectedUserIds.length} tài khoản
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleBulkDeleteUsers}
+                      disabled={bulkDeleting}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 disabled:opacity-60"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      {bulkDeleting ? "Đang xóa..." : "Xóa hàng loạt"}
+                    </button>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto w-full max-w-full overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
-                  <table className="w-full min-w-[1060px] text-left border-collapse">
+                  <table className="w-full min-w-[1250px] text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+                        <th className="py-4 px-4 w-12 text-center">
+                          <input
+                            ref={selectAllRef}
+                            type="checkbox"
+                            checked={allPageSelected}
+                            onChange={toggleSelectAllOnPage}
+                            disabled={selectableUsers.length === 0}
+                            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer disabled:cursor-not-allowed"
+                            title="Chọn tất cả trên trang này"
+                            aria-label="Chọn tất cả trên trang này"
+                          />
+                        </th>
                         <th className="py-4 px-6 whitespace-nowrap min-w-[200px]">Họ và Tên</th>
                         <th className="py-4 px-6 whitespace-nowrap min-w-[160px]">Số điện thoại / Email</th>
+                        <th className="py-4 px-6 whitespace-nowrap min-w-[150px]">Ví tiền</th>
                         <th className="py-4 px-6 whitespace-nowrap min-w-[130px]">Vai trò</th>
                         <th className="py-4 px-6 whitespace-nowrap min-w-[210px]">Đơn & Tiền Giao Dịch</th>
                         <th className="py-4 px-6 whitespace-nowrap min-w-[140px]">Xác minh eKYC</th>
@@ -2003,7 +2232,27 @@ function AdminUsersContent() {
                       {users.map((user) => {
                         const avatarUrl = getUserAvatarUrl(user);
                         return (
-                        <tr key={user._id} className="hover:bg-slate-50/50 transition-colors">
+                        <tr
+                          key={user._id}
+                          className={`hover:bg-slate-50/50 transition-colors ${
+                            selectedUserIds.includes(user._id) ? "bg-primary-50/40" : ""
+                          }`}
+                        >
+                          <td className="py-4.5 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedUserIds.includes(user._id)}
+                              disabled={isProtectedUser(user)}
+                              onChange={() => toggleUserSelection(user._id)}
+                              className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                              title={
+                                isProtectedUser(user)
+                                  ? "Tài khoản này không thể xóa hàng loạt"
+                                  : "Chọn để xóa hàng loạt"
+                              }
+                              aria-label={`Chọn ${user.name || user.phone || "người dùng"}`}
+                            />
+                          </td>
                           {/* Name */}
                           <td className="py-4.5 px-6 whitespace-nowrap">
                             <div className="flex items-center gap-3">
@@ -2034,6 +2283,23 @@ function AdminUsersContent() {
                               <p className="font-semibold text-slate-700">{user.phone || "---"}</p>
                               <p className="text-xs text-slate-400">{user.email || "---"}</p>
                             </div>
+                          </td>
+
+                          <td className="py-4.5 px-6 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => openWalletGiftModal(user)}
+                              className="group text-left p-2 -m-2 rounded-xl hover:bg-emerald-50 transition-all cursor-pointer block"
+                              title="Nhấn để tặng tiền vào ví người dùng"
+                            >
+                              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                                <Wallet className="w-3.5 h-3.5" />
+                                {formatCurrency(user.wallet?.mainBalance ?? 0, true)}
+                              </span>
+                              <p className="mt-1 text-[10px] font-semibold text-emerald-600/80 group-hover:text-emerald-700">
+                                Tặng tiền
+                              </p>
+                            </button>
                           </td>
 
                           {/* Role Select & Badge */}
@@ -3847,6 +4113,107 @@ function AdminUsersContent() {
                   className="w-1/2 btn-primary py-3 rounded-xl text-xs font-bold transition-all"
                 >
                   Xác Nhận Đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showWalletGiftModal && walletGiftUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md p-8 relative shadow-2xl border border-slate-100 animate-scale-up">
+            <button
+              type="button"
+              onClick={() => {
+                setShowWalletGiftModal(false);
+                setWalletGiftUser(null);
+              }}
+              className="absolute right-4 top-4 p-2 text-slate-400 hover:text-slate-600 rounded-full transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2 mb-2">
+              <Wallet className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-xl font-bold text-slate-900">Tặng tiền vào ví</h3>
+            </div>
+            <p className="text-slate-400 text-xs mb-5">
+              Cộng tiền từ admin vào ví của{" "}
+              <span className="font-bold text-slate-700">
+                {walletGiftUser.name || walletGiftUser.phone || "người dùng"}
+              </span>
+              .
+            </p>
+            <div className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">
+                Số dư hiện tại
+              </p>
+              <p className="mt-1 text-lg font-bold text-emerald-800">
+                {formatCurrency(walletGiftUser.wallet?.mainBalance ?? 0, true)}
+              </p>
+            </div>
+            <form onSubmit={handleGiftWalletSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
+                  Số tiền tặng
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={walletGiftAmount}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/[^\d]/g, "");
+                    setWalletGiftAmount(
+                      digits ? Number(digits).toLocaleString("vi-VN") : ""
+                    );
+                  }}
+                  placeholder="Ví dụ: 100.000"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-primary-500 text-sm mt-1"
+                  required
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[50000, 100000, 200000, 500000, 1000000].map((amount) => (
+                    <button
+                      key={amount}
+                      type="button"
+                      onClick={() => setWalletGiftAmount(amount.toLocaleString("vi-VN"))}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                    >
+                      {formatCurrency(amount, true)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
+                  Lý do
+                </label>
+                <textarea
+                  value={walletGiftReason}
+                  onChange={(e) => setWalletGiftReason(e.target.value)}
+                  rows={3}
+                  placeholder="Nhập lý do tặng tiền"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-primary-500 text-sm mt-1 resize-none"
+                  required
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowWalletGiftModal(false);
+                    setWalletGiftUser(null);
+                  }}
+                  className="w-1/2 border border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={walletGifting}
+                  className="w-1/2 btn-primary py-3 rounded-xl text-xs font-bold transition-all disabled:opacity-60"
+                >
+                  {walletGifting ? "Đang tặng..." : "Xác nhận tặng"}
                 </button>
               </div>
             </form>
