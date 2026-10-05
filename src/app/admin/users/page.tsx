@@ -13,7 +13,7 @@ import {
   MessageSquare, Send, Eye, ZoomIn, FileText, CheckCircle2, XCircle, Clock, ExternalLink, RefreshCw, Layers,
   Truck, Plus, Car, MapPin, Box, Upload, Info, Camera,
   TrendingUp, BarChart3, DollarSign, Receipt, Coins, CreditCard, Users, PackageCheck, Package,
-  ArrowUpRight, ArrowDownRight, Sparkles, Navigation, ArrowRight, PackageOpen, Wallet
+  ArrowUpRight, ArrowDownRight, Sparkles, Navigation, ArrowRight, PackageOpen, Wallet, Save
 } from "lucide-react";
 // Interfaces
 interface VehicleItem {
@@ -225,11 +225,47 @@ interface KycDetails {
     gender?: string | null;
     nationality?: string | null;
     permanentAddress?: string | null;
+    currentAddress?: string | null;
     issueDate?: string | null;
     expiryDate?: string | null;
+    issuePlace?: string | null;
   } | null;
   documents: KycDocumentItem[];
 }
+
+const EMPTY_IDENTITY_FORM = {
+  fullName: "",
+  idNumber: "",
+  dateOfBirth: "",
+  gender: "",
+  nationality: "VN",
+  permanentAddress: "",
+  currentAddress: "",
+  issueDate: "",
+  expiryDate: "",
+  issuePlace: "",
+};
+
+const normalizeIdentityGender = (value?: string | null) => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (["male", "nam", "m"].includes(raw)) return "male";
+  if (["female", "nu", "nữ", "nư", "f"].includes(raw)) return "female";
+  if (raw === "other") return "other";
+  return raw;
+};
+
+const identityToForm = (identity?: KycDetails["identity"], fallbackName = "") => ({
+  fullName: identity?.fullName || fallbackName || "",
+  idNumber: identity?.idNumber || "",
+  dateOfBirth: identity?.dateOfBirth || "",
+  gender: normalizeIdentityGender(identity?.gender),
+  nationality: identity?.nationality || "VN",
+  permanentAddress: identity?.permanentAddress || "",
+  currentAddress: identity?.currentAddress || "",
+  issueDate: identity?.issueDate || "",
+  expiryDate: identity?.expiryDate || "",
+  issuePlace: identity?.issuePlace || "",
+});
 
 type ManagedUserRole = "tai-xe" | "chu-hang";
 
@@ -465,6 +501,8 @@ function AdminUsersContent() {
   // KYC Documents & Verification in Edit Modal
   const [loadingKyc, setLoadingKyc] = useState(false);
   const [kycDetails, setKycDetails] = useState<KycDetails | null>(null);
+  const [identityForm, setIdentityForm] = useState(EMPTY_IDENTITY_FORM);
+  const [savingIdentity, setSavingIdentity] = useState(false);
   const [previewZoomImage, setPreviewZoomImage] = useState<{ title: string; url: string } | null>(null);
 
   // Vehicles Management in Edit Modal
@@ -910,6 +948,7 @@ function AdminUsersContent() {
     }
     setShowEditModal(false);
     setKycDetails(null);
+    setIdentityForm(EMPTY_IDENTITY_FORM);
   };
 
   // Open Edit modal & load user's KYC verification data
@@ -1513,28 +1552,69 @@ function AdminUsersContent() {
       }
 
       const identity = submission?.identity || userDetail?.kycData || null;
+      const mappedIdentity = identity ? {
+        fullName: identity.fullName || user.name,
+        idNumber: identity.idNumber || null,
+        dateOfBirth: identity.dateOfBirth || null,
+        gender: identity.gender || null,
+        nationality: identity.nationality || "VN",
+        permanentAddress: identity.permanentAddress || null,
+        currentAddress: identity.currentAddress || null,
+        issueDate: identity.issueDate || null,
+        expiryDate: identity.expiryDate || null,
+        issuePlace: identity.issuePlace || null,
+      } : null;
 
+      setIdentityForm(identityToForm(mappedIdentity, user.name));
       setKycDetails({
         submissionId: submission?._id || null,
         status: submission?.status || user.kycStatus,
         role: submission?.role || user.role,
         submittedAt: submission?.submittedAt || submission?.createdAt || null,
-        identity: identity ? {
-          fullName: identity.fullName || user.name,
-          idNumber: identity.idNumber || null,
-          dateOfBirth: identity.dateOfBirth || null,
-          gender: identity.gender || null,
-          nationality: identity.nationality || "VN",
-          permanentAddress: identity.permanentAddress || null,
-          issueDate: identity.issueDate || null,
-          expiryDate: identity.expiryDate || null,
-        } : null,
+        identity: mappedIdentity,
         documents: docItems
       });
     } catch (err) {
       console.error("Error loading KYC details:", err);
     } finally {
       setLoadingKyc(false);
+    }
+  };
+
+  const updateIdentityField = (key: keyof typeof EMPTY_IDENTITY_FORM, value: string) => {
+    setIdentityForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const handleSaveKycIdentity = async () => {
+    if (!currentUser) return;
+
+    setSavingIdentity(true);
+    try {
+      const url = kycDetails?.submissionId
+        ? `${API_BASE}/admin/users/kyc-submissions/${kycDetails.submissionId}/identity`
+        : `${API_BASE}/admin/users/${currentUser._id}/kyc-identity`;
+      const res = await fetchWithAuth(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identity: identityForm }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || "Không thể lưu thông tin giấy tờ");
+      }
+
+      const savedIdentity = data?.data?.submission?.identity || data?.data?.identity || identityForm;
+      setIdentityForm(identityToForm(savedIdentity, identityForm.fullName));
+      setKycDetails((current) => current ? { ...current, identity: identityToForm(savedIdentity, identityForm.fullName) } : current);
+      if (savedIdentity?.fullName) {
+        setFormData((current) => ({ ...current, name: savedIdentity.fullName }));
+        setCurrentUser((current) => current ? { ...current, name: savedIdentity.fullName } : current);
+      }
+      showToast(true, "Đã lưu thông tin giấy tờ");
+    } catch (err: any) {
+      showToast(false, err.message || "Không thể lưu thông tin giấy tờ");
+    } finally {
+      setSavingIdentity(false);
     }
   };
 
@@ -3163,42 +3243,137 @@ function AdminUsersContent() {
                       {!loadingKyc && (
                         <>
                           {/* Identity & OCR Card (if available) */}
-                          {kycDetails?.identity && (kycDetails.identity.idNumber || kycDetails.identity.fullName) && (
-                            <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-xs">
-                              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                          <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-xs mb-3">
+                              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between gap-2">
                                 <span>Thông tin trích xuất giấy tờ</span>
-                                {kycDetails.identity.idNumber && (
+                                {identityForm.idNumber ? (
                                   <span className="font-mono text-primary-600 font-bold bg-primary-50 px-2 py-0.5 rounded">
-                                    {kycDetails.identity.idNumber}
+                                    {identityForm.idNumber}
                                   </span>
-                                )}
+                                ) : null}
                               </div>
-                              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                                <div>
-                                  <span className="text-slate-400">Họ và tên: </span>
-                                  <span className="font-semibold text-slate-800">{kycDetails.identity.fullName || "---"}</span>
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                                <div className="col-span-2">
+                                  <label className="text-slate-400 block mb-1" htmlFor="kyc-identity-fullName">Họ và tên</label>
+                                  <input
+                                    id="kyc-identity-fullName"
+                                    type="text"
+                                    value={identityForm.fullName}
+                                    onChange={(e) => updateIdentityField("fullName", e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary-500"
+                                  />
                                 </div>
                                 <div>
-                                  <span className="text-slate-400">Ngày sinh: </span>
-                                  <span className="font-semibold text-slate-800">{kycDetails.identity.dateOfBirth || "---"}</span>
+                                  <label className="text-slate-400 block mb-1" htmlFor="kyc-identity-idNumber">CCCD</label>
+                                  <input
+                                    id="kyc-identity-idNumber"
+                                    type="text"
+                                    value={identityForm.idNumber}
+                                    onChange={(e) => updateIdentityField("idNumber", e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 font-mono focus:outline-none focus:border-primary-500"
+                                  />
                                 </div>
                                 <div>
-                                  <span className="text-slate-400">Giới tính: </span>
-                                  <span className="font-semibold text-slate-800">{kycDetails.identity.gender || "---"}</span>
+                                  <label className="text-slate-400 block mb-1" htmlFor="kyc-identity-dateOfBirth">Ngày sinh</label>
+                                  <input
+                                    id="kyc-identity-dateOfBirth"
+                                    type="text"
+                                    value={identityForm.dateOfBirth}
+                                    onChange={(e) => updateIdentityField("dateOfBirth", e.target.value)}
+                                    placeholder="YYYY-MM-DD"
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary-500"
+                                  />
                                 </div>
                                 <div>
-                                  <span className="text-slate-400">Ngày cấp: </span>
-                                  <span className="font-semibold text-slate-800">{kycDetails.identity.issueDate || "---"}</span>
+                                  <label className="text-slate-400 block mb-1" htmlFor="kyc-identity-gender">Giới tính</label>
+                                  <select
+                                    id="kyc-identity-gender"
+                                    value={identityForm.gender}
+                                    onChange={(e) => updateIdentityField("gender", e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:border-primary-500"
+                                  >
+                                    <option value="">—</option>
+                                    <option value="male">Nam</option>
+                                    <option value="female">Nữ</option>
+                                    <option value="other">Khác</option>
+                                    {identityForm.gender && !["male", "female", "other", ""].includes(identityForm.gender) ? (
+                                      <option value={identityForm.gender}>{identityForm.gender}</option>
+                                    ) : null}
+                                  </select>
                                 </div>
-                                {kycDetails.identity.permanentAddress && (
-                                  <div className="col-span-2 mt-0.5">
-                                    <span className="text-slate-400">Nơi thường trú: </span>
-                                    <span className="font-semibold text-slate-800">{kycDetails.identity.permanentAddress}</span>
-                                  </div>
-                                )}
+                                <div>
+                                  <label className="text-slate-400 block mb-1" htmlFor="kyc-identity-nationality">Quốc tịch</label>
+                                  <input
+                                    id="kyc-identity-nationality"
+                                    type="text"
+                                    value={identityForm.nationality}
+                                    onChange={(e) => updateIdentityField("nationality", e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-slate-400 block mb-1" htmlFor="kyc-identity-issueDate">Ngày cấp</label>
+                                  <input
+                                    id="kyc-identity-issueDate"
+                                    type="text"
+                                    value={identityForm.issueDate}
+                                    onChange={(e) => updateIdentityField("issueDate", e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-slate-400 block mb-1" htmlFor="kyc-identity-expiryDate">Ngày hết hạn</label>
+                                  <input
+                                    id="kyc-identity-expiryDate"
+                                    type="text"
+                                    value={identityForm.expiryDate}
+                                    onChange={(e) => updateIdentityField("expiryDate", e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary-500"
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="text-slate-400 block mb-1" htmlFor="kyc-identity-permanentAddress">Nơi thường trú</label>
+                                  <input
+                                    id="kyc-identity-permanentAddress"
+                                    type="text"
+                                    value={identityForm.permanentAddress}
+                                    onChange={(e) => updateIdentityField("permanentAddress", e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary-500"
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="text-slate-400 block mb-1" htmlFor="kyc-identity-currentAddress">Địa chỉ hiện tại</label>
+                                  <input
+                                    id="kyc-identity-currentAddress"
+                                    type="text"
+                                    value={identityForm.currentAddress}
+                                    onChange={(e) => updateIdentityField("currentAddress", e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary-500"
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="text-slate-400 block mb-1" htmlFor="kyc-identity-issuePlace">Nơi cấp</label>
+                                  <input
+                                    id="kyc-identity-issuePlace"
+                                    type="text"
+                                    value={identityForm.issuePlace}
+                                    onChange={(e) => updateIdentityField("issuePlace", e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                              <div className="mt-3 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={handleSaveKycIdentity}
+                                  disabled={savingIdentity}
+                                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Save className="w-3.5 h-3.5" />
+                                  <span>{savingIdentity ? "Đang lưu..." : "Lưu thông tin giấy tờ"}</span>
+                                </button>
                               </div>
                             </div>
-                          )}
 
                           {/* Documents Grid */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
