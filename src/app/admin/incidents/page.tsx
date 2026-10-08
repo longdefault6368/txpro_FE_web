@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { getServerMediaUrl } from "@/utils/media";
+import { incidentRoleLabel, incidentResponderRole, incidentResponseLabel, incidentReviewActions, incidentEventLabel, incidentConfirmMessage } from "@/utils/incident-review";
 import { useToast } from "@/context/ToastContext";
+import { PendingCancellationCompensations } from "./compensation_queue";
 import {
   ShieldAlert,
   Search,
@@ -29,13 +32,13 @@ import {
   X,
   FileText,
   Camera,
-  Calendar,
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
   RotateCcw,
   Check,
-  AlertCircle
+  WalletCards,
+  type LucideIcon,
 } from "lucide-react";
 
 // Types
@@ -71,7 +74,8 @@ interface IncidentEventItem {
 interface ContactAttempt {
   attemptedAt?: string;
   note?: string;
-  success?: boolean;
+  channel?: string;
+  outcome?: string;
 }
 
 interface IncidentItem {
@@ -97,6 +101,14 @@ interface IncidentItem {
     reviewedAt?: string;
     faultSide?: string;
   } | null;
+  counterpartyResponse?: {
+    decision: "accepted" | "appealed";
+    appealReason?: string | null;
+    appealReasonLabel?: string | null;
+    description?: string | null;
+    respondedAt?: string | null;
+    responderRole?: "driver" | "shipper";
+  } | null;
   submittedAt?: string;
   pendingReviewAt?: string;
   confirmedAt?: string;
@@ -107,6 +119,7 @@ interface IncidentItem {
   updatedAt: string;
   availableActions: string[];
   evidence?: IncidentEvidenceItem[];
+  responseEvidence?: IncidentEvidenceItem[];
   events?: IncidentEventItem[];
 }
 
@@ -114,9 +127,13 @@ interface SettlementAction {
   escrowOwner: string;
   action: string;
   amount: number;
+  destinationWallet?: "promo";
+  releaseAfterDays?: number;
+  fundingSource?: "escrow" | "platform_fund";
 }
 
 interface SettlementPreview {
+  plan?: { payerMethod: string; compensationAmount: number; revokesLifetimeVoucher: boolean; fundingSource: string };
   advisoryOnly: boolean;
   executesOnReview: boolean;
   executableBy: string | null;
@@ -124,10 +141,34 @@ interface SettlementPreview {
   currency: string;
   actions: SettlementAction[];
   note: string;
+  compensationPolicy?: {
+    method: "money";
+    destinationWallet: "promo";
+    releaseAfterDays: number;
+    voucherIsCompensation: boolean;
+  };
 }
 
+interface CompensationClaimItem {
+  id: string;
+  recipientRole: "shipper" | "driver";
+  payerRole: "shipper" | "driver";
+  amount: number;
+  currency: string;
+  status: "held" | "paid" | "released";
+  automatic: boolean;
+  fundingSource?: "escrow" | "platform_fund";
+  holdReason?: "manual_review" | "platform_fund_insufficient" | null;
+  paidAt?: string | null;
+  promoAvailableAt?: string | null;
+  promoReleasedAt?: string | null;
+  compensationDestination?: string | null;
+}
+
+interface CompensationFundSummary { balance: number; totalAllocated: number; totalPaid: number; currency: string }
+
 // Meta dictionaries
-const INCIDENT_TYPE_META: Record<string, { label: string; desc: string; icon: any; color: string; badge: string }> = {
+const INCIDENT_TYPE_META: Record<string, { label: string; desc: string; icon: LucideIcon; color: string; badge: string }> = {
   cargo_mismatch: {
     label: "Sai Lệch Hàng Hóa / Tải Trọng",
     desc: "Khối lượng thực tế vượt tải, sai quy cách hoặc sai nhóm hàng đã đăng",
@@ -144,21 +185,21 @@ const INCIDENT_TYPE_META: Record<string, { label: string; desc: string; icon: an
   },
   unreachable_shipper: {
     label: "Không Liên Hệ Được Chủ Hàng",
-    desc: "Tài xế đã đến điểm hẹn và gọi điện tối thiểu 3 lần không phản hồi",
+    desc: "Báo cáo không thể liên hệ; cần đối chiếu lịch sử liên lạc và phản hồi của hai bên",
     icon: PhoneOff,
     color: "text-orange-700",
     badge: "bg-orange-50 text-orange-800 border-orange-200",
   },
   force_majeure: {
     label: "Sự Kiện Bất Khả Kháng",
-    desc: "Thiên tai bão lũ, thời tiết nguy hiểm, sạt lở hoặc lệnh phong tỏa nhà nước",
+    desc: "Tai nạn, hư hỏng đột xuất hoặc tình huống ngoài khả năng kiểm soát có minh chứng",
     icon: ShieldAlert,
     color: "text-indigo-700",
     badge: "bg-indigo-50 text-indigo-800 border-indigo-200",
   },
   refused_delivery: {
-    label: "Từ Chối Nhận Hàng",
-    desc: "Người nhận từ chối nhận hàng không có lý do chính đáng tại điểm giao",
+    label: "Sự cố giao nhận",
+    desc: "Phát sinh khi giao hoặc nhận hàng; đối chiếu thỏa thuận trước khi kết luận",
     icon: XCircle,
     color: "text-purple-700",
     badge: "bg-purple-50 text-purple-800 border-purple-200",
@@ -169,6 +210,13 @@ const INCIDENT_TYPE_META: Record<string, { label: string; desc: string; icon: an
     icon: AlertTriangle,
     color: "text-rose-700",
     badge: "bg-rose-50 text-rose-800 border-rose-200",
+  },
+  delivery_location_changed: {
+    label: "Thay đổi địa điểm giao hàng",
+    desc: "Tài xế báo địa điểm giao hàng phát sinh khác với địa điểm đã thỏa thuận",
+    icon: MapPin,
+    color: "text-amber-700",
+    badge: "bg-amber-50 text-amber-800 border-amber-200",
   },
   other: {
     label: "Sự Cố Khác",
@@ -181,7 +229,7 @@ const INCIDENT_TYPE_META: Record<string, { label: string; desc: string; icon: an
 
 const INCIDENT_STATUS_META: Record<string, { label: string; badge: string; dot: string }> = {
   open: {
-    label: "Chờ Tiếp Nhận",
+    label: "Chờ phản hồi / tiếp nhận",
     badge: "bg-amber-50 text-amber-800 border-amber-200",
     dot: "bg-amber-500",
   },
@@ -191,7 +239,7 @@ const INCIDENT_STATUS_META: Record<string, { label: string; badge: string; dot: 
     dot: "bg-blue-500",
   },
   confirmed: {
-    label: "Đã Xác Định Lỗi",
+    label: "Đã có kết luận",
     badge: "bg-purple-50 text-purple-800 border-purple-200",
     dot: "bg-purple-500",
   },
@@ -201,12 +249,12 @@ const INCIDENT_STATUS_META: Record<string, { label: string; badge: string; dot: 
     dot: "bg-slate-400",
   },
   resolved: {
-    label: "Đã Tất Toán & Đóng",
+    label: "Đã đóng hồ sơ",
     badge: "bg-emerald-50 text-emerald-800 border-emerald-200",
     dot: "bg-emerald-500",
   },
   cancelled: {
-    label: "Đã Hủy",
+    label: "Đã rút báo cáo",
     badge: "bg-gray-100 text-gray-600 border-gray-200",
     dot: "bg-gray-400",
   },
@@ -231,7 +279,7 @@ const FAULT_SIDE_META: Record<string, { label: string; badge: string; actionDesc
   system: {
     label: "Lỗi Sàn Vận Hành",
     badge: "bg-blue-100 text-blue-800 border-blue-200",
-    actionDesc: "Sàn chịu trách nhiệm chi trả đền bù theo chính sách",
+    actionDesc: "Xử lý theo kết luận vận hành; không tự suy diễn khoản bồi thường từ ký quỹ hai bên",
   },
 };
 
@@ -249,7 +297,7 @@ const SETTLEMENT_STATUS_META: Record<string, { label: string; badge: string }> =
     badge: "bg-blue-50 text-blue-700 border-blue-200",
   },
   none: {
-    label: "Không Ký Quỹ",
+    label: "Không giữ ký quỹ cho hồ sơ",
     badge: "bg-slate-50 text-slate-500 border-slate-200",
   },
   waived: {
@@ -275,6 +323,41 @@ const formatDateTime = (val?: string | null) => {
   });
 };
 
+const CONTACT_CHANNEL: Record<string, string> = { phone: "Điện thoại", chat: "Nhắn tin", in_person: "Trực tiếp", other: "Khác" };
+const CONTACT_OUTCOME: Record<string, string> = { contacted: "Đã liên hệ", no_answer: "Không nghe máy", unreachable: "Không liên lạc được", refused: "Từ chối", other: "Khác" };
+
+function IncidentEvidenceGallery({ title, evidence = [], onPreview }: {
+  title: string; evidence?: IncidentEvidenceItem[]; onPreview: (url: string) => void;
+}) {
+  return (
+    <section className="p-4 rounded-2xl border border-slate-200 bg-white space-y-3">
+      <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+        <Camera className="w-4 h-4 text-slate-500" /> {title} ({evidence.length})
+      </h4>
+      {evidence.length === 0 ? <p className="text-xs text-slate-500 py-3">Không có bằng chứng đính kèm. Ảnh không bắt buộc khi gửi kháng cáo.</p> : (
+        <div className="grid grid-cols-2 gap-3">
+          {evidence.map((item, index) => {
+            const url = getServerMediaUrl(item.url);
+            const isPhoto = item.type === "photo" || item.type.endsWith("_photo") || item.mimeType?.startsWith("image/");
+            if (!url) return null;
+            return isPhoto ? (
+              <div key={item.id || index} className="space-y-1">
+                <button type="button" onClick={() => onPreview(url)} aria-label={`Phóng to ${title.toLowerCase()} ${index + 1}`}
+                  className="group relative w-full rounded-xl border border-slate-200 overflow-hidden bg-slate-100 aspect-video focus-visible:ring-2 focus-visible:ring-blue-500">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`${title} ${index + 1}`} className="w-full h-full object-cover" />
+                  <span className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 flex items-center justify-center text-white"><Eye className="w-5 h-5" /></span>
+                </button>
+                <p className="text-[11px] text-slate-500">{item.type === "pickup_photo" ? "Ảnh nhận hàng" : item.type === "dropoff_photo" ? "Ảnh giao hàng" : "Ảnh đính kèm"} • {formatDateTime(item.capturedAt || item.createdAt)}</p>
+              </div>
+            ) : <a key={item.id || index} href={url} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-slate-200 p-3 text-blue-700 underline">Mở tệp bằng chứng {index + 1}</a>;
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function AdminIncidentsContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -292,21 +375,38 @@ function AdminIncidentsContent() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [search, setSearch] = useState(queryOrderId || "");
+  const [debouncedSearch, setDebouncedSearch] = useState(queryOrderId || "");
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterType, setFilterType] = useState<string>("");
   const [filterReporterRole, setFilterReporterRole] = useState<string>("");
   const [filterFaultSide, setFilterFaultSide] = useState<string>("");
+  const [filterResponse, setFilterResponse] = useState("");
+  const [statusSummary, setStatusSummary] = useState<Record<string, number>>({});
+  const [listError, setListError] = useState<string | null>(null);
 
   // Modal / Detail State
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<IncidentItem | null>(null);
   const [settlementPreview, setSettlementPreview] = useState<SettlementPreview | null>(null);
+  const [compensationClaims, setCompensationClaims] = useState<CompensationClaimItem[]>([]);
+  const [compensationFund, setCompensationFund] = useState<CompensationFundSummary | null>(null);
+  const [relatedIncidents, setRelatedIncidents] = useState<IncidentItem[]>([]);
+  const [fundAmount, setFundAmount] = useState("");
+  const [fundReference, setFundReference] = useState("");
+  const [fundReason, setFundReason] = useState("");
+  const [fundAttested, setFundAttested] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const listRequest = useRef(0);
+  const detailRequest = useRef(0);
+  const previewRequest = useRef(0);
+  const actionLock = useRef(false);
 
   // Adjudication form state
-  const [adjudicationFaultSide, setAdjudicationFaultSide] = useState<string>("shipper");
+  const [adjudicationFaultSide, setAdjudicationFaultSide] = useState<string>("");
   const [adjudicationReason, setAdjudicationReason] = useState<string>("");
   const [actionSubmitting, setActionSubmitting] = useState(false);
   const [fullPhotoUrl, setFullPhotoUrl] = useState<string | null>(null);
@@ -317,17 +417,9 @@ function AdminIncidentsContent() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // Handle URL query parameters on load
-  useEffect(() => {
-    if (queryId) {
-      loadIncidentDetail(queryId);
-    } else if (queryOrderId) {
-      setSearch(queryOrderId);
-    }
-  }, [queryId, queryOrderId]);
-
   // Fetch incidents list
   const fetchIncidents = useCallback(async (isSilent = false) => {
+    const requestId = ++listRequest.current;
     if (!isSilent) setLoading(true);
     else setRefreshing(true);
 
@@ -340,201 +432,252 @@ function AdminIncidentsContent() {
       if (filterType) params.append("type", filterType);
       if (filterReporterRole) params.append("reporterRole", filterReporterRole);
       if (filterFaultSide) params.append("faultSide", filterFaultSide);
+      if (filterResponse) params.append("response", filterResponse);
 
       const res = await fetchWithAuth(`${API_BASE}/admin/incidents?${params.toString()}`);
+      const json = await res.json();
+      if (requestId !== listRequest.current) return;
       if (res.ok) {
-        const json = await res.json();
         const data = json.data || {};
+        setListError(null);
         setIncidents(data.items || []);
         setTotal(data.pagination?.total || 0);
-        setTotalPages(data.pagination?.pages || 1);
+        const pages = data.pagination?.pages || 1;
+        setTotalPages(pages);
+        if (page > pages) setPage(pages);
+        setStatusSummary(data.summary || {});
       } else {
-        toast.error("Không thể tải danh sách sự cố tranh chấp");
+        throw new Error(json.message || "Không thể tải danh sách sự cố tranh chấp");
       }
-    } catch (err: any) {
-      toast.error(err?.message || "Lỗi kết nối máy chủ");
+    } catch (err) {
+      if (requestId !== listRequest.current) return;
+      const message = err instanceof Error ? err.message : "Lỗi kết nối máy chủ";
+      setListError(message);
+      toast.error(message);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === listRequest.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [page, limit, debouncedSearch, filterStatus, filterType, filterReporterRole, filterFaultSide]);
+  }, [page, limit, debouncedSearch, filterStatus, filterType, filterReporterRole, filterFaultSide, filterResponse, toast]);
 
   useEffect(() => {
-    fetchIncidents();
+    const requests = listRequest;
+    const timer = setTimeout(() => void fetchIncidents(), 0);
+    return () => { clearTimeout(timer); requests.current++; };
   }, [fetchIncidents]);
 
   // Load Single Incident Detail & Settlement Preview
-  const loadIncidentDetail = async (id: string) => {
+  const loadIncidentDetail = useCallback(async (id: string) => {
+    const requestId = ++detailRequest.current;
+    previewRequest.current++;
     setSelectedIncidentId(id);
+    setSelectedIncident(null);
+    setSettlementPreview(null);
+    setCompensationClaims([]);
+    setCompensationFund(null);
+    setRelatedIncidents([]);
+    setDetailError(null);
+    setPreviewError(null);
+    setPreviewLoading(false);
+    setAdjudicationFaultSide("");
+    setAdjudicationReason("");
     setLoadingDetail(true);
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/incidents/${id}`);
       if (res.ok) {
         const json = await res.json();
         const data = json.data || {};
+        if (requestId !== detailRequest.current) return;
         const inc: IncidentItem = data.incident;
+        if (!inc?.id) throw new Error("Hồ sơ trả về không hợp lệ");
         setSelectedIncident(inc);
         setSettlementPreview(data.settlementPreview || null);
+        setCompensationClaims(data.compensationClaims || []);
+        setCompensationFund(data.compensationFund || null);
+        setRelatedIncidents(data.relatedIncidents || []);
 
         // Pre-fill adjudication
-        const defaultFault = inc.faultSide || inc.suggestedFaultSide || (inc.type === "force_majeure" ? "none" : "shipper");
-        setAdjudicationFaultSide(defaultFault);
-        setAdjudicationReason(inc.latestReview?.reason || "");
+        // A suggestion is not a verdict. Require an explicit admin selection.
+        setAdjudicationFaultSide(inc.faultSide || "");
       } else {
-        toast.error("Không tìm thấy thông tin sự cố này");
+        const json = await res.json();
+        throw new Error(json.message || "Không tìm thấy thông tin sự cố này");
       }
-    } catch (err: any) {
-      toast.error(err?.message || "Lỗi tải chi tiết sự cố");
+    } catch (err) {
+      if (requestId !== detailRequest.current) return;
+      setDetailError(err instanceof Error ? err.message : "Lỗi tải chi tiết sự cố");
     } finally {
-      setLoadingDetail(false);
+      if (requestId === detailRequest.current) setLoadingDetail(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (queryId) void loadIncidentDetail(queryId);
+      else if (queryOrderId) { setSearch(queryOrderId); setPage(1); }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [queryId, queryOrderId, loadIncidentDetail]);
+
+  useEffect(() => () => { listRequest.current++; detailRequest.current++; previewRequest.current++; }, []);
 
   // Update dynamic settlement preview when faultSide changes in modal
   const fetchUpdatedPreview = async (incidentId: string, faultSide: string) => {
+    const requestId = ++previewRequest.current;
+    const detailId = detailRequest.current;
+    setPreviewLoading(true);
+    setPreviewError(null);
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/incidents/${incidentId}/settlement-preview?faultSide=${faultSide}`);
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data?.settlementPreview) {
-          setSettlementPreview(json.data.settlementPreview);
-        }
+      const json = await res.json();
+      if (!res.ok || !json.data?.settlementPreview) throw new Error(json.message || "Không thể tải dự toán quyết toán");
+      if (requestId === previewRequest.current && detailId === detailRequest.current) {
+        setSettlementPreview(json.data.settlementPreview);
+        setCompensationFund(json.data.compensationFund || null);
       }
     } catch {
-      // Best-effort
+      if (requestId === previewRequest.current && detailId === detailRequest.current) setPreviewError("Chưa lấy được dự toán cho lựa chọn này. Vui lòng chọn lại hoặc tải lại hồ sơ.");
+    } finally {
+      if (requestId === previewRequest.current && detailId === detailRequest.current) setPreviewLoading(false);
     }
   };
 
   const handleFaultSideSelect = (side: string) => {
+    if (actionLock.current || !selectedIncident || !incidentReviewActions(selectedIncident, compensationClaims).includes("confirmed")) return;
     setAdjudicationFaultSide(side);
     if (selectedIncidentId) {
       fetchUpdatedPreview(selectedIncidentId, side);
     }
   };
 
-  // Actions
-  const handleStartReview = async () => {
-    if (!selectedIncident) return;
+  const runDecision = async (
+    action: string, path: string, payload: Record<string, string>, message: string, success: string,
+  ) => {
+    if (!selectedIncident || actionLock.current) return;
+    const claimAction = action === "approve" || action === "dismiss-claim";
+    if (!claimAction && !incidentReviewActions(selectedIncident, compensationClaims).includes(action)) {
+      toast.error("Hồ sơ không còn cho phép thao tác này. Vui lòng tải lại để xem trạng thái mới.");
+      return;
+    }
+    if (!window.confirm(message)) return;
+    const id = selectedIncident.id;
+    const detailId = detailRequest.current;
+    actionLock.current = true;
     setActionSubmitting(true);
     try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/incidents/${selectedIncident.id}/pending-review`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: adjudicationReason || "Bộ phận vận hành TXEPRO tiếp nhận và bắt đầu thẩm tra vụ việc" }),
+      const res = await fetchWithAuth(path, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
-      if (res.ok) {
-        toast.success("Đã chuyển trạng thái sự cố sang Đang thẩm tra!");
-        await loadIncidentDetail(selectedIncident.id);
-        fetchIncidents(true);
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Không thể thực hiện thao tác");
+      const json = await res.json();
+      if (!res.ok) {
+        if (res.status === 409 && detailId === detailRequest.current) await loadIncidentDetail(id);
+        throw new Error(json.message || "Không thể thực hiện thao tác");
       }
-    } catch (err: any) {
-      toast.error(err.message || "Lỗi mạng");
+      toast.success(success);
+      if (detailId === detailRequest.current) await loadIncidentDetail(id);
+      await fetchIncidents(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể kết nối máy chủ");
     } finally {
+      actionLock.current = false;
       setActionSubmitting(false);
     }
+  };
+
+  const reasonForDecision = () => {
+    const reason = adjudicationReason.trim();
+    if (reason.length < 3 || reason.length > 1000) {
+      toast.error("Vui lòng nhập căn cứ xử lý từ 3 đến 1.000 ký tự.");
+      return null;
+    }
+    return reason;
+  };
+
+  const handleCompensationDecision = async (claim: CompensationClaimItem, action: "approve" | "dismiss") => {
+    if (!selectedIncident || claim.status !== "held") return;
+    const reason = reasonForDecision();
+    if (!reason) return;
+    const message = action === "approve"
+      ? `Duyệt ${formatVND(claim.amount)} tiền bồi thường cho ${incidentRoleLabel(claim.recipientRole)} vào Ví khuyến mãi? Khoản tiền được giải ngân sau 30 ngày.`
+      : claim.fundingSource === "platform_fund"
+        ? `Bác khoản chi ${formatVND(claim.amount)} từ quỹ TXE PRO? Không cộng ví người nhận và không hoàn ký quỹ giả cho bên dùng voucher; kết luận vi phạm đã ghi nhận vẫn giữ nguyên.`
+        : `Bác khoản bồi thường ${formatVND(claim.amount)} và hoàn lại ký quỹ cho ${incidentRoleLabel(claim.payerRole)}?`;
+    await runDecision(action === "approve" ? "approve" : "dismiss-claim",
+      `${API_BASE}/admin/compensations/${claim.id}/${action}`, { reason }, message,
+      action === "approve" ? "Đã duyệt bồi thường bằng tiền. Xem kết quả và lịch giải ngân bên dưới." : "Đã xử lý khoản bồi thường theo nguồn tiền của hồ sơ.");
+  };
+
+  const handleStartReview = async () => {
+    if (!selectedIncident) return;
+    const reason = adjudicationReason.trim() || "TXE PRO tiếp nhận hồ sơ và đối chiếu báo cáo, phản hồi và bằng chứng của hai bên.";
+    await runDecision("pending_review", `${API_BASE}/admin/incidents/${selectedIncident.id}/pending-review`,
+      { reason }, "Tiếp nhận hồ sơ để thẩm tra? Thao tác này chưa kết luận vi phạm và chưa chuyển tiền.", "Đã tiếp nhận hồ sơ thẩm tra.");
   };
 
   const handleConfirmFault = async () => {
     if (!selectedIncident) return;
-    if (!adjudicationReason || adjudicationReason.trim().length < 3) {
-      toast.error("Vui lòng nhập lý do phán quyết (tối thiểu 3 ký tự)");
+    const reason = reasonForDecision();
+    if (!reason) return;
+    if (!["shipper", "driver", "none"].includes(adjudicationFaultSide)) {
+      toast.error("Vui lòng chọn kết luận trách nhiệm sau khi đối chiếu hai bên.");
       return;
     }
+    if (previewLoading || previewError || !settlementPreview || settlementPreview.faultSide !== adjudicationFaultSide) {
+      toast.error("Vui lòng chờ dự toán đúng với lựa chọn trách nhiệm trước khi xác nhận.");
+      return;
+    }
+    await runDecision("confirmed", `${API_BASE}/admin/incidents/${selectedIncident.id}/confirm`,
+      { reason, faultSide: adjudicationFaultSide },
+      incidentConfirmMessage(adjudicationFaultSide, settlementPreview.executesOnReview,
+        settlementPreview.compensationPolicy?.releaseAfterDays || 30, settlementPreview.plan),
+      "Đã ghi nhận kết luận. Xem kết quả xử lý ký quỹ và bồi thường trong hồ sơ.");
+  };
 
-    const confirmMsg = adjudicationFaultSide === "shipper"
-      ? "Xác nhận LỖI THUỘC VỀ CHỦ HÀNG. Hệ thống sẽ khấu trừ 3% tiền cọc ký quỹ của chủ hàng chuyển bồi thường cho tài xế theo Điều 3 HĐVT. Tiếp tục?"
-      : adjudicationFaultSide === "driver"
-      ? "Xác nhận LỖI THUỘC VỀ TÀI XẾ. Hệ thống sẽ khấu trừ 3% tiền cọc ký quỹ của tài xế bồi hoàn cho chủ hàng theo Điều 3 HĐVT. Tiếp tục?"
-      : "Xác nhận SỰ KIỆN BẤT KHẢ KHÁNG / MIỄN TRÁCH. Tiền cọc ký quỹ 3% của cả hai bên sẽ được hoàn trả 100%. Tiếp tục?";
-
-    if (!window.confirm(confirmMsg)) return;
-
+  const handleAllocateFund = async () => {
+    if (actionLock.current || !selectedIncident) return;
+    const amount = Number(fundAmount);
+    const reference = fundReference.trim();
+    const reason = fundReason.trim();
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000000 ||
+        !/^[a-zA-Z0-9_-]{8,120}$/.test(reference) || reason.length < 10 || reason.length > 1000 || !fundAttested) {
+      toast.error("Nhập số tiền nguyên từ 1 đến 1 tỷ, mã đối soát 8–120 ký tự (chữ/số/_/-), căn cứ 10–1.000 ký tự và xác nhận nguồn đã được cấp.");
+      return;
+    }
+    if (!window.confirm(`Ghi nhận ${formatVND(amount)} ngân sách TXE PRO đã được cấp nguồn, mã ${reference}? Đây không phải lệnh chuyển tiền ngân hàng.`)) return;
+    const id = selectedIncident.id;
+    const detailId = detailRequest.current;
+    actionLock.current = true;
     setActionSubmitting(true);
     try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/incidents/${selectedIncident.id}/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          faultSide: adjudicationFaultSide,
-          reason: adjudicationReason.trim(),
-        }),
+      const res = await fetchWithAuth(`${API_BASE}/admin/compensations/fund/allocate`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, reference, reason }),
       });
-      if (res.ok) {
-        toast.success("Đã phán quyết lỗi và thực thi chế tài đối soát tiền cọc thành công!");
-        await loadIncidentDetail(selectedIncident.id);
-        fetchIncidents(true);
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Không thể xác nhận sự cố");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Lỗi kết nối");
-    } finally {
-      setActionSubmitting(false);
-    }
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Không thể cấp nguồn");
+      toast.success(json.data?.changed ? "Đã ghi nhận nguồn quỹ. Có thể duyệt khoản chi chờ cấp nguồn." : "Mã đối soát đã ghi nhận; không cộng nguồn lần nữa.");
+      setFundAmount(""); setFundReference(""); setFundReason(""); setFundAttested(false);
+      if (detailId === detailRequest.current) await loadIncidentDetail(id);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Lỗi kết nối máy chủ"); }
+    finally { actionLock.current = false; setActionSubmitting(false); }
   };
 
   const handleDismissIncident = async () => {
     if (!selectedIncident) return;
-    if (!adjudicationReason || adjudicationReason.trim().length < 3) {
-      toast.error("Vui lòng nhập lý do bác bỏ khiếu nại (tối thiểu 3 ký tự)");
-      return;
-    }
-
-    if (!window.confirm("Bác bỏ khiếu nại này do không đủ căn cứ chứng minh vi phạm hợp đồng?")) return;
-
-    setActionSubmitting(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/incidents/${selectedIncident.id}/dismiss`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: adjudicationReason.trim() }),
-      });
-      if (res.ok) {
-        toast.success("Đã bác bỏ khiếu nại thành công!");
-        await loadIncidentDetail(selectedIncident.id);
-        fetchIncidents(true);
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Không thể bác bỏ khiếu nại");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Lỗi kết nối");
-    } finally {
-      setActionSubmitting(false);
-    }
+    const reason = reasonForDecision();
+    if (!reason) return;
+    await runDecision("dismissed", `${API_BASE}/admin/incidents/${selectedIncident.id}/dismiss`,
+      { reason }, "Bác bỏ báo cáo sau khi đối chiếu bằng chứng? Hồ sơ không ghi nhận vi phạm và các khoản ký quỹ đang giữ sẽ được xử lý theo chính sách.", "Đã bác bỏ báo cáo.");
   };
 
   const handleResolveIncident = async () => {
     if (!selectedIncident) return;
-    if (!adjudicationReason || adjudicationReason.trim().length < 3) {
-      toast.error("Vui lòng nhập kết luận đóng vụ việc (tối thiểu 3 ký tự)");
-      return;
-    }
-
-    setActionSubmitting(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/incidents/${selectedIncident.id}/resolve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: adjudicationReason.trim() }),
-      });
-      if (res.ok) {
-        toast.success("Đã hoàn tất tất toán và đóng hồ sơ sự cố thành công!");
-        await loadIncidentDetail(selectedIncident.id);
-        fetchIncidents(true);
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Không thể đóng hồ sơ");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Lỗi kết nối");
-    } finally {
-      setActionSubmitting(false);
-    }
+    const reason = reasonForDecision();
+    if (!reason) return;
+    await runDecision("resolved", `${API_BASE}/admin/incidents/${selectedIncident.id}/resolve`,
+      { reason }, "Đóng hồ sơ đã có kết luận? Khoản bồi thường đã vào Ví khuyến mãi vẫn giữ lịch giải ngân 30 ngày; đóng hồ sơ không giải ngân sớm.", "Đã đóng hồ sơ sự cố.");
   };
 
   // Reset Filters
@@ -545,6 +688,7 @@ function AdminIncidentsContent() {
     setFilterType("");
     setFilterReporterRole("");
     setFilterFaultSide("");
+    setFilterResponse("");
     setPage(1);
   };
 
@@ -552,12 +696,28 @@ function AdminIncidentsContent() {
   const summaryCounts = useMemo(() => {
     return {
       total,
-      openOrPending: incidents.filter(i => i.status === "open" || i.status === "pending_review").length,
-      confirmed: incidents.filter(i => i.status === "confirmed").length,
-      resolved: incidents.filter(i => i.status === "resolved").length,
-      dismissed: incidents.filter(i => i.status === "dismissed").length,
+      openOrPending: (statusSummary.open || 0) + (statusSummary.pending_review || 0),
+      confirmed: statusSummary.confirmed || 0,
+      resolved: statusSummary.resolved || 0,
+      dismissed: statusSummary.dismissed || 0,
+      cancelled: statusSummary.cancelled || 0,
     };
-  }, [total, incidents]);
+  }, [total, statusSummary]);
+
+  const reviewActions = selectedIncident ? incidentReviewActions(selectedIncident, compensationClaims) : [];
+  const canAdjudicate = reviewActions.includes("confirmed");
+  const formReadOnly = actionSubmitting || (!reviewActions.length && !compensationClaims.some(c => c.status === "held"));
+
+  const closeDetail = () => {
+    if (actionLock.current) return;
+    detailRequest.current++;
+    previewRequest.current++;
+    setSelectedIncidentId(null);
+    setSelectedIncident(null);
+    setSettlementPreview(null);
+    setCompensationClaims([]);
+    setFullPhotoUrl(null);
+  };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
@@ -576,7 +736,7 @@ function AdminIncidentsContent() {
                 </span>
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                Thẩm định vi phạm hợp đồng vận chuyển, phán quyết trách nhiệm (Tài xế / Chủ hàng) và đối soát cọc ký quỹ 3% theo Điều 3 & Điều 5 HĐVT.
+                Đối chiếu báo cáo, kháng cáo và bằng chứng hai bên; kết luận trách nhiệm và xử lý ký quỹ, bồi thường theo hồ sơ thực tế.
               </p>
             </div>
           </div>
@@ -601,63 +761,67 @@ function AdminIncidentsContent() {
             <Scale className="w-4 h-4" />
           </div>
           <div>
-            <span className="font-bold text-blue-950 text-sm block">Quy chuẩn Phán Quyết Ký Quỹ Hợp Đồng TXEPRO (3% Escrow)</span>
+            <span className="font-bold text-blue-950 text-sm block">Quy chuẩn phán quyết và bồi thường tiền TXE PRO</span>
             <span className="text-slate-600 leading-relaxed block mt-0.5">
-              - <strong>Lỗi Chủ hàng</strong> (hàng sai tải, sai quy cách, không nghe máy, cấm tải): Khấu trừ 3% cọc chủ hàng đền bù tài xế.<br/>
-              - <strong>Lỗi Tài xế</strong> (tự ý bỏ đơn, không đến điểm hẹn): Khấu trừ 3% cọc tài xế bồi thường chủ hàng.<br/>
-              - <strong>Bất khả kháng</strong> (thiên tai, sạt lở, bão lũ): Miễn trừ trách nhiệm, hoàn 100% tiền cọc cả 2 bên.
+              - <strong>Hủy không hợp lệ quá 5 phút:</strong> hệ thống xử lý theo chính sách của đơn. <strong>Báo cáo sự cố:</strong> đối chiếu phản hồi, ảnh và căn cứ trước khi kết luận.<br/>
+              - <strong>Một bên báo cáo, bên còn lại phản hồi:</strong> chấp nhận là xác nhận trách nhiệm; kháng cáo được chuyển quản trị viên xem xét. Không tự coi người bị báo cáo là bên vi phạm.<br/>
+              - Bên không có lỗi được <strong>hoàn quyền lợi hợp lệ và nhận thêm tiền bồi thường</strong>. Bên có lỗi bị trừ ký quỹ hoặc thu hồi voucher đã áp dụng; nhánh voucher do <strong>quỹ TXE PRO</strong> cấp tiền, không bồi thường bằng voucher.<br/>
+              - Tiền bồi thường đủ nguồn và được duyệt vào <strong>Ví khuyến mãi</strong>, có thể giải ngân sang Ví chính sau <strong>30 ngày kể từ lúc ghi có</strong>. Thiếu nguồn thì ghi nhận chờ cấp nguồn, chưa cộng số dư.<br/>
+              - <strong>Bất khả kháng hoặc không có lỗi:</strong> cần minh chứng và kết luận phù hợp; chỉ xử lý những khoản ký quỹ thực tế đang giữ. Rút báo cáo không đồng nghĩa hủy đơn hàng.
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
           <span className="px-2.5 py-1 bg-white/80 border border-blue-200 rounded-lg text-blue-800 font-semibold text-[11px] shadow-2xs">
-            Điều 3 & Điều 5 HĐVT
+            Bồi thường bằng tiền
           </span>
         </div>
       </div>
 
+      <PendingCancellationCompensations key={`${selectedIncident?.updatedAt || ''}:${refreshing}`} />
+
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">Tổng Ghi Nhận</span>
             <FileText className="w-4 h-4 text-slate-400" />
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2">{total}</p>
-          <span className="text-[11px] text-slate-400 mt-1 block">Toàn hệ thống</span>
+          <span className="text-[11px] text-slate-400 mt-1 block">Theo bộ lọc hiện tại</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-2xs bg-amber-50/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-amber-700">Chờ Xử Lý / Thẩm Tra</span>
+            <span className="text-xs font-semibold text-amber-700">Chờ xử lý</span>
             <Clock className="w-4 h-4 text-amber-500" />
           </div>
           <p className="text-2xl font-bold text-amber-700 mt-2">
-            {incidents.filter(i => i.status === "open" || i.status === "pending_review").length}
+            {summaryCounts.openOrPending}
           </p>
-          <span className="text-[11px] text-amber-600 mt-1 block">Cần điều phối viên duyệt</span>
+          <span className="text-[11px] text-amber-600 mt-1 block">Chờ phản hồi hoặc quản trị xem xét</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-purple-200 shadow-2xs bg-purple-50/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-purple-700">Đã Xác Định Lỗi</span>
+            <span className="text-xs font-semibold text-purple-700">Đã có kết luận</span>
             <Gavel className="w-4 h-4 text-purple-600" />
           </div>
           <p className="text-2xl font-bold text-purple-700 mt-2">
-            {incidents.filter(i => i.status === "confirmed").length}
+            {summaryCounts.confirmed}
           </p>
-          <span className="text-[11px] text-purple-600 mt-1 block">Đã phán quyết chế tài</span>
+          <span className="text-[11px] text-purple-600 mt-1 block">Đã xác định trách nhiệm</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-2xs bg-emerald-50/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-emerald-700">Đã Tất Toán & Đóng</span>
+            <span className="text-xs font-semibold text-emerald-700">Đã đóng hồ sơ</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <p className="text-2xl font-bold text-emerald-700 mt-2">
-            {incidents.filter(i => i.status === "resolved").length}
+            {summaryCounts.resolved}
           </p>
-          <span className="text-[11px] text-emerald-600 mt-1 block">Đã giải phóng tiền cọc</span>
+          <span className="text-[11px] text-emerald-600 mt-1 block">Không giải ngân trước hạn 30 ngày</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
@@ -666,9 +830,14 @@ function AdminIncidentsContent() {
             <XCircle className="w-4 h-4 text-slate-400" />
           </div>
           <p className="text-2xl font-bold text-slate-700 mt-2">
-            {incidents.filter(i => i.status === "dismissed").length}
+            {summaryCounts.dismissed}
           </p>
           <span className="text-[11px] text-slate-400 mt-1 block">Không vi phạm hợp đồng</span>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+          <div className="flex items-center justify-between"><span className="text-xs font-medium text-slate-500">Đã rút báo cáo</span><RotateCcw className="w-4 h-4 text-slate-400" /></div>
+          <p className="text-2xl font-bold text-slate-700 mt-2">{summaryCounts.cancelled}</p>
+          <span className="text-[11px] text-slate-400 mt-1 block">Lưu hồ sơ để đối soát</span>
         </div>
       </div>
 
@@ -709,12 +878,12 @@ function AdminIncidentsContent() {
               className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium text-slate-700 cursor-pointer"
             >
               <option value="">Tất cả trạng thái</option>
-              <option value="open">Chờ tiếp nhận (Open)</option>
+              <option value="open">Chờ phản hồi / tiếp nhận</option>
               <option value="pending_review">Đang thẩm tra</option>
-              <option value="confirmed">Đã xác định lỗi</option>
-              <option value="resolved">Đã tất toán & đóng</option>
+              <option value="confirmed">Đã có kết luận</option>
+              <option value="resolved">Đã đóng hồ sơ</option>
               <option value="dismissed">Đã bác bỏ</option>
-              <option value="cancelled">Đã hủy</option>
+              <option value="cancelled">Đã rút báo cáo</option>
             </select>
           </div>
 
@@ -732,9 +901,10 @@ function AdminIncidentsContent() {
               <option value="cargo_mismatch">Sai lệch hàng hóa / Quá tải</option>
               <option value="inaccessible_pickup">Địa điểm không tiếp cận được</option>
               <option value="unreachable_shipper">Không liên hệ được chủ hàng</option>
-              <option value="force_majeure">Bất khả kháng (Thời tiết/sạt lở)</option>
-              <option value="refused_delivery">Từ chối nhận hàng</option>
+              <option value="force_majeure">Sự cố bất khả kháng</option>
+              <option value="refused_delivery">Sự cố giao nhận</option>
               <option value="unsafe_pickup">Điểm bốc xếp không an toàn</option>
+              <option value="delivery_location_changed">Thay đổi địa điểm giao hàng</option>
               <option value="other">Sự cố khác</option>
             </select>
           </div>
@@ -758,7 +928,7 @@ function AdminIncidentsContent() {
 
           {/* Reset Filter Button */}
           <div className="md:col-span-1 flex items-center">
-            {(search || filterStatus || filterType || filterReporterRole || filterFaultSide) ? (
+            {(search || filterStatus || filterType || filterReporterRole || filterFaultSide || filterResponse) ? (
               <button
                 onClick={handleResetFilters}
                 title="Đặt lại bộ lọc"
@@ -773,9 +943,24 @@ function AdminIncidentsContent() {
             )}
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
+          <label className="flex items-center gap-2 text-xs text-slate-600">Phản hồi
+            <select value={filterResponse} onChange={e => { setFilterResponse(e.target.value); setPage(1); }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <option value="">Tất cả phản hồi</option><option value="awaiting">Chưa phản hồi</option>
+              <option value="appealed">Đã kháng cáo</option><option value="accepted">Đã chấp nhận báo cáo</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-slate-600">Kết luận
+            <select value={filterFaultSide} onChange={e => { setFilterFaultSide(e.target.value); setPage(1); }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <option value="">Tất cả kết luận</option><option value="shipper">Trách nhiệm Chủ hàng</option>
+              <option value="driver">Trách nhiệm Tài xế</option><option value="none">Không bên nào có lỗi</option><option value="system">Sự cố hệ thống</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       {/* Incident List Table */}
+      {listError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{listError} Dữ liệu hiện tại có thể chưa mới. <button onClick={() => void fetchIncidents()} className="font-bold underline">Thử lại</button></div>}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {loading ? (
           <div className="py-24 text-center space-y-3">
@@ -808,7 +993,7 @@ function AdminIncidentsContent() {
                   <th className="py-3.5 px-4">Vận Đơn & Loại Sự Cố</th>
                   <th className="py-3.5 px-4">Bên Báo Cáo & Đối Tượng</th>
                   <th className="py-3.5 px-4">Mô Tả & Bằng Chứng</th>
-                  <th className="py-3.5 px-4">Trạng Thái & Phán Quyết Lỗi</th>
+                  <th className="py-3.5 px-4">Phản hồi & Kết luận</th>
                   <th className="py-3.5 px-4">Ký Quỹ (3% Escrow)</th>
                   <th className="py-3.5 px-4 text-right">Thao Tác</th>
                 </tr>
@@ -864,7 +1049,7 @@ function AdminIncidentsContent() {
                           {/* Reporter */}
                           <div className="flex items-start gap-1.5">
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
-                              Báo cáo: {incident.reporterRole === "driver" ? "Tài xế" : incident.reporterRole === "shipper" ? "Chủ hàng" : incident.reporterRole}
+                              Báo cáo: {incidentRoleLabel(incident.reporterRole)}
                             </span>
                             <div className="min-w-0">
                               <p className="font-semibold text-slate-800 truncate">
@@ -880,7 +1065,7 @@ function AdminIncidentsContent() {
                           {incident.reportedUser && (
                             <div className="flex items-start gap-1.5 text-slate-500">
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
-                                Bị tố: {incident.reportedUser.role === "shipper" ? "Chủ hàng" : "Tài xế"}
+                                Phản hồi: {incidentRoleLabel(incident.reportedUser.role || incidentResponderRole(incident))}
                               </span>
                               <div className="min-w-0">
                                 <p className="text-slate-700 truncate">{incident.reportedUser.name || "---"}</p>
@@ -904,10 +1089,10 @@ function AdminIncidentsContent() {
                             {incident.contactAttempts?.length > 0 && (
                               <span className="inline-flex items-center gap-1 text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
                                 <PhoneCall className="w-2.5 h-2.5" />
-                                {incident.contactAttempts.length} lần gọi
+                                {incident.contactAttempts.length} lần liên hệ
                               </span>
                             )}
-                            {incident.reporterLocation?.lat && (
+                            {incident.reporterLocation?.lat != null && (
                               <span className="inline-flex items-center gap-1 text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
                                 <MapPin className="w-2.5 h-2.5" />
                                 GPS
@@ -925,6 +1110,10 @@ function AdminIncidentsContent() {
                             {statusMeta.label}
                           </span>
 
+                          <p className={`text-[11px] font-semibold ${incident.counterpartyResponse?.decision === "appealed" ? "text-amber-700" : "text-slate-500"}`}>
+                            {incidentResponseLabel(incident)}
+                          </p>
+
                           {faultMeta ? (
                             <div className="block">
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${faultMeta.badge}`}>
@@ -934,7 +1123,7 @@ function AdminIncidentsContent() {
                             </div>
                           ) : incident.suggestedFaultSide ? (
                             <div className="text-[10px] text-slate-400 italic">
-                              Gợi ý: {incident.suggestedFaultSide === "shipper" ? "Bên chủ hàng" : incident.suggestedFaultSide === "driver" ? "Bên tài xế" : "Không bên nào"}
+                              Chưa có kết luận trách nhiệm
                             </div>
                           ) : null}
                         </div>
@@ -1021,7 +1210,7 @@ function AdminIncidentsContent() {
                   <Gavel className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900 flex flex-wrap items-center gap-2">
                     Hồ Sơ Thẩm Định & Phán Quyết Sự Cố
                     {selectedIncident?.orderCode && (
                       <span className="text-xs px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-semibold">
@@ -1036,10 +1225,10 @@ function AdminIncidentsContent() {
               </div>
               <button
                 onClick={() => {
-                  setSelectedIncidentId(null);
-                  setSelectedIncident(null);
-                  setSettlementPreview(null);
+                  closeDetail();
                 }}
+                disabled={actionSubmitting}
+                aria-label="Đóng hồ sơ tranh chấp"
                 className="w-8 h-8 rounded-full hover:bg-slate-200/80 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -1052,6 +1241,10 @@ function AdminIncidentsContent() {
                 <div className="py-20 text-center space-y-3">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-3 border-primary-600 border-t-transparent"></div>
                   <p className="text-slate-500">Đang tải hồ sơ chứng cứ và đối soát ký quỹ...</p>
+                </div>
+              ) : detailError ? (
+                <div role="alert" className="rounded-xl bg-rose-50 p-5 text-rose-800">
+                  {detailError} <button className="font-bold underline" onClick={() => void loadIncidentDetail(selectedIncidentId)}>Tải lại hồ sơ</button>
                 </div>
               ) : selectedIncident ? (
                 <>
@@ -1090,7 +1283,7 @@ function AdminIncidentsContent() {
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wide flex items-center gap-1.5">
                           <User className="w-3.5 h-3.5" />
-                          Bên Báo Cáo Sự Cố ({selectedIncident.reporterRole === "driver" ? "Tài xế" : "Chủ hàng"})
+                          Bên báo cáo ({incidentRoleLabel(selectedIncident.reporterRole)})
                         </span>
                         <span className="text-[11px] text-slate-400">
                           Gửi lúc: {formatDateTime(selectedIncident.submittedAt || selectedIncident.createdAt)}
@@ -1108,7 +1301,7 @@ function AdminIncidentsContent() {
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
                           <Truck className="w-3.5 h-3.5" />
-                          Đối Tượng Bị Khiếu Nại ({selectedIncident.reportedUser?.role === "shipper" ? "Chủ hàng" : "Tài xế"})
+                          Bên được báo cáo ({incidentRoleLabel(selectedIncident.reportedUser?.role || incidentResponderRole(selectedIncident))})
                         </span>
                       </div>
                       <div className="space-y-1">
@@ -1120,6 +1313,44 @@ function AdminIncidentsContent() {
                   </div>
 
                   {/* Incident Nature & Incident Description */}
+                  {!selectedIncident.counterpartyResponse && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-1">
+                      <p className="font-bold text-slate-800">{incidentResponseLabel(selectedIncident)}</p>
+                      <p className="text-slate-600">{selectedIncident.status === "cancelled" ? "Người gửi đã rút báo cáo; hồ sơ được giữ để đối soát, không tiếp tục coi là tranh chấp đang chờ xử lý." : "Chưa ghi nhận lựa chọn chấp nhận hoặc kháng cáo từ bên được báo cáo. Không tự suy diễn trách nhiệm từ việc chưa phản hồi."}</p>
+                    </div>
+                  )}
+                  {selectedIncident.counterpartyResponse && (
+                    <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-bold text-amber-900 flex items-center gap-2">
+                          <Scale className="w-4 h-4" />
+                          Phản hồi của {incidentRoleLabel(incidentResponderRole(selectedIncident))}
+                        </p>
+                        <span className="text-xs text-amber-800">
+                          {formatDateTime(selectedIncident.counterpartyResponse.respondedAt)}
+                        </span>
+                      </div>
+                      <p className="font-semibold text-slate-900">
+                        {selectedIncident.status === "cancelled" ? "Phản hồi được lưu để đối soát. Báo cáo đã rút lại, không tiếp tục xử lý như một tranh chấp đang chờ kết luận." : selectedIncident.counterpartyResponse.decision === "accepted"
+                          ? "Bên được báo cáo đã chấp nhận báo cáo và xác nhận trách nhiệm."
+                          : "Bên được báo cáo phản đối và đề nghị quản trị viên xem xét."}
+                      </p>
+                      {selectedIncident.counterpartyResponse.appealReasonLabel && (
+                        <p className="text-sm text-slate-800">
+                          <span className="font-semibold">Lý do kháng cáo: </span>
+                          {selectedIncident.counterpartyResponse.appealReasonLabel}
+                        </p>
+                      )}
+                      {selectedIncident.counterpartyResponse.description && (
+                        <p className="text-sm text-slate-800 whitespace-pre-wrap">
+                          {selectedIncident.counterpartyResponse.description}
+                        </p>
+                      )}
+                      <p className="text-xs text-amber-800">
+                        Đối chiếu lời khai và bằng chứng của hai bên trước khi kết luận trách nhiệm và xử lý bồi thường.
+                      </p>
+                    </div>
+                  )}
                   <div className="p-4 rounded-2xl border border-slate-200 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -1154,7 +1385,7 @@ function AdminIncidentsContent() {
                           <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
                           <div>
                             <span className="font-semibold text-slate-700 block">Tọa độ GPS lúc báo sự cố:</span>
-                            {selectedIncident.reporterLocation?.lat ? (
+                            {selectedIncident.reporterLocation?.lat != null ? (
                               <span className="text-slate-500 font-mono">
                                 {selectedIncident.reporterLocation.lat.toFixed(5)}, {selectedIncident.reporterLocation.lng?.toFixed(5)}
                               </span>
@@ -1163,7 +1394,7 @@ function AdminIncidentsContent() {
                             )}
                           </div>
                         </div>
-                        {selectedIncident.reporterLocation?.lat && (
+                        {selectedIncident.reporterLocation?.lat != null && (
                           <a
                             href={`https://www.google.com/maps?q=${selectedIncident.reporterLocation.lat},${selectedIncident.reporterLocation.lng}`}
                             target="_blank"
@@ -1186,54 +1417,34 @@ function AdminIncidentsContent() {
                             </span>
                           </div>
                         </div>
-                        {selectedIncident.contactAttempts?.length > 0 && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-100 text-orange-800">
-                            Không nghe máy
-                          </span>
-                        )}
                       </div>
                     </div>
+                    {!!selectedIncident.contactAttempts?.length && <div className="space-y-2 border-t border-slate-100 pt-3">
+                      {selectedIncident.contactAttempts.map((attempt, index) => <div key={index} className="rounded-xl bg-slate-50 p-3 flex flex-wrap gap-2 text-slate-600">
+                        <span>{formatDateTime(attempt.attemptedAt)}</span>
+                        <strong>{CONTACT_CHANNEL[attempt.channel || ""] || "Liên hệ"}</strong>
+                        <span>{CONTACT_OUTCOME[attempt.outcome || ""] || "Chưa ghi nhận kết quả"}</span>
+                        {attempt.note && <p className="w-full whitespace-pre-wrap">{attempt.note}</p>}
+                      </div>)}
+                    </div>}
                   </div>
 
-                  {/* Evidence Gallery */}
-                  <div className="p-4 rounded-2xl border border-slate-200 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                        <Camera className="w-4 h-4 text-primary-600" />
-                        Bằng Chứng Tại Hiện Trường ({selectedIncident.evidence?.length || 0} tệp)
-                      </span>
-                    </div>
-
-                    {!selectedIncident.evidence || selectedIncident.evidence.length === 0 ? (
-                      <p className="text-slate-400 italic py-3 text-center">Không có hình ảnh hoặc video bằng chứng đính kèm</p>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {selectedIncident.evidence.map((ev, index) => (
-                          <div
-                            key={ev.id || index}
-                            onClick={() => setFullPhotoUrl(ev.url)}
-                            className="group relative rounded-xl border border-slate-200 overflow-hidden bg-slate-100 aspect-video cursor-pointer hover:shadow-md transition"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={ev.url}
-                              alt={`Evidence ${index + 1}`}
-                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = "none";
-                              }}
-                            />
-                            <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
-                              <Eye className="w-5 h-5" />
-                            </div>
-                            <div className="absolute bottom-1 left-1 right-1 px-1.5 py-0.5 bg-slate-900/70 text-white rounded text-[10px] truncate">
-                              {ev.type || "Ảnh hiện trường"}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  {/* Compare report and appeal evidence without mixing their owners. */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <IncidentEvidenceGallery title={`Bằng chứng báo cáo • ${incidentRoleLabel(selectedIncident.reporterRole)}`}
+                      evidence={selectedIncident.evidence} onPreview={setFullPhotoUrl} />
+                    <IncidentEvidenceGallery title={`Bằng chứng kháng cáo • ${incidentRoleLabel(incidentResponderRole(selectedIncident))}`}
+                      evidence={selectedIncident.responseEvidence} onPreview={setFullPhotoUrl} />
                   </div>
+
+                  {relatedIncidents.length > 0 && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+                    <h4 className="font-semibold text-amber-950">Báo cáo khác của cùng đơn • Cần đối chiếu trước khi kết luận</h4>
+                    <p className="text-xs text-amber-900">Có thể hai bên cùng báo cáo. Xem toàn bộ căn cứ và tránh quyết toán mâu thuẫn hoặc chi bồi thường nhiều lần cho cùng lần nhận chuyến.</p>
+                    {relatedIncidents.map(item => <button type="button" key={item.id} disabled={actionSubmitting} onClick={() => void loadIncidentDetail(item.id)} className="block w-full rounded-xl border border-amber-200 bg-white p-3 text-left disabled:opacity-50">
+                      <p className="font-semibold text-slate-800">{incidentRoleLabel(item.reporterRole)} báo cáo • {INCIDENT_TYPE_META[item.type]?.label || item.type} • {INCIDENT_STATUS_META[item.status]?.label || item.status}</p>
+                      {item.description && <p className="mt-1 text-xs text-slate-600 whitespace-pre-wrap">{item.description}</p>}
+                    </button>)}
+                  </section>}
 
                   {/* Settlement & Escrow Impact Preview (Real calculation from contract service) */}
                   <div className="p-5 rounded-2xl border border-indigo-200 bg-indigo-50/30 space-y-4">
@@ -1243,13 +1454,33 @@ function AdminIncidentsContent() {
                           <DollarSign className="w-4 h-4" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-indigo-950 text-sm">Dự Toán Xử Lý Ký Quỹ & Chế Tài 3% (Escrow Settlement)</h4>
+                          <h4 className="font-bold text-indigo-950 text-sm">Dự toán ký quỹ và bồi thường bằng tiền</h4>
                           <p className="text-slate-500 text-[11px]">
-                            {settlementPreview?.note || "Áp dụng chế tài tự động theo điều khoản ký quỹ của Hợp Đồng Vận Tải."}
+                            {settlementPreview?.note || "Chưa có dữ liệu dự toán quyết toán."}
                           </p>
                         </div>
                       </div>
                     </div>
+
+                    {previewLoading && <p role="status" className="flex items-center gap-2 text-slate-600"><RefreshCw className="w-4 h-4 animate-spin" />Đang tính dự toán theo kết luận đã chọn...</p>}
+                    {previewError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-rose-800">{previewError}</p>}
+                    {settlementPreview?.advisoryOnly && <p className="rounded-xl bg-white p-3 text-slate-600 border border-slate-200">Hồ sơ đã quyết toán hoặc đóng, không xử lý quyền lợi lần nữa. Khoản bồi thường còn chờ cấp nguồn/duyệt vẫn có thể được xử lý riêng bên dưới.</p>}
+                    {!adjudicationFaultSide && canAdjudicate && <p className="text-amber-800 font-semibold">Chưa chọn kết luận trách nhiệm. Dự toán gợi ý bên dưới không phải là phán quyết.</p>}
+                    {settlementPreview?.plan?.payerMethod === "voucher" && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 space-y-1">
+                        <p className="font-semibold">{settlementPreview.plan.revokesLifetimeVoucher ? "Bên có lỗi: thu hồi toàn bộ voucher miễn ký quỹ trọn đời của Chủ hàng" : "Bên có lỗi: thu hồi voucher Tài xế đã áp dụng cho chuyến, không trừ thêm voucher chưa dùng"}</p>
+                        <p>Hoàn lại lượt voucher/ký quỹ hợp lệ của bên không có lỗi. Tiền bồi thường bổ sung: {formatVND(settlementPreview.plan.compensationAmount)}, do quỹ TXE PRO chi, không lấy voucher làm nguồn tiền mặt.</p>
+                        {settlementPreview.executesOnReview && (compensationFund?.balance ?? 0) < settlementPreview.plan.compensationAmount && <p className="font-semibold">Quỹ chưa đủ nguồn. Khi kết luận, khoản chi được ghi nhận chờ cấp nguồn; chưa cộng vào ví người nhận.</p>}
+                      </div>
+                    )}
+
+                    {settlementPreview?.actions.some((action) => action.action.startsWith("transfer_to_")) && (
+                      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900">
+                        <WalletCards className="h-4 w-4 shrink-0" />
+                        <span className="font-bold">Nơi nhận: Ví khuyến mãi</span>
+                        <span className="text-emerald-700">• Bồi thường bằng tiền • Giải ngân sau {settlementPreview?.compensationPolicy?.releaseAfterDays || 30} ngày • Không thay thế bằng voucher</span>
+                      </div>
+                    )}
 
                     {settlementPreview?.actions && settlementPreview.actions.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1257,20 +1488,27 @@ function AdminIncidentsContent() {
                           <div key={i} className="p-3 bg-white rounded-xl border border-indigo-100 shadow-2xs space-y-1">
                             <div className="flex items-center justify-between">
                               <span className="font-semibold text-slate-700">
-                                Cọc {act.escrowOwner === "shipper" ? "Chủ hàng" : "Tài xế"} (3%):
+                                {act.action === "release" ? `Hoàn ký quỹ ${incidentRoleLabel(act.escrowOwner)}` : "Bồi thường bổ sung (3%)"}:
                               </span>
                               <span className="font-bold text-slate-900">{formatVND(act.amount)}</span>
                             </div>
                             <div className="text-[11px]">
+                              {act.action.startsWith("transfer_to_") && <p className="text-slate-600">Nguồn: {act.fundingSource === "platform_fund" ? "Quỹ bồi thường TXE PRO" : "Ký quỹ bên có lỗi (không thu thêm)"}</p>}
                               {act.action === "transfer_to_driver" && (
-                                <span className="text-rose-700 font-semibold flex items-center gap-1">
-                                  <ArrowRight className="w-3 h-3" /> Chuyển bồi thường cho Tài xế
-                                </span>
+                                <div className="space-y-0.5">
+                                  <span className="text-rose-700 font-semibold flex items-center gap-1">
+                                    <ArrowRight className="w-3 h-3" /> Chuyển tiền vào Ví khuyến mãi của Tài xế
+                                  </span>
+                                  <p className="text-slate-500">Được giải ngân sau {act.releaseAfterDays || 30} ngày</p>
+                                </div>
                               )}
                               {act.action === "transfer_to_shipper" && (
-                                <span className="text-orange-700 font-semibold flex items-center gap-1">
-                                  <ArrowRight className="w-3 h-3" /> Chuyển bồi hoàn cho Chủ hàng
-                                </span>
+                                <div className="space-y-0.5">
+                                  <span className="text-orange-700 font-semibold flex items-center gap-1">
+                                    <ArrowRight className="w-3 h-3" /> Chuyển tiền vào Ví khuyến mãi của Chủ hàng
+                                  </span>
+                                  <p className="text-slate-500">Được giải ngân sau {act.releaseAfterDays || 30} ngày</p>
+                                </div>
                               )}
                               {act.action === "release" && (
                                 <span className="text-emerald-700 font-semibold flex items-center gap-1">
@@ -1289,6 +1527,74 @@ function AdminIncidentsContent() {
                           - Lỗi Tài xế: Khấu trừ 3% cọc của Tài xế bồi hoàn Chủ hàng, hoàn cọc 3% cho Chủ hàng.<br />
                           - Bất khả kháng: Giải tỏa cọc 100% về tài khoản ví hai bên.
                         </p>
+                      </div>
+                    )}
+
+                    <details className="rounded-xl border border-slate-200 bg-white p-3">
+                      <summary className="cursor-pointer font-semibold text-slate-800">Quỹ bồi thường TXE PRO • Khả dụng: {formatVND(compensationFund?.balance ?? 0)}</summary>
+                      <div className="mt-3 space-y-3">
+                        <p className="text-xs text-slate-600">Đã cấp nguồn: {formatVND(compensationFund?.totalAllocated ?? 0)} • Đã chi: {formatVND(compensationFund?.totalPaid ?? 0)}. Chỉ ghi nhận ngân sách đã được TXE PRO cấp và đối soát; thao tác này không chuyển tiền ngân hàng, không dùng tiền nạp của khách hàng.</p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="text-xs text-slate-700">Số tiền cấp nguồn (VND)<input type="number" min="1" max="1000000000" step="1" value={fundAmount} disabled={actionSubmitting} onChange={e => setFundAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+                          <label className="text-xs text-slate-700">Mã đối soát ngân sách/ngân hàng<input value={fundReference} maxLength={120} disabled={actionSubmitting} onChange={e => setFundReference(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+                        </div>
+                        <label className="block text-xs text-slate-700">Căn cứ cấp nguồn<textarea value={fundReason} maxLength={1000} disabled={actionSubmitting} onChange={e => setFundReason(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+                        <label className="flex items-start gap-2 text-xs text-slate-700"><input type="checkbox" checked={fundAttested} disabled={actionSubmitting} onChange={e => setFundAttested(e.target.checked)} className="mt-0.5" />Tôi xác nhận nguồn đã được cấp, có chứng từ đối soát và không phải tiền ký quỹ của người dùng.</label>
+                        <button type="button" disabled={actionSubmitting || !fundAttested} onClick={handleAllocateFund} className="rounded-xl bg-sky-700 px-4 py-2 font-semibold text-white disabled:opacity-50">Ghi nhận nguồn quỹ</button>
+                      </div>
+                    </details>
+
+                    {compensationClaims.length > 0 && (
+                      <div className="space-y-2 border-t border-indigo-200/60 pt-3">
+                        <p className="font-bold text-slate-800">Kết quả bồi thường</p>
+                        {compensationClaims.map((claim) => (
+                          <div key={claim.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="font-bold text-slate-900">
+                                  {formatVND(claim.amount)} • {claim.status === "released" ? (claim.fundingSource === "platform_fund" ? "Khoản chi TXE PRO không được duyệt" : `Hoàn ký quỹ cho ${incidentRoleLabel(claim.payerRole)}`) : `${claim.fundingSource === "platform_fund" ? "Quỹ TXE PRO" : incidentRoleLabel(claim.payerRole)} → ${incidentRoleLabel(claim.recipientRole)}`}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-slate-500">
+                                  {claim.automatic ? "Xử lý tự động theo chính sách đơn • " : "Xử lý qua thẩm định • "}
+                                  {claim.status === "held" && (claim.holdReason === "platform_fund_insufficient" ? "Chờ TXE PRO cấp nguồn • Chưa cộng tiền vào ví" : "Chờ quản trị viên đối soát • Chưa cộng tiền vào ví")}
+                                  {claim.status === "paid" && !claim.promoReleasedAt && claim.promoAvailableAt && `Đã ghi nhận • Được giải ngân từ ${formatDateTime(claim.promoAvailableAt)}`}
+                                  {claim.status === "paid" && claim.promoReleasedAt && `Đã giải ngân vào Ví chính lúc ${formatDateTime(claim.promoReleasedAt)}`}
+                                  {claim.status === "paid" && !claim.promoAvailableAt && !claim.promoReleasedAt && "Đã bồi thường theo cơ chế ví trước thời điểm áp dụng chính sách 30 ngày"}
+                                  {claim.status === "released" && (claim.fundingSource === "platform_fund" ? "Không duyệt khoản chi • Không tạo giao dịch hoàn ký quỹ giả" : "Không duyệt bồi thường • Đã hoàn tiền ký quỹ cho bên nộp")}
+                                </p>
+                              </div>
+                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                                claim.status === "paid"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : claim.status === "held"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-slate-100 text-slate-700"
+                              }`}>
+                                {claim.status === "paid" ? (claim.promoReleasedAt ? "Đã giải ngân" : "Đã ghi nhận bồi thường") : claim.status === "held" ? (claim.holdReason === "platform_fund_insufficient" ? "Chờ cấp nguồn" : "Chờ duyệt") : "Không duyệt bồi thường"}
+                              </span>
+                            </div>
+                            {claim.status === "held" && (
+                              <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
+                                <button
+                                  type="button"
+                                  disabled={actionSubmitting}
+                                  onClick={() => handleCompensationDecision(claim, "dismiss")}
+                                  className="rounded-xl bg-slate-100 px-3 py-2 font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                                >
+                                  Bác bồi thường
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={actionSubmitting || (claim.fundingSource === "platform_fund" && (compensationFund?.balance ?? 0) < claim.amount)}
+                                  onClick={() => handleCompensationDecision(claim, "approve")}
+                                  className="rounded-xl bg-emerald-600 px-3 py-2 font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  Duyệt bồi thường tiền
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
 
@@ -1313,14 +1619,21 @@ function AdminIncidentsContent() {
                       <Scale className="w-4 h-4 text-primary-600" />
                       Quyết Định Phán Quyết & Xử Lý Hồ Sơ
                     </h4>
+                    {selectedIncident.latestReview?.reason && <div className="rounded-xl bg-slate-50 p-3 text-slate-600 space-y-1">
+                      <p className="font-semibold">Kết luận / phản hồi gần nhất • {incidentRoleLabel(selectedIncident.latestReview.actorRole)} • {formatDateTime(selectedIncident.latestReview.reviewedAt)}</p>
+                      <p className="whitespace-pre-wrap">{selectedIncident.latestReview.reason}</p>
+                    </div>}
+                    {selectedIncident.status === "cancelled" && <p className="text-slate-600">Báo cáo đã được rút lại, chỉ được xem để đối soát. Không ghi nhận thêm vi phạm hoặc bồi thường từ hồ sơ này.</p>}
+                    {compensationClaims.some(c => c.status === "held") && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">Còn khoản bồi thường chờ xử lý. Báo cáo đã giải quyết không có nghĩa tiền đã được chi. Đối soát nguồn quỹ, nhập căn cứ và xử lý khoản tiền bên trên.</p>}
 
                     {/* Step 1: Select Fault Side */}
-                    <div className="space-y-2">
-                      <label className="font-bold text-slate-700 block">1. Chọn bên chịu trách nhiệm vi phạm hợp đồng:</label>
+                    {canAdjudicate && <div className="space-y-2">
+                      <label className="font-bold text-slate-700 block">Chọn kết luận trách nhiệm:</label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <button
                           type="button"
                           onClick={() => handleFaultSideSelect("shipper")}
+                          disabled={actionSubmitting}
                           className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                             adjudicationFaultSide === "shipper"
                               ? "border-rose-500 bg-rose-50/70 text-rose-900 ring-2 ring-rose-400"
@@ -1332,13 +1645,14 @@ function AdminIncidentsContent() {
                             {adjudicationFaultSide === "shipper" && <Check className="w-4 h-4 text-rose-600" />}
                           </div>
                           <p className="text-[11px] text-slate-500 mt-1">
-                            Hàng sai tải, sai quy cách, không nghe máy, cấm tải xe không vào được. Phạt mất cọc 3%.
+                            Chỉ kết luận khi có căn cứ xác định Chủ hàng vi phạm. Quyết toán theo khoản ký quỹ thực tế.
                           </p>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleFaultSideSelect("driver")}
+                          disabled={actionSubmitting}
                           className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                             adjudicationFaultSide === "driver"
                               ? "border-orange-500 bg-orange-50/70 text-orange-900 ring-2 ring-orange-400"
@@ -1350,13 +1664,14 @@ function AdminIncidentsContent() {
                             {adjudicationFaultSide === "driver" && <Check className="w-4 h-4 text-orange-600" />}
                           </div>
                           <p className="text-[11px] text-slate-500 mt-1">
-                            Tự ý hủy đơn, trễ hẹn, không bốc dỡ hàng theo cam kết. Phạt khấu trừ 3% cọc.
+                            Chỉ kết luận khi có căn cứ xác định Tài xế vi phạm thỏa thuận hoặc chính sách của đơn.
                           </p>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleFaultSideSelect("none")}
+                          disabled={actionSubmitting}
                           className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                             adjudicationFaultSide === "none"
                               ? "border-teal-500 bg-teal-50/70 text-teal-900 ring-2 ring-teal-400"
@@ -1364,26 +1679,28 @@ function AdminIncidentsContent() {
                           }`}
                         >
                           <div className="flex items-center justify-between font-bold">
-                            <span>Bất Khả Kháng (Miễn lỗi)</span>
+                            <span>Không bên nào có lỗi</span>
                             {adjudicationFaultSide === "none" && <Check className="w-4 h-4 text-teal-600" />}
                           </div>
                           <p className="text-[11px] text-slate-500 mt-1">
-                            Thiên tai, thời tiết cực đoan, đường sạt lở. Hoàn trả 100% tiền cọc hai bên.
+                            Hiểu nhầm đã được đối chiếu hoặc bất khả kháng có minh chứng. Hoàn các khoản ký quỹ đang giữ.
                           </p>
                         </button>
                       </div>
-                    </div>
+                    </div>}
 
                     {/* Step 2: Reason / Notes */}
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700 block">
-                        2. Căn cứ phán quyết / Ghi chú thẩm định nội bộ: <span className="text-rose-500">*</span>
+                        Căn cứ xử lý / Ghi chú thẩm định: <span className="text-rose-500">*</span>
                       </label>
                       <textarea
                         rows={3}
+                        maxLength={1000}
+                        disabled={formReadOnly}
                         value={adjudicationReason}
                         onChange={(e) => setAdjudicationReason(e.target.value)}
-                        placeholder="Ghi rõ lý do phán quyết (ví dụ: Tài xế có ảnh chụp biển cấm tải và lịch sử 3 cuộc gọi không nghe máy; đối chiếu theo Điều 3.3 HĐVT...)"
+                        placeholder="Ghi rõ nội dung báo cáo, lý do phản đối, ảnh và nhật ký đã đối chiếu; giải thích căn cứ kết luận của quản trị viên..."
                         className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-800 text-xs"
                       />
                     </div>
@@ -1391,7 +1708,7 @@ function AdminIncidentsContent() {
                     {/* Step 3: Action Buttons based on status */}
                     <div className="pt-2 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100">
                       {/* If Open: Start Review */}
-                      {selectedIncident.status === "open" && (
+                      {reviewActions.includes("pending_review") && (
                         <button
                           type="button"
                           onClick={handleStartReview}
@@ -1404,7 +1721,7 @@ function AdminIncidentsContent() {
                       )}
 
                       {/* If Pending Review: Confirm or Dismiss */}
-                      {selectedIncident.status === "pending_review" && (
+                      {reviewActions.includes("dismissed") && (
                         <>
                           <button
                             type="button"
@@ -1413,23 +1730,23 @@ function AdminIncidentsContent() {
                             className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                           >
                             <XCircle className="w-4 h-4 text-slate-600" />
-                            Bác Bỏ Khiếu Nại (Không vi phạm)
+                            Bác bỏ báo cáo
                           </button>
 
-                          <button
+                          {canAdjudicate && <button
                             type="button"
                             onClick={handleConfirmFault}
-                            disabled={actionSubmitting}
+                            disabled={actionSubmitting || previewLoading || !!previewError || !adjudicationFaultSide}
                             className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
                           >
                             <Gavel className="w-4 h-4" />
-                            Xác Nhận Lỗi & Thực Thi Khấu Trừ Cọc 3%
-                          </button>
+                            {adjudicationFaultSide === "none" ? "Kết luận không có lỗi" : settlementPreview?.executesOnReview ? "Kết luận & quyết toán ký quỹ" : "Ghi nhận kết luận"}
+                          </button>}
                         </>
                       )}
 
                       {/* If Confirmed or Dismissed: Resolve / Close */}
-                      {(selectedIncident.status === "confirmed" || selectedIncident.status === "dismissed") && (
+                      {reviewActions.includes("resolved") && (
                         <button
                           type="button"
                           onClick={handleResolveIncident}
@@ -1437,14 +1754,14 @@ function AdminIncidentsContent() {
                           className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
                         >
                           <CheckCircle2 className="w-4 h-4" />
-                          Hoàn Tất Tất Toán & Đóng Hồ Sơ
+                          Đóng hồ sơ
                         </button>
                       )}
 
                       {selectedIncident.status === "resolved" && (
                         <div className="flex items-center gap-2 text-emerald-700 font-bold bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-200">
                           <CheckCircle2 className="w-4 h-4" />
-                          Vụ việc đã được tất toán và đóng hồ sơ hoàn tất.
+                          Hồ sơ đã đóng. Lịch giải ngân khoản bồi thường vẫn được giữ nguyên.
                         </div>
                       )}
                     </div>
@@ -1458,7 +1775,8 @@ function AdminIncidentsContent() {
                         {selectedIncident.events.map((evt) => (
                           <div key={evt.id} className="text-[11px] space-y-0.5">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-800">{evt.type}</span>
+                              <span className="font-bold text-slate-800">{incidentEventLabel(evt)}</span>
+                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">{incidentRoleLabel(evt.actorRole)}</span>
                               <span className="text-slate-400 font-mono">{formatDateTime(evt.createdAt)}</span>
                             </div>
                             {evt.reason && <p className="text-slate-600 italic">&ldquo;{evt.reason}&rdquo;</p>}

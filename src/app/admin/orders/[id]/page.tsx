@@ -35,7 +35,7 @@ interface Order {
   _id: string;
   orderCode: string;
   title: string;
-  status: "searching_driver" | "waiting_driver" | "waiting_driver_acceptance" | "accepted" | "rejected" | "in_progress" | "delivered" | "completed" | "cancelled";
+  status: "searching_driver" | "waiting_driver" | "waiting_driver_acceptance" | "accepted" | "rejected" | "in_progress" | "delivered" | "disputed" | "completed" | "cancelled";
   cargoType?: string;
   weight?: number;
   volume?: number;
@@ -262,6 +262,12 @@ const STATUS_MAP: Record<string, { label: string; detail: string; color: string;
     detail: "Chủ hàng đã xác nhận, đối soát cọc & cước xong 100%",
     color: "text-emerald-800 bg-emerald-100 border-emerald-300 font-extrabold",
     stepIndex: 3,
+  },
+  disputed: {
+    label: "Đang giải quyết sự cố",
+    detail: "Hai bên chưa thống nhất báo cáo; chờ quản trị viên đối soát. Tài xế có thể nhận chuyến khác.",
+    color: "text-amber-800 bg-amber-50 border-amber-200",
+    stepIndex: -1,
   },
   cancelled: {
     label: "Đã hủy vận đơn",

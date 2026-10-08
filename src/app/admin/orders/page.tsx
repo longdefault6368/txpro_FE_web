@@ -83,6 +83,7 @@ const STATUS_SORT_ORDER: Record<string, number> = {
   in_progress: 7,
   in_transit: 8,
   delivered: 9,
+  disputed: 9.5,
   completed: 10,
   rejected: 11,
   cancelled: 12,
@@ -237,6 +238,12 @@ const STATUS_MAP: Record<string, StatusConfig> = {
     detail: "Chủ hàng đã xác nhận, đối soát cọc & cước xong 100%",
     color: "text-emerald-900 bg-emerald-100 border-emerald-300 font-extrabold",
     icon: CheckCircle,
+  },
+  disputed: {
+    label: "Đang giải quyết sự cố",
+    detail: "Hai bên chưa thống nhất báo cáo; chờ quản trị viên đối soát. Tài xế có thể nhận chuyến khác.",
+    color: "text-amber-800 bg-amber-50 border-amber-200",
+    icon: AlertTriangle,
   },
   cancelled: {
     label: "Đã hủy vận đơn",
@@ -1073,6 +1080,7 @@ function AdminOrdersContent() {
               <option value="in_progress">Tài xế đang di chuyển</option>
               <option value="delivered">Đã giao hàng (Chờ chủ hàng xác nhận)</option>
               <option value="completed">Đã hoàn thành</option>
+              <option value="disputed">Đang giải quyết sự cố</option>
               <option value="rejected">Tài xế từ chối nhận</option>
               <option value="cancelled">Đã hủy vận đơn</option>
             </select>

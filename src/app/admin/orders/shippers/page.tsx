@@ -304,6 +304,7 @@ const STATUS_MAP: Record<
   rejected: { label: "Tài xế từ chối nhận", color: "text-rose-800 bg-rose-50 border-rose-200", dotColor: "#e11d48", bg: "bg-rose-50", icon: XCircle },
   in_progress: { label: "Tài xế đang di chuyển", color: "text-blue-800 bg-blue-50 border-blue-200", dotColor: "#2563eb", bg: "bg-blue-50", icon: Truck },
   delivered: { label: "Đã giao hàng (Chờ chủ hàng xác nhận)", color: "text-teal-800 bg-teal-50 border-teal-200", dotColor: "#0d9488", bg: "bg-teal-50", icon: CheckCircle },
+  disputed: { label: "Đang giải quyết sự cố", color: "text-amber-800 bg-amber-50 border-amber-200", dotColor: "#b45309", bg: "bg-amber-50", icon: AlertTriangle },
   completed: { label: "Đã hoàn thành", color: "text-emerald-900 bg-emerald-100 border-emerald-300 font-extrabold", dotColor: "#10b981", bg: "bg-emerald-100", icon: CheckCircle },
   cancelled: { label: "Đã hủy vận đơn", color: "text-red-800 bg-red-50 border-red-200", dotColor: "#dc2626", bg: "bg-red-50", icon: XCircle },
 };
