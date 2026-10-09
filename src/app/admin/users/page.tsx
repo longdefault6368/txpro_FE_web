@@ -194,6 +194,7 @@ interface User {
   portraitImage?: string | null;
   role: "admin" | "tai-xe" | "chu-hang";
   isActive: boolean;
+  deletedAt?: string | null;
   kycStatus: "draft" | "pending" | "pending_review" | "verified" | "rejected";
   language: string;
   createdAt: string;
@@ -435,6 +436,8 @@ function AdminUsersContent() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [accountScope, setAccountScope] = useState<"all" | "published" | "trash">("all");
+  const userListRequestRef = useRef(0);
   const [kycFilter, setKycFilter] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -447,6 +450,9 @@ function AdminUsersContent() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<User | null>(null);
+  const [restoringUser, setRestoringUser] = useState(false);
+  const restoringUserRef = useRef(false);
   const [showWalletGiftModal, setShowWalletGiftModal] = useState(false);
   const [walletGiftUser, setWalletGiftUser] = useState<User | null>(null);
   const [walletGiftAmount, setWalletGiftAmount] = useState("");
@@ -637,12 +643,14 @@ function AdminUsersContent() {
 
   // Fetch Users
   const fetchUsers = async () => {
+    const requestId = ++userListRequestRef.current;
     setLoading(true);
     setErrorMsg(null);
 
     const queryParams = new URLSearchParams({
       page: String(currentPage),
       limit: String(pageSize),
+      scope: accountScope,
       ...(search ? { search } : {}),
       ...(roleFilter ? { role: roleFilter } : {}),
       ...(statusFilter ? { status: statusFilter } : {}),
@@ -654,11 +662,16 @@ function AdminUsersContent() {
 
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/users?${queryParams.toString()}`);
+      if (requestId !== userListRequestRef.current) return;
 
       if (res.ok) {
         const data = await res.json();
+        if (requestId !== userListRequestRef.current) return;
         const members = (data.data.users || []).filter((user: User) => user.role !== "admin");
         const pagination = data.data.pagination || { page: currentPage, limit: pageSize, total: 0, pages: 1 };
+        if (pagination.pages > 0 && currentPage > pagination.pages) {
+          setCurrentPage(pagination.pages);
+        }
         const hiddenAdminCount = (data.data.users || []).length - members.length;
         setUsers(members);
         setPagination({
@@ -672,6 +685,7 @@ function AdminUsersContent() {
         errorResponseMsg = errData.message || "Không thể tải danh sách người dùng từ hệ thống.";
       }
     } catch (err: any) {
+      if (requestId !== userListRequestRef.current) return;
       console.warn("Backend connection error:", err);
       setUsers([]);
       setPagination({
@@ -682,9 +696,13 @@ function AdminUsersContent() {
       });
       errorResponseMsg = "Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại dịch vụ backend.";
     } finally {
-      setLoading(false);
-      if (!responseOk && errorResponseMsg) {
-        setErrorMsg(errorResponseMsg);
+      if (requestId === userListRequestRef.current) {
+        setLoading(false);
+        if (!responseOk && errorResponseMsg) {
+          setUsers([]);
+          setPagination({ page: currentPage, limit: pageSize, total: 0, pages: 0 });
+          setErrorMsg(errorResponseMsg);
+        }
       }
     }
   };
@@ -851,14 +869,14 @@ function AdminUsersContent() {
       fetchUsers();
       fetchOrderStats();
     }
-  }, [isAdmin, currentPage, pageSize, search, roleFilter, statusFilter, kycFilter, token]);
+  }, [isAdmin, currentPage, pageSize, search, roleFilter, statusFilter, kycFilter, accountScope, token]);
 
   useEffect(() => {
     setSelectedUserIds([]);
-  }, [search, roleFilter, statusFilter, kycFilter]);
+  }, [search, roleFilter, statusFilter, kycFilter, accountScope]);
 
   const isProtectedUser = (user: User) =>
-    user.role === "admin" || user._id === sessionUserId;
+    user.role === "admin" || user._id === sessionUserId || Boolean(user.deletedAt);
 
   const selectableUsers = useMemo(
     () => users.filter((user) => !isProtectedUser(user)),
@@ -1804,6 +1822,29 @@ function AdminUsersContent() {
     }
   };
 
+  const handleRestoreUser = async () => {
+    if (!restoreTarget || restoringUserRef.current) return;
+    restoringUserRef.current = true;
+    setRestoringUser(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${restoreTarget._id}/restore`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Không thể khôi phục tài khoản");
+      showToast(true, data.data?.requiresKycVerification
+        ? "Đã khôi phục tài khoản. Tài xế cần xác minh lại giấy tờ trước khi sử dụng các chức năng yêu cầu eKYC."
+        : "Đã khôi phục tài khoản. Người dùng có thể đăng nhập lại.");
+      setRestoreTarget(null);
+      await fetchUsers();
+    } catch (err: unknown) {
+      showToast(false, err instanceof Error ? err.message : "Không thể khôi phục tài khoản");
+    } finally {
+      restoringUserRef.current = false;
+      setRestoringUser(false);
+    }
+  };
+
   // Delete User
   const handleDeleteUser = async (id: string) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản này?")) return;
@@ -2148,6 +2189,37 @@ function AdminUsersContent() {
           </div>
         </div>
 
+          <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Phạm vi tài khoản">
+            {([
+              { value: "all", label: "Tất cả", icon: Users },
+              { value: "published", label: "Publish / Chưa xóa", icon: CheckCircle2 },
+              { value: "trash", label: "Thùng rác", icon: Trash2 },
+            ] as const).map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={accountScope === value}
+                onClick={() => {
+                  setAccountScope(value);
+                  setCurrentPage(1);
+                }}
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                  accountScope === value
+                    ? "border-primary-600 bg-primary-600 text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+            <p className="w-full text-xs leading-relaxed text-slate-500">
+              {accountScope === "trash"
+                ? "Chọn Khôi phục để đưa tài khoản về Publish. Ví và lịch sử được giữ nguyên; hồ sơ eKYC đã xóa không thể tự phục hồi."
+                : "Publish gồm tất cả tài khoản chưa xóa, kể cả tài khoản đang khóa hoặc chờ xác minh."}
+            </p>
+          </div>
+
           {/* Filters Bar */}
           <div className="bg-white/80 backdrop-blur-xl border border-slate-200/50 p-6 rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.03)] mb-6 flex flex-col md:flex-row gap-4 items-center">
             {/* Search Input */}
@@ -2369,7 +2441,8 @@ function AdminUsersContent() {
                             <button
                               type="button"
                               onClick={() => openWalletGiftModal(user)}
-                              className="group text-left p-2 -m-2 rounded-xl hover:bg-emerald-50 transition-all cursor-pointer block"
+                              disabled={Boolean(user.deletedAt)}
+                              className="group text-left p-2 -m-2 rounded-xl hover:bg-emerald-50 transition-all cursor-pointer block disabled:cursor-not-allowed disabled:opacity-50"
                               title="Nhấn để tặng tiền vào ví người dùng"
                             >
                               <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
@@ -2386,6 +2459,7 @@ function AdminUsersContent() {
                           <td className="py-4.5 px-6 whitespace-nowrap">
                             <select
                               value={user.role}
+                              disabled={Boolean(user.deletedAt)}
                               onChange={(e) => handleChangeRole(user, e.target.value as ManagedUserRole)}
                               className={`px-3 py-1.5 rounded-xl text-xs font-bold focus:outline-none border border-slate-200 bg-white transition-all cursor-pointer ${
                                 user.role === "tai-xe" 
@@ -2480,6 +2554,15 @@ function AdminUsersContent() {
 
                           {/* Status Switch Toggle */}
                           <td className="py-4.5 px-6 text-center whitespace-nowrap">
+                            {user.deletedAt ? (
+                              <div className="space-y-1.5">
+                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  Đã xóa
+                                </span>
+                                <p className="text-[11px] text-slate-500">{formatDateTime(user.deletedAt)}</p>
+                              </div>
+                            ) : (
                             <button
                               onClick={() => handleToggleStatus(user)}
                               className={`transition-colors duration-200 outline-none focus:outline-none cursor-pointer ${
@@ -2493,6 +2576,7 @@ function AdminUsersContent() {
                                 <ToggleLeft className="w-8 h-8" />
                               )}
                             </button>
+                            )}
                           </td>
 
                           {/* Actions */}
@@ -2510,7 +2594,8 @@ function AdminUsersContent() {
                               {/* Chat With User */}
                               <button
                                 onClick={() => handleOpenChat(user)}
-                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all cursor-pointer"
+                                disabled={Boolean(user.deletedAt)}
+                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                                 title={`Nhắn tin với ${user.name || user.phone || 'người dùng'}`}
                               >
                                 <MessageSquare className="w-4 h-4" />
@@ -2518,12 +2603,13 @@ function AdminUsersContent() {
 
                               {/* Reset Password */}
                               <button
+                                disabled={Boolean(user.deletedAt)}
                                 onClick={() => {
                                   setCurrentUser(user);
                                   setNewPassword("");
                                   setShowPasswordModal(true);
                                 }}
-                                className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all cursor-pointer"
+                                className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                                 title="Đặt lại mật khẩu"
                               >
                                 <RotateCcw className="w-4 h-4" />
@@ -2532,13 +2618,27 @@ function AdminUsersContent() {
                               {/* Edit */}
                               <button
                                 onClick={() => handleOpenEditModal(user)}
-                                className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all cursor-pointer"
+                                disabled={Boolean(user.deletedAt)}
+                                className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                                 title="Chỉnh sửa thông tin"
                               >
                                 <Edit3 className="w-4 h-4" />
                               </button>
 
                               {/* Delete */}
+                              {user.deletedAt && (
+                                <button
+                                  type="button"
+                                  onClick={() => setRestoreTarget(user)}
+                                  disabled={restoringUser}
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                  title="Khôi phục tài khoản từ thùng rác"
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                  Khôi phục
+                                </button>
+                              )}
+                              {!user.deletedAt && (
                               <button
                                 onClick={() => handleDeleteUser(user._id)}
                                 className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
@@ -2546,6 +2646,7 @@ function AdminUsersContent() {
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -4243,6 +4344,37 @@ function AdminUsersContent() {
       )}
 
 
+
+      {restoreTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !restoringUser) setRestoreTarget(null);
+          }}
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="restore-user-title" aria-describedby="restore-user-description"
+            className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl sm:p-8">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+              <RotateCcw className="h-6 w-6" />
+            </div>
+            <h3 id="restore-user-title" className="text-xl font-bold text-slate-900">Khôi phục tài khoản?</h3>
+            <div id="restore-user-description" className="mt-3 space-y-3 text-sm leading-relaxed text-slate-600">
+              <p>Đưa <span className="font-semibold text-slate-900">{restoreTarget.name || restoreTarget.phone}</span> ra khỏi Thùng rác và trở lại danh sách Publish.</p>
+              <p>Ví, lịch sử đơn hàng và các dữ liệu còn lưu được giữ nguyên. Không cấp thêm voucher hay tự mở lại tin đã hết hạn.</p>
+              <p className="rounded-xl bg-amber-50 p-3 text-amber-800">Hồ sơ eKYC đã xóa không thể tự phục hồi. Tài xế chưa đủ hồ sơ cần xác minh lại; người dùng cần đăng nhập lại.</p>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button type="button" autoFocus disabled={restoringUser} onClick={() => setRestoreTarget(null)}
+                className="h-11 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Không</button>
+              <button type="button" disabled={restoringUser} onClick={handleRestoreUser}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60">
+                {restoringUser && <RefreshCw className="h-4 w-4 animate-spin" />}
+                {restoringUser ? "Đang khôi phục" : "Khôi phục"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- RESET PASSWORD MODAL --- */}
       {showPasswordModal && currentUser && (
