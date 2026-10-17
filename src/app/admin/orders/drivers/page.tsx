@@ -37,6 +37,8 @@ import {
   Radio,
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { getVehicleCapabilities } from "@/utils/vehicleCapabilities";
+import { AdminDriverPost, formatPostCapacity, getPostPauseReason, getPostHoldLabel } from "@/utils/admin-driver-post";
 
 interface UserInfo {
   name?: string;
@@ -57,7 +59,7 @@ interface VehicleInfo {
   cargoTypes?: string[];
 }
 
-interface DriverPost {
+interface DriverPost extends AdminDriverPost {
   _id: string;
   driverId?: UserInfo;
   vehicleId?: VehicleInfo;
@@ -83,12 +85,15 @@ interface DriverPost {
   vehicleSeats?: number | null;
   availableSeats?: number | null;
   isFull?: boolean;
-  status: "draft" | "active" | "paused" | "scheduled" | "matched" | "in_progress" | "completed" | "cancelled";
+  status: string;
   cargoTypes?: string[];
   createdAt: string;
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string; dotColor: string }> = {
+  expired: { label: "Hết hạn", color: "text-orange-700 bg-orange-50 border-orange-200", dotColor: "#c2410c" },
+  deleted: { label: "Đã xóa", color: "text-slate-600 bg-slate-100 border-slate-200", dotColor: "#64748b" },
+  archived: { label: "Lưu trữ cũ", color: "text-slate-600 bg-slate-50 border-slate-200", dotColor: "#64748b" },
   draft: { label: "Bản nháp", color: "text-slate-600 bg-slate-50 border-slate-200", dotColor: "#94a3b8" },
   active: { label: "Đang mở", color: "text-emerald-700 bg-emerald-50 border-emerald-200", dotColor: "#10b981" },
   paused: { label: "Tạm dừng", color: "text-amber-700 bg-amber-50 border-amber-200", dotColor: "#f59e0b" },
@@ -151,12 +156,6 @@ const formatRadius = (meters?: number | null) => {
   return Number.isInteger(km) ? `${km} km` : `${km.toFixed(1)} km`;
 };
 
-const formatCapacityTon = (value?: number | null) => {
-  if (value == null || value <= 0) return null;
-  const ton = value >= 100 ? value / 1000 : value;
-  const formatted = Number.isInteger(ton) ? ton.toString() : ton.toFixed(1).replace(/\.0$/, "");
-  return `${formatted} tấn`;
-};
 
 // Helper to resolve coordinates
 function resolvePointCoordinates(
@@ -178,86 +177,6 @@ function resolvePointCoordinates(
 }
 
 // Helper to categorize vehicle logic
-function getVehicleCategory(typeString?: string | null): "cargo_heavy" | "passenger_car" | "other" {
-  if (!typeString) return "other";
-  const str = typeString.toLowerCase().trim();
-
-  // Nhóm xe loại trừ đặc biệt: công trình, cứu hộ, xe máy, ba gác... -> không số ghế, không tải trọng, không loại hàng hóa
-  const isExcluded =
-    str.includes("công trình") ||
-    str.includes("cong trinh") ||
-    str.includes("cứu hộ") ||
-    str.includes("cuu ho") ||
-    str.includes("ba gác") ||
-    str.includes("ba gac") ||
-    str.includes("xe máy") ||
-    str.includes("xe may") ||
-    str.includes("mô tô") ||
-    str.includes("mo to");
-
-  if (isExcluded) {
-    return "other";
-  }
-
-  // 1. Nhóm: Xe tải vs Xe công vs Xe cẩu vs Xe tải cẩu
-  const isCargoHeavy =
-    str.includes("xe tải") ||
-    str.includes("xe tai") ||
-    str.includes("tải cẩu") ||
-    str.includes("tai cau") ||
-    str.includes("xe cẩu") ||
-    str.includes("xe cau") ||
-    str.includes("cần cẩu") ||
-    str.includes("cẩu tự hành") ||
-    str.includes("xe công") ||
-    str.includes("xe cong") ||
-    str.includes("container") ||
-    str.includes("đầu kéo") ||
-    str.includes("dau keo") ||
-    str.includes("rơ moóc") ||
-    str.includes("ro mooc") ||
-    str.includes("sơ mi rơ moóc") ||
-    str.includes("so mi") ||
-    str.includes("mooc") ||
-    str.includes("thùng bạt") ||
-    str.includes("thung bat") ||
-    str.includes("thùng kín") ||
-    str.includes("thung kin") ||
-    str.includes("thùng lửng") ||
-    str.includes("thung lung") ||
-    str.includes("đông lạnh") ||
-    str.includes("dong lanh") ||
-    (str.includes("tải") && !str.includes("bán tải")) ||
-    (str.includes("tai") && !str.includes("ban tai")) ||
-    (str.includes("cẩu") && !str.includes("cuu ho"));
-
-  if (isCargoHeavy) {
-    return "cargo_heavy";
-  }
-
-  // 2. Nhóm: Ô tô
-  const isPassengerCar =
-    str.includes("ô tô") ||
-    str.includes("o to") ||
-    str.includes("oto") ||
-    str.includes("xe con") ||
-    str.includes("du lịch") ||
-    str.includes("du lich") ||
-    str.includes("xe khách") ||
-    str.includes("xe khach") ||
-    str.includes("limousine") ||
-    str.includes("chỗ") ||
-    str.includes("cho") ||
-    str.includes("ghế") ||
-    str.includes("ghe");
-
-  if (isPassengerCar) {
-    return "passenger_car";
-  }
-
-  // 3. Các xe còn lại (xe máy, ba gác, cứu hộ, công trình...)
-  return "other";
-}
 
 export default function AdminDriverPostsPage() {
   const [posts, setPosts] = useState<DriverPost[]>([]);
@@ -1297,10 +1216,8 @@ export default function AdminDriverPostsPage() {
 
                           {/* Sức chứa / Số chỗ / Hàng hóa theo logic nghiệp vụ (Dưới mô tả, trước hàng biển số) */}
                           {(() => {
-                            const fullType = [vehicle?.vehicleTypeParent, vehicle?.vehicleTypeChild, vehicle?.type]
-                              .filter(Boolean)
-                              .join(" ");
-                            const category = getVehicleCategory(fullType);
+                            const capabilities = getVehicleCapabilities(vehicle);
+                            const category = capabilities.hasSeats ? "passenger_car" : capabilities.hasCapacity ? "cargo_heavy" : "other";
 
                             // 1. Số chỗ: Chỉ ô tô
                             if (category === "passenger_car") {
@@ -1320,7 +1237,7 @@ export default function AdminDriverPostsPage() {
 
                             // 2. Tải trọng với hàng hoá chỉ: xe tải vs xe công vs Xe cẩu , xe tải cẩu
                             if (category === "cargo_heavy") {
-                              const capacityText = formatCapacityTon(vehicle?.capacity);
+                              const capacityText = formatPostCapacity(post);
                               const cargoList =
                                 post.cargoTypes && post.cargoTypes.length > 0
                                   ? post.cargoTypes
@@ -1410,10 +1327,13 @@ export default function AdminDriverPostsPage() {
                         </td>
 
                         {/* Status */}
-                        <td className="py-4.5 px-6 whitespace-nowrap">
+                        <td className="py-4.5 px-6 min-w-60 max-w-80">
                           <span className={`inline-flex px-3 py-1 rounded-xl text-xs font-bold border ${statusInfo.color}`}>
                             {statusInfo.label}
                           </span>
+                          <p className="mt-2 text-[11px] text-slate-500">{getPostHoldLabel(post)}</p>
+                          {getPostPauseReason(post) && <p className="mt-1 text-[11px] text-amber-800">{getPostPauseReason(post)}</p>}
+                          <div className="mt-2 flex flex-wrap gap-1">{post.relatedOrders?.map(order => <Link key={order._id} href={`/admin/orders/${order._id}`} className="rounded-md bg-primary-50 px-2 py-1 text-[11px] text-primary-800">{order.orderCode}</Link>)}</div>
                         </td>
 
                         {/* Created At */}

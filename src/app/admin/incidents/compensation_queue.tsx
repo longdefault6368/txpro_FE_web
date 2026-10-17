@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
-import { incidentRoleLabel } from "@/utils/incident-review";
+import { incidentRoleLabel, COMPENSATION_PROMO_HOLD_DAYS } from "@/utils/incident-review";
 
 type Fund = { balance: number; totalAllocated: number; totalPaid: number };
 type Claim = { id: string; orderId: string; orderCode?: string; amount: number;
@@ -63,7 +63,7 @@ export function PendingCancellationCompensations() {
   const decide = async (claim: Claim, action: "approve" | "dismiss") => {
     if (reason.trim().length < 3 || reason.trim().length > 1000) { setMessage("Nhập căn cứ xử lý từ 3 đến 1.000 ký tự."); return; }
     const summary = action === "approve"
-      ? `Duyệt ${money(claim.amount)} cho ${incidentRoleLabel(claim.recipientRole)} vào Ví khuyến mãi, giải ngân sau 30 ngày kể từ lúc ghi có?`
+      ? `Duyệt ${money(claim.amount)} cho ${incidentRoleLabel(claim.recipientRole)} vào Ví khuyến mãi, giải ngân sau ${COMPENSATION_PROMO_HOLD_DAYS} ngày kể từ lúc ghi có?`
       : claim.fundingSource === "platform_fund" ? "Bác khoản chi TXE PRO? Không hoàn ký quỹ giả cho bên dùng voucher. Vi phạm và voucher đã thu hồi vẫn giữ nguyên."
         : "Bác bồi thường và hoàn khoản ký quỹ đang giữ cho bên nộp?";
     await post(`${API_BASE}/admin/compensations/${claim.id}/${action}`, { reason: reason.trim() }, summary);

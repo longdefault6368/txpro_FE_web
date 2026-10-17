@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useEffect, Suspense, useMemo } from "react";
+import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import Link from "next/link";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { AdminOrderState, AdminFinancialSnapshot, getAdminOrderStatus, getAdminCompletionNotice } from "@/utils/admin-order-state";
+import { OrderFinancialSummary, AdminCompensationClaim } from "@/components/admin/OrderFinancialSummary";
+import { useAdminPageRefresh } from "@/hooks/useAdminPageRefresh";
 import { useToast } from "@/context/ToastContext";
 import { 
   Search, Filter, Truck, CheckCircle, Clock, XCircle, 
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, AlertTriangle, Eye, Loader, SlidersHorizontal,
   Calendar, RotateCcw, Package, ArrowUpRight, Banknote, Download,
-  Sliders, RefreshCw, UserPlus, Lock, StickyNote, Ban, Send, ShieldCheck, X
+  Sliders, RefreshCw, StickyNote, Ban, Send, X
 } from "lucide-react";
 
 export interface AdminInternalNote {
@@ -26,7 +29,7 @@ interface UserInfo {
   email: string;
 }
 
-interface Order {
+interface Order extends AdminOrderState {
   _id: string;
   orderCode: string;
   title: string;
@@ -45,7 +48,11 @@ interface Order {
     | "cancelled"
     | string;
   offerPrice?: number;
-  budget?: number;
+  budget?: number | { min?: number; max?: number };
+  financialSnapshot?: AdminFinancialSnapshot | null;
+  adminOperations?: { canCancelUnassigned: boolean; reason: string; autoSettlementEnabled?: boolean; autoSettlementEligible?: boolean };
+  compensationClaims?: AdminCompensationClaim[];
+  escrowLocks?: { _id: string; amount: number; status: string; role: string }[];
   pickup?: { address: string };
   dropoff?: { address: string };
   shipperId?: UserInfo;
@@ -89,7 +96,7 @@ const STATUS_SORT_ORDER: Record<string, number> = {
   cancelled: 12,
 };
 
-const getOrderCost = (order: Order) => order.offerPrice || order.budget || 0;
+const getOrderCost = (order: Order) => order.financialSnapshot?.orderAmount ?? order.offerPrice ?? (typeof order.budget === "number" ? order.budget : order.budget?.max) ?? 0;
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return "---";
@@ -273,37 +280,26 @@ function AdminOrdersContent() {
 
   // TMS Action Modal states
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [activeActionTab, setActiveActionTab] = useState<"none" | "status" | "reassign" | "escrow" | "notes" | "cancel">("none");
+  const [activeActionTab, setActiveActionTab] = useState<"none" | "notes" | "cancel">("none");
+  const detailRequestRef = useRef(0);
+  const selectedOrderIdRef = useRef<string | null>(null);
+  const listSequenceRef = useRef(0);
+  const actionSubmitRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSyncingOrder, setIsSyncingOrder] = useState(false);
 
   // TMS form fields
-  const [targetStatus, setTargetStatus] = useState<string>("in_progress");
-  const [statusNote, setStatusNote] = useState("");
-  const [newDriverName, setNewDriverName] = useState("");
-  const [newDriverPhone, setNewDriverPhone] = useState("");
-  const [newDriverVehicle, setNewDriverVehicle] = useState("");
-  const [reassignMode, setReassignMode] = useState<"assign" | "reopen">("assign");
-  const [reassignReason, setReassignReason] = useState("");
-  const [escrowActionType, setEscrowActionType] = useState<"disburse" | "freeze" | "refund">("disburse");
-  const [escrowActionReason, setEscrowActionReason] = useState("");
   const [adminNotes, setAdminNotes] = useState<AdminInternalNote[]>([]);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [newNoteType, setNewNoteType] = useState<"info" | "warning" | "action">("info");
-  const [cancelReasonChoice, setCancelReasonChoice] = useState("Xe hư hỏng / tai nạn kỹ thuật");
+  const [cancelReasonChoice, setCancelReasonChoice] = useState("Chủ hàng yêu cầu hủy tìm xe");
   const [cancelReasonDetail, setCancelReasonDetail] = useState("");
-  const [releaseDriverChoice, setReleaseDriverChoice] = useState(true);
 
   const handleOpenOrderDetail = async (order: Order) => {
     setSelectedOrder(order);
-    setTargetStatus(order.status);
+    const requestId = ++detailRequestRef.current;
+    selectedOrderIdRef.current = order._id;
     setActiveActionTab("none");
-    setStatusNote("");
-    setNewDriverName("");
-    setNewDriverPhone("");
-    setNewDriverVehicle("");
-    setReassignReason("");
-    setEscrowActionReason("");
     setCancelReasonDetail("");
     setAdminNotes(order.adminNotes || []);
 
@@ -312,8 +308,9 @@ function AdminOrdersContent() {
       if (res.ok) {
         const data = await res.json();
         if (data.data?.order) {
-          const fetched = data.data.order;
-          setSelectedOrder((prev) => prev ? { ...prev, ...fetched } : fetched);
+          if (requestId !== detailRequestRef.current || selectedOrderIdRef.current !== order._id) return;
+          const fetched = { ...data.data.order, compensationClaims: data.data.compensationClaims || [], escrowLocks: data.data.escrowLocks || [] };
+          setSelectedOrder(prev => prev?._id === order._id ? { ...prev, ...fetched } : prev);
           if (Array.isArray(fetched.adminNotes)) {
             setAdminNotes(fetched.adminNotes);
           }
@@ -325,282 +322,70 @@ function AdminOrdersContent() {
   };
 
   const handleSyncSelectedOrder = async () => {
-    if (!selectedOrder) return;
+    if (!selectedOrder || isSyncingOrder) return;
+    const orderId = selectedOrder._id;
+    const requestId = ++detailRequestRef.current;
     setIsSyncingOrder(true);
     try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${selectedOrder._id}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.data?.order) {
-          const updated = data.data.order;
-          setSelectedOrder(updated);
-          setOrders((prev) => prev.map((o) => (o._id === updated._id ? { ...o, ...updated } : o)));
-          if (Array.isArray(updated.adminNotes)) {
-            setAdminNotes(updated.adminNotes);
-          }
-        }
-      }
-      toast.success("Đã đồng bộ dữ liệu vận đơn thời gian thực");
-    } catch {
-      toast.error("Không thể kết nối máy chủ");
-    } finally {
-      setIsSyncingOrder(false);
-    }
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${orderId}`);
+      const data = await res.json();
+      if (!res.ok || !data.data?.order) throw new Error(data.message || "Không thể tải dữ liệu vận đơn");
+      if (requestId !== detailRequestRef.current || selectedOrderIdRef.current !== orderId) return;
+      const updated = { ...data.data.order, compensationClaims: data.data.compensationClaims || [], escrowLocks: data.data.escrowLocks || [] };
+      setSelectedOrder(prev => prev?._id === orderId ? updated : prev);
+      setOrders(prev => prev.map(o => o._id === orderId ? { ...o, ...updated } : o));
+      setAdminNotes(updated.adminNotes || []);
+      toast.success("Đã lấy dữ liệu mới nhất từ máy chủ");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể kết nối máy chủ");
+    } finally { setIsSyncingOrder(false); }
   };
 
-  const handleConfirmStatusChange = async () => {
-    if (!selectedOrder) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${selectedOrder._id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: targetStatus,
-          note: statusNote.trim() || undefined,
-        }),
-      });
 
-      if (res.ok) {
-        const data = await res.json();
-        const updated = data.data?.order || { ...selectedOrder, status: targetStatus };
-        setSelectedOrder((prev) => prev ? { ...prev, ...updated } : null);
-        setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, ...updated } : o)));
-        if (Array.isArray(updated.adminNotes)) {
-          setAdminNotes(updated.adminNotes);
-        }
-        toast.success(`Đã chuyển trạng thái sang "${STATUS_MAP[targetStatus]?.label || targetStatus}"`);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        setSelectedOrder((prev) => prev ? { ...prev, status: targetStatus } : null);
-        setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, status: targetStatus } : o)));
-        toast.warning(errData.message || "Đã cập nhật trạng thái đơn (chế độ cục bộ)");
-      }
-    } catch {
-      setSelectedOrder((prev) => prev ? { ...prev, status: targetStatus } : null);
-      setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, status: targetStatus } : o)));
-      toast.warning("Đã cập nhật trạng thái đơn (chế độ ngoại tuyến)");
-    } finally {
-      setIsSubmitting(false);
-      setStatusNote("");
-      setActiveActionTab("none");
-    }
-  };
-
-  const handleConfirmReassignDriver = async () => {
-    if (!selectedOrder) return;
-    if (reassignMode === "assign" && !newDriverName.trim()) {
-      toast.warning("Vui lòng nhập họ và tên tài xế để chỉ định");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${selectedOrder._id}/assign-driver`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: reassignMode,
-          driverName: newDriverName.trim() || undefined,
-          driverPhone: newDriverPhone.trim() || undefined,
-          vehicle: newDriverVehicle.trim() || undefined,
-          reason: reassignReason.trim() || undefined,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const updated = data.data?.order || selectedOrder;
-        setSelectedOrder((prev) => prev ? { ...prev, ...updated } : null);
-        setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, ...updated } : o)));
-        if (Array.isArray(updated.adminNotes)) {
-          setAdminNotes(updated.adminNotes);
-        }
-        toast.success(reassignMode === "reopen" ? "Đã mở lại tìm kiếm tài xế trên sàn" : `Đã chỉ định tài xế: ${newDriverName}`);
-      } else {
-        const updatedDriver = reassignMode === "reopen" ? undefined : { name: newDriverName, phone: newDriverPhone || "---", email: "" };
-        const newStatus = reassignMode === "reopen" ? "searching_driver" : "accepted";
-        setSelectedOrder((prev) => prev ? { ...prev, driverId: updatedDriver, status: newStatus } : null);
-        setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, driverId: updatedDriver, status: newStatus } : o)));
-        toast.warning("Đã cập nhật điều phối (chế độ cục bộ)");
-      }
-    } catch {
-      const updatedDriver = reassignMode === "reopen" ? undefined : { name: newDriverName, phone: newDriverPhone || "---", email: "" };
-      const newStatus = reassignMode === "reopen" ? "searching_driver" : "accepted";
-      setSelectedOrder((prev) => prev ? { ...prev, driverId: updatedDriver, status: newStatus } : null);
-      setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, driverId: updatedDriver, status: newStatus } : o)));
-      toast.warning("Đã cập nhật điều phối (chế độ ngoại tuyến)");
-    } finally {
-      setIsSubmitting(false);
-      setNewDriverName("");
-      setNewDriverPhone("");
-      setNewDriverVehicle("");
-      setReassignReason("");
-      setActiveActionTab("none");
-    }
-  };
-
-  const handleConfirmEscrowAction = async () => {
-    if (!selectedOrder) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${selectedOrder._id}/escrow`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          actionType: escrowActionType,
-          reason: escrowActionReason.trim() || undefined,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const updated = data.data?.order || selectedOrder;
-        setSelectedOrder((prev) => prev ? { ...prev, ...updated } : null);
-        setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, ...updated } : o)));
-        if (Array.isArray(updated.adminNotes)) {
-          setAdminNotes(updated.adminNotes);
-        }
-        toast.success(
-          escrowActionType === "disburse"
-            ? "Đã duyệt giải ngân 95% cước phí qua MB Bank"
-            : escrowActionType === "freeze"
-            ? "Đã đóng băng ký quỹ MB Bank do phát sinh tranh chấp"
-            : "Đã gửi lệnh hoàn cước 100% cho chủ hàng"
-        );
-      } else {
-        const newStatus = escrowActionType === "disburse" ? "completed" : escrowActionType === "refund" ? "cancelled" : selectedOrder.status;
-        setSelectedOrder((prev) => prev ? { ...prev, status: newStatus } : null);
-        setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, status: newStatus } : o)));
-        toast.warning("Đã thực thi nghiệp vụ ký quỹ (chế độ cục bộ)");
-      }
-    } catch {
-      const newStatus = escrowActionType === "disburse" ? "completed" : escrowActionType === "refund" ? "cancelled" : selectedOrder.status;
-      setSelectedOrder((prev) => prev ? { ...prev, status: newStatus } : null);
-      setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, status: newStatus } : o)));
-      toast.warning("Đã thực thi nghiệp vụ ký quỹ (chế độ ngoại tuyến)");
-    } finally {
-      setIsSubmitting(false);
-      setEscrowActionReason("");
-      setActiveActionTab("none");
-    }
-  };
 
   const handleAddAdminNote = async () => {
-    if (!selectedOrder || !newNoteContent.trim()) {
-      toast.error("Vui lòng nhập nội dung ghi chú");
-      return;
-    }
-
+    if (!selectedOrder || !newNoteContent.trim() || actionSubmitRef.current) return;
+    actionSubmitRef.current = true;
     setIsSubmitting(true);
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${selectedOrder._id}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: newNoteContent.trim(),
-          type: newNoteType,
-        }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newNoteContent.trim(), type: newNoteType }),
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.data?.adminNotes)) {
-          setAdminNotes(data.data.adminNotes);
-        } else if (data.data?.note) {
-          setAdminNotes((prev) => [data.data.note, ...prev]);
-        }
-        toast.success("Đã lưu ghi chú nội bộ thành công");
-      } else {
-        const note: AdminInternalNote = {
-          id: `n-${Date.now()}`,
-          author: "Quản trị viên TMS",
-          role: "Admin điều hành",
-          content: newNoteContent.trim(),
-          createdAt: new Date().toISOString(),
-          type: newNoteType,
-        };
-        setAdminNotes((prev) => [note, ...prev]);
-        toast.warning("Đã lưu ghi chú vào phiên làm việc");
-      }
-    } catch {
-      const note: AdminInternalNote = {
-        id: `n-${Date.now()}`,
-        author: "Quản trị viên TMS",
-        role: "Admin điều hành",
-        content: newNoteContent.trim(),
-        createdAt: new Date().toISOString(),
-        type: newNoteType,
-      };
-      setAdminNotes((prev) => [note, ...prev]);
-      toast.warning("Đã lưu ghi chú vào phiên làm việc");
-    } finally {
-      setIsSubmitting(false);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Không thể lưu ghi chú");
+      if (!Array.isArray(data.data?.adminNotes)) throw new Error("Phản hồi thiếu ghi chú đã lưu");
+      setAdminNotes(data.data.adminNotes);
       setNewNoteContent("");
-    }
+      toast.success("Đã lưu ghi chú nội bộ");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể kết nối máy chủ; ghi chú chưa được lưu");
+    } finally { setIsSubmitting(false); actionSubmitRef.current = false; }
   };
 
+
   const handleConfirmEmergencyCancel = async () => {
-    if (!selectedOrder) return;
+    if (!selectedOrder?.adminOperations?.canCancelUnassigned || selectedOrder.activeIncident || actionSubmitRef.current) return;
+    actionSubmitRef.current = true;
     setIsSubmitting(true);
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${selectedOrder._id}/cancel`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reason: cancelReasonChoice,
-          detail: cancelReasonDetail.trim() || undefined,
-          releaseDriver: releaseDriverChoice,
-          refundEscrow: true,
-        }),
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: cancelReasonChoice, detail: cancelReasonDetail.trim() || undefined }),
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        const updated = data.data?.order || { ...selectedOrder, status: "cancelled" };
-        setSelectedOrder((prev) => prev ? { ...prev, ...updated } : null);
-        setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, ...updated } : o)));
-        if (Array.isArray(updated.adminNotes)) {
-          setAdminNotes(updated.adminNotes);
-        }
-        if (data.data?.driverFreed) {
-          toast.success("Vận đơn đã hủy & ĐÃ GIẢI PHÓNG TÀI XẾ để nhận chuyến mới!");
-        } else {
-          toast.warning("Vận đơn đã được chuyển sang trạng thái Đã hủy đơn");
-        }
-      } else {
-        const fullReason = `${cancelReasonChoice}${cancelReasonDetail ? `. Chi tiết: ${cancelReasonDetail}` : ""}`;
-        const updated = {
-          ...selectedOrder,
-          status: "cancelled",
-          cancellationReason: fullReason,
-          cancelledByName: "Quản trị viên hệ thống",
-          cancelledByRole: "admin",
-          cancelledAt: new Date().toISOString(),
-        };
-        setSelectedOrder(updated);
-        setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, ...updated } : o)));
-        toast.warning("Vận đơn đã được hủy (chế độ cục bộ)");
-      }
-    } catch {
-      const fullReason = `${cancelReasonChoice}${cancelReasonDetail ? `. Chi tiết: ${cancelReasonDetail}` : ""}`;
-      const updated = {
-        ...selectedOrder,
-        status: "cancelled",
-        cancellationReason: fullReason,
-        cancelledByName: "Quản trị viên hệ thống",
-        cancelledByRole: "admin",
-        cancelledAt: new Date().toISOString(),
-      };
-      setSelectedOrder(updated);
-      setOrders((prev) => prev.map((o) => (o._id === selectedOrder._id ? { ...o, ...updated } : o)));
-      toast.warning("Vận đơn đã được hủy (chế độ ngoại tuyến)");
-    } finally {
-      setIsSubmitting(false);
+      const data = await res.json();
+      if (!res.ok || !data.data?.order) throw new Error(data.message || "Không thể hủy yêu cầu");
+      setSelectedOrder((prev) => prev?._id === selectedOrder._id ? { ...prev, ...data.data.order } : prev);
+      setOrders((prev) => prev.map(o => o._id === selectedOrder._id ? { ...o, ...data.data.order } : o));
+      if (Array.isArray(data.data.order.adminNotes)) setAdminNotes(data.data.order.adminNotes);
       setCancelReasonDetail("");
       setActiveActionTab("none");
-    }
+      toast.success("Đã hủy yêu cầu chưa chọn xe");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể kết nối máy chủ; yêu cầu chưa được hủy");
+    } finally { setIsSubmitting(false); actionSubmitRef.current = false; }
   };
+
 
   // Fetch overview metrics on mount if available
   useEffect(() => {
@@ -712,8 +497,9 @@ function AdminOrdersContent() {
     setCurrentPage(1);
   };
 
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (silent = false) => {
+    const requestId = ++listSequenceRef.current;
+    if (!silent) setLoading(true);
 
     const queryParams = new URLSearchParams({
       page: String(currentPage),
@@ -729,25 +515,23 @@ function AdminOrdersContent() {
 
       if (res.ok) {
         const data = await res.json();
+        if (requestId !== listSequenceRef.current) return;
         setOrders(data.data.orders);
         setPagination(data.data.pagination);
         setIsOffline(false);
       } else {
         const errData = await res.json().catch(() => ({}));
-        console.error("API error:", errData.message || "Failed to fetch orders");
-        setOrders([]);
-        setPagination({ page: 1, limit, total: 0, pages: 1 });
-        setIsOffline(false);
+        throw new Error(errData.message || "Không thể tải danh sách vận đơn");
       }
     } catch (err: unknown) {
+      if (requestId !== listSequenceRef.current) return;
       console.warn("Backend connection error:", err);
-      setOrders([]);
-      setPagination({ page: 1, limit, total: 0, pages: 1 });
-      setIsOffline(false);
+      setIsOffline(true);
     } finally {
-      setLoading(false);
+      if (requestId === listSequenceRef.current) setLoading(false);
     }
   };
+  useAdminPageRefresh(() => { if (!actionSubmitRef.current) { void fetchOrders(true); if (selectedOrder) void handleSyncSelectedOrder(); } });
 
   useEffect(() => {
     fetchOrders();
@@ -892,7 +676,7 @@ function AdminOrdersContent() {
       {/* Offline Alert Banner */}
       {isOffline && (
         <div className="bg-amber-50 border border-amber-100 text-amber-700 p-3 rounded-2xl flex items-center gap-2 text-xs font-semibold">
-          <AlertTriangle className="w-4 h-4" /> Hệ thống đang ở chế độ Offline. Dữ liệu hiển thị bên dưới là dữ liệu giả lập.
+          <AlertTriangle className="w-4 h-4" /> Không thể tải dữ liệu mới từ máy chủ. Nếu có dữ liệu bên dưới, đó là lần tải thành công gần nhất; không phải dữ liệu giả lập.
         </div>
       )}
 
@@ -979,7 +763,7 @@ function AdminOrdersContent() {
             id: "gmv",
             label: "Tổng Cước Phí (GMV)",
             value: formatVND(totalGmvAmount),
-            subValue: "Bảo chứng ký quỹ MB Bank",
+            subValue: "Giá cước của các đơn đang hiển thị",
             badge: "Doanh số",
             trendUp: true,
             icon: Banknote,
@@ -1228,7 +1012,7 @@ function AdminOrdersContent() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
                   {sortedOrders.map((order) => {
-                    const statusInfo = STATUS_MAP[order.status] || { label: order.status, color: "text-slate-500 bg-slate-50", icon: Clock };
+                    const statusInfo = { ...getAdminOrderStatus(order), icon: STATUS_MAP[order.status]?.icon || Clock, animate: STATUS_MAP[order.status]?.animate };
                     const StatusIcon = statusInfo.icon;
                     const cancelReason = order.status === "cancelled" ? getCancelReasonText(order) : "";
                     const cancelledBy = order.status === "cancelled" ? getCancelledByDisplay(order) : "";
@@ -1276,6 +1060,7 @@ function AdminOrdersContent() {
                         <td className="py-4.5 px-6 text-xs font-bold text-slate-600 whitespace-nowrap">
                           {formatDateTime(order.createdAt)}
                         </td>
+
 
                         {/* Status */}
                         <td className="py-4.5 px-6 min-w-[220px]">
@@ -1419,7 +1204,7 @@ function AdminOrdersContent() {
                       Chi Tiết Vận Đơn: <span className="text-primary-600 font-mono">{selectedOrder.orderCode}</span>
                     </h3>
                     {(() => {
-                      const statusInfo = STATUS_MAP[selectedOrder.status] || { label: selectedOrder.status, color: "text-slate-500 bg-slate-50", icon: Clock };
+                      const statusInfo = { ...getAdminOrderStatus(selectedOrder), icon: STATUS_MAP[selectedOrder.status]?.icon || Clock };
                       const StatusIcon = statusInfo.icon;
                       return (
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusInfo.color}`}>
@@ -1495,7 +1280,7 @@ function AdminOrdersContent() {
                       <h4 className="text-xs font-bold tracking-wider uppercase text-white">
                         Bộ Công Cụ Thao Tác Nhanh Quản Trị Viên (TMS Operations)
                       </h4>
-                      <p className="text-slate-400 text-[11px]">Can thiệp điều vận thời gian thực và quản trị bảo chứng MB Bank</p>
+                      <p className="text-slate-400 text-[11px]">Đối soát tiến trình, chứng cứ và các khoản bảo đảm thực tế</p>
                     </div>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 w-fit">
@@ -1516,48 +1301,7 @@ function AdminOrdersContent() {
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingOrder ? "animate-spin text-primary-400" : "text-slate-300"}`} />
                     <span>{isSyncingOrder ? "Đang đồng bộ..." : "Làm mới"}</span>
                   </button>
-
-                  {/* Status */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveActionTab(activeActionTab === "status" ? "none" : "status")}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      activeActionTab === "status"
-                        ? "bg-indigo-500 text-white shadow-sm ring-2 ring-indigo-300"
-                        : "bg-indigo-600 hover:bg-indigo-500 text-white"
-                    }`}
-                  >
-                    <Sliders className="w-3.5 h-3.5" />
-                    <span>Chuyển trạng thái</span>
-                  </button>
-
-                  {/* Reassign Driver */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveActionTab(activeActionTab === "reassign" ? "none" : "reassign")}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                      activeActionTab === "reassign"
-                        ? "bg-blue-600 text-white border-blue-400 ring-2 ring-blue-300"
-                        : "bg-white/10 hover:bg-white/15 text-slate-200 border-white/10"
-                    }`}
-                  >
-                    <UserPlus className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Điều phối tài xế</span>
-                  </button>
-
-                  {/* Escrow MB Bank */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveActionTab(activeActionTab === "escrow" ? "none" : "escrow")}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                      activeActionTab === "escrow"
-                        ? "bg-emerald-600 text-white border-emerald-400 ring-2 ring-emerald-300"
-                        : "bg-emerald-600/25 hover:bg-emerald-600/35 text-emerald-300 border-emerald-500/30"
-                    }`}
-                  >
-                    <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Ký quỹ MB Bank</span>
-                  </button>
+                  <Link href={`/admin/incidents?orderId=${selectedOrder._id}`} className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-xs font-bold text-amber-800">Đối soát tranh chấp / tài chính</Link>
 
                   {/* Notes */}
                   <button
@@ -1579,6 +1323,7 @@ function AdminOrdersContent() {
                   </button>
 
                   {/* Cancel */}
+                  {selectedOrder.adminOperations?.canCancelUnassigned && !selectedOrder.activeIncident && (
                   <button
                     type="button"
                     onClick={() => setActiveActionTab(activeActionTab === "cancel" ? "none" : "cancel")}
@@ -1589,261 +1334,16 @@ function AdminOrdersContent() {
                     }`}
                   >
                     <Ban className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Hủy đơn</span>
+                    <span>Hủy yêu cầu chưa chọn xe</span>
                   </button>
+                  )}
                 </div>
               </div>
 
+              <p className="text-xs text-slate-500">{selectedOrder.adminOperations?.reason}</p>
+              {getAdminCompletionNotice(selectedOrder) && <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">{getAdminCompletionNotice(selectedOrder)?.text}{selectedOrder.shipperConfirmDeadlineAt ? ` Hạn: ${formatDateTime(selectedOrder.shipperConfirmDeadlineAt)}` : ""}</p>}
+              <OrderFinancialSummary snapshot={selectedOrder.financialSnapshot} claims={selectedOrder.compensationClaims} locks={selectedOrder.escrowLocks} />
               {/* ACTION FORM PANELS */}
-              {activeActionTab === "status" && (
-                <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 space-y-3 text-xs animate-in fade-in duration-150">
-                  <h5 className="font-bold text-indigo-900 flex items-center gap-1.5">
-                    <Sliders className="w-4 h-4 text-indigo-600" /> Chuyển Trạng Thái Vận Đơn
-                  </h5>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-700 font-bold mb-1">Chọn trạng thái mới</label>
-                      <select
-                        value={targetStatus}
-                        onChange={(e) => setTargetStatus(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs"
-                      >
-                        <option value="searching_driver">Đang tìm tài xế (Quét xe xung quanh)</option>
-                        <option value="waiting_driver_acceptance">Chờ tài xế xác nhận cuốc xe</option>
-                        <option value="accepted">Đã tìm được tài xế (Đang đến điểm bốc)</option>
-                        <option value="in_progress">Tài xế đang di chuyển (Vận chuyển hàng)</option>
-                        <option value="delivered">Đã giao hàng (Chờ chủ hàng xác nhận nghiệm thu)</option>
-                        <option value="completed">Đã hoàn thành (Chủ hàng đã xác nhận & đối soát xong)</option>
-                        <option value="cancelled">Đã hủy vận đơn</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-slate-700 font-bold mb-1">Lý do điều chuyển (Audit log)</label>
-                      <input
-                        type="text"
-                        value={statusNote}
-                        onChange={(e) => setStatusNote(e.target.value)}
-                        placeholder="Ví dụ: Đã nhận được xác nhận từ khách hàng..."
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-end gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setActiveActionTab("none")}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold cursor-pointer"
-                    >
-                      Hủy bỏ
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleConfirmStatusChange}
-                      disabled={isSubmitting}
-                      className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {isSubmitting && <Loader className="w-3 h-3 animate-spin" />}
-                      <span>{isSubmitting ? "Đang xử lý..." : "Xác nhận chuyển trạng thái"}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {activeActionTab === "reassign" && (
-                <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-3 text-xs animate-in fade-in duration-150">
-                  <h5 className="font-bold text-blue-900 flex items-center gap-1.5">
-                    <UserPlus className="w-4 h-4 text-blue-600" /> Điều Phối & Chỉ Định Tài Xế
-                  </h5>
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-blue-100/60 rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => setReassignMode("assign")}
-                      className={`py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                        reassignMode === "assign" ? "bg-white text-blue-900 shadow-xs" : "text-blue-700 hover:text-blue-950"
-                      }`}
-                    >
-                      Chỉ định tài xế trực tiếp
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReassignMode("reopen")}
-                      className={`py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                        reassignMode === "reopen" ? "bg-white text-blue-900 shadow-xs" : "text-blue-700 hover:text-blue-950"
-                      }`}
-                    >
-                      Mở lại tìm kiếm trên sàn
-                    </button>
-                  </div>
-
-                  {reassignMode === "assign" ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      <div>
-                        <label className="block text-slate-700 font-bold mb-1">Họ tên tài xế mới *</label>
-                        <input
-                          type="text"
-                          value={newDriverName}
-                          onChange={(e) => setNewDriverName(e.target.value)}
-                          placeholder="Ví dụ: Nguyễn Văn Hùng"
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-700 font-bold mb-1">Số điện thoại</label>
-                        <input
-                          type="text"
-                          value={newDriverPhone}
-                          onChange={(e) => setNewDriverPhone(e.target.value)}
-                          placeholder="09xx xxx xxx"
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-700 font-bold mb-1">Biển số / Loại xe</label>
-                        <input
-                          type="text"
-                          value={newDriverVehicle}
-                          onChange={(e) => setNewDriverVehicle(e.target.value)}
-                          placeholder="51D-987.65 (15 tấn)"
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-blue-800 bg-blue-100/50 p-2.5 rounded-xl text-[11px]">
-                      Hệ thống sẽ hủy ghép nối với tài xế hiện tại và đưa đơn hàng trở lại trạng thái tìm kiếm tài xế trên sàn toàn hệ thống.
-                    </p>
-                  )}
-
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Lý do điều phối</label>
-                    <input
-                      type="text"
-                      value={reassignReason}
-                      onChange={(e) => setReassignReason(e.target.value)}
-                      placeholder="Ví dụ: Tài xế gặp sự cố, chủ hàng yêu cầu đổi phương tiện..."
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setActiveActionTab("none")}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold cursor-pointer"
-                    >
-                      Hủy bỏ
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleConfirmReassignDriver}
-                      disabled={isSubmitting}
-                      className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {isSubmitting && <Loader className="w-3 h-3 animate-spin" />}
-                      <span>{isSubmitting ? "Đang xử lý..." : "Xác nhận điều phối"}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {activeActionTab === "escrow" && (
-                <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-3 text-xs animate-in fade-in duration-150">
-                  <h5 className="font-bold text-emerald-900 flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" /> Nghiệp Vụ Ký Quỹ & Bảo Chứng MB Bank
-                  </h5>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 bg-emerald-100/50 rounded-xl">
-                    <div>
-                      <span className="text-slate-500 font-medium">Mã GD MB Bank:</span>
-                      <p className="font-mono font-bold text-slate-900">MB-TXE-{selectedOrder.orderCode}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 font-medium">Cước phí bảo chứng:</span>
-                      <p className="font-bold text-blue-700">{getOrderCost(selectedOrder).toLocaleString()} ₫</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 font-medium">Tài xế thực nhận (95%):</span>
-                      <p className="font-bold text-emerald-700">{(Math.round(getOrderCost(selectedOrder) * 0.95)).toLocaleString()} ₫</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className={`p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${
-                      escrowActionType === "disburse" ? "bg-white border-emerald-500 text-emerald-900 shadow-2xs" : "bg-emerald-50/50 border-emerald-200 text-slate-700"
-                    }`}>
-                      <input
-                        type="radio"
-                        name="escrowActionType"
-                        checked={escrowActionType === "disburse"}
-                        onChange={() => setEscrowActionType("disburse")}
-                      />
-                      <div>
-                        <p className="font-bold">Giải ngân ngay cho Tài xế (Disburse)</p>
-                        <p className="text-[11px] opacity-80">Phát lệnh chuyển 95% cước phí vào tài khoản MB Bank của tài xế</p>
-                      </div>
-                    </label>
-
-                    <label className={`p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${
-                      escrowActionType === "freeze" ? "bg-white border-amber-500 text-amber-900 shadow-2xs" : "bg-emerald-50/50 border-emerald-200 text-slate-700"
-                    }`}>
-                      <input
-                        type="radio"
-                        name="escrowActionType"
-                        checked={escrowActionType === "freeze"}
-                        onChange={() => setEscrowActionType("freeze")}
-                      />
-                      <div>
-                        <p className="font-bold">Đóng băng tranh chấp (Freeze Escrow)</p>
-                        <p className="text-[11px] opacity-80">Khóa tiền tạm thời tại MB Bank, chờ biên bản giám định hư hỏng</p>
-                      </div>
-                    </label>
-
-                    <label className={`p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${
-                      escrowActionType === "refund" ? "bg-white border-rose-500 text-rose-900 shadow-2xs" : "bg-emerald-50/50 border-emerald-200 text-slate-700"
-                    }`}>
-                      <input
-                        type="radio"
-                        name="escrowActionType"
-                        checked={escrowActionType === "refund"}
-                        onChange={() => setEscrowActionType("refund")}
-                      />
-                      <div>
-                        <p className="font-bold">Hoàn tiền 100% cho Chủ hàng (Refund)</p>
-                        <p className="text-[11px] opacity-80">Hoàn lại tiền cước bảo chứng vào ví/tài khoản của chủ hàng</p>
-                      </div>
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Ghi chú xác nhận nghiệp vụ</label>
-                    <input
-                      type="text"
-                      value={escrowActionReason}
-                      onChange={(e) => setEscrowActionReason(e.target.value)}
-                      placeholder="Ví dụ: Phê duyệt theo nghiệm thu hàng hóa..."
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setActiveActionTab("none")}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold cursor-pointer"
-                    >
-                      Hủy bỏ
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleConfirmEscrowAction}
-                      disabled={isSubmitting}
-                      className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {isSubmitting && <Loader className="w-3 h-3 animate-spin" />}
-                      <span>{isSubmitting ? "Đang xử lý..." : "Xác nhận lệnh ký quỹ"}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {activeActionTab === "notes" && (
                 <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-3 text-xs animate-in fade-in duration-150">
@@ -1901,10 +1401,10 @@ function AdminOrdersContent() {
                 </div>
               )}
 
-              {activeActionTab === "cancel" && (
+              {activeActionTab === "cancel" && selectedOrder.adminOperations?.canCancelUnassigned && !selectedOrder.activeIncident && (
                 <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200/80 space-y-3 text-xs animate-in fade-in duration-150">
                   <h5 className="font-bold text-rose-900 flex items-center gap-1.5">
-                    <Ban className="w-4 h-4 text-rose-600" /> Hủy Vận Đơn Khẩn Cấp
+                    <Ban className="w-4 h-4 text-rose-600" /> Hủy yêu cầu chưa chọn xe
                   </h5>
                   <div>
                     <label className="block text-slate-700 font-bold mb-1">Lý do hủy đơn chính</label>
@@ -1913,12 +1413,10 @@ function AdminOrdersContent() {
                       onChange={(e) => setCancelReasonChoice(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-xs"
                     >
-                      <option value="Xe hư hỏng / tai nạn kỹ thuật">Xe hư hỏng / tai nạn kỹ thuật</option>
-                      <option value="Tranh chấp giá cước hoặc chi phí phát sinh">Tranh chấp giá cước hoặc chi phí phát sinh</option>
-                      <option value="Hàng hóa sai quy cách / không an toàn">Hàng hóa sai quy cách / không an toàn</option>
-                      <option value="Chủ hàng yêu cầu hủy chuyến">Chủ hàng yêu cầu hủy chuyến</option>
-                      <option value="Tài xế không liên hệ được">Tài xế không liên hệ được</option>
-                      <option value="Thời tiết bất khả kháng (bão lũ)">Thời tiết bất khả kháng (bão lũ)</option>
+                      <option>Chủ hàng yêu cầu hủy tìm xe</option>
+                      <option>Thông tin yêu cầu cần chỉnh sửa</option>
+                      <option>Tin trùng lặp hoặc không còn nhu cầu</option>
+                      <option>Lý do khác</option>
                     </select>
                   </div>
                   <div>
@@ -1931,26 +1429,6 @@ function AdminOrdersContent() {
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/20"
                     />
                   </div>
-                  {selectedOrder.driverId && (
-                    <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/80 space-y-1">
-                      <label className="flex items-start gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={releaseDriverChoice}
-                          onChange={(e) => setReleaseDriverChoice(e.target.checked)}
-                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                        />
-                        <div className="text-[11px] leading-tight">
-                          <span className="font-bold text-blue-950 block">
-                            Giải phóng tài xế ({selectedOrder.driverId.name || "Tài xế"})
-                          </span>
-                          <span className="text-slate-600 block mt-0.5">
-                            Tự động xóa cờ bận đơn, khôi phục tin đăng tìm hàng và mở cọc 3% để tài xế nổ đơn mới ngay.
-                          </span>
-                        </div>
-                      </label>
-                    </div>
-                  )}
                   <div className="flex items-center justify-end gap-2 pt-1">
                     <button
                       type="button"

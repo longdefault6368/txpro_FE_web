@@ -5,13 +5,15 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { AdminFinancialSnapshot, getAdminOrderStatus, getAdminCompletionNotice } from "@/utils/admin-order-state";
+import { OrderFinancialSummary, AdminCompensationClaim } from "@/components/admin/OrderFinancialSummary";
+import { useAdminPageRefresh } from "@/hooks/useAdminPageRefresh";
 import { 
-  ArrowLeft, MapPin, Phone, Mail, Clock, CheckCircle, 
-  AlertTriangle, Truck, Info, Shield, User, Loader, DollarSign, Calendar, Star,
-  ShieldCheck, CreditCard, Copy, Check, ExternalLink, Banknote, Lock,
-  Camera, FileCheck, FileText, Maximize2, Download, Printer, Eye, CheckCircle2,
-  Image as ImageIcon, X, ZoomIn, RotateCw, RefreshCw, Sliders, StickyNote,
-  UserPlus, Ban, Send, Unlock, ChevronDown, CheckCheck, FileSignature
+  ArrowLeft, MapPin, Phone, Mail, CheckCircle,
+  AlertTriangle, Truck, Info, Shield, User, Loader, DollarSign, Star,
+  ExternalLink, Camera, FileCheck, FileText, Maximize2, Download, Printer, CheckCircle2,
+  Image as ImageIcon, X, ZoomIn, RotateCw, RefreshCw, StickyNote,
+  Ban, Send, FileSignature
 } from "lucide-react";
 import { useToast } from "@/context/ToastContext";
 
@@ -53,20 +55,19 @@ interface Order {
     declaredValue?: number | null;
     fee?: number | null;
   } | null;
-  financialSnapshot?: {
-    orderAmount?: number | null;
-    settlementStatus?: string | null;
-    settlementReference?: string | null;
-    shipperEscrow?: { amount?: number | null; status?: string | null };
-    driverEscrow?: { amount?: number | null; status?: string | null };
-    driverPlatformFee?: { amount?: number | null; status?: string | null };
-  } | null;
+  financialSnapshot?: AdminFinancialSnapshot | null;
   completion?: {
+    driverNearPickupNotifiedAt?: string | null;
+    driverNearDropoffNotifiedAt?: string | null;
     acceptNote?: string | null;
     estimatedPickupTime?: string | null;
     pickupArrivedAt?: string | null;
     deliveredAt?: string | null;
     shipperConfirmed?: boolean;
+    autoConfirmed?: boolean;
+    settlementTrigger?: string | null;
+    incidentResolvedAt?: string | null;
+    shipperConfirmedAt?: string | null;
     shipperNote?: string | null;
     driverUnselectedAt?: string | null;
     pickupPhotos?: string[];
@@ -113,6 +114,12 @@ interface Order {
   } | null;
   createdAt: string;
   updatedAt?: string;
+  acceptedAt?: string | null;
+  deliveredAt?: string | null;
+  shipperConfirmDeadlineAt?: string | null;
+  adminOperations?: { canCancelUnassigned: boolean; reason: string; autoSettlementEnabled?: boolean; autoSettlementEligible?: boolean };
+  compensationClaims?: AdminCompensationClaim[];
+  escrowLocks?: { _id: string; amount: number; status: string; role: string }[];
 }
 
 export const INCIDENT_TYPE_LABELS: Record<string, string> = {
@@ -214,68 +221,6 @@ function getVehicleIconSvg(vehicleText?: string | null) {
 }
 
 
-const STATUS_MAP: Record<string, { label: string; detail: string; color: string; stepIndex: number }> = {
-  searching_driver: {
-    label: "Đang tìm tài xế",
-    detail: "Đang quét và phát tín hiệu tìm xe rỗng trên tuyến",
-    color: "text-amber-800 bg-amber-50 border-amber-200",
-    stepIndex: 0,
-  },
-  waiting_driver: {
-    label: "Chờ tài xế xác nhận",
-    detail: "Đã ghép chuyến, chờ tài xế xác nhận cuốc xe",
-    color: "text-purple-800 bg-purple-50 border-purple-200",
-    stepIndex: 0,
-  },
-  waiting_driver_acceptance: {
-    label: "Chờ tài xế xác nhận",
-    detail: "Tài xế đang xem xét thông tin đơn hàng",
-    color: "text-purple-800 bg-purple-50 border-purple-200",
-    stepIndex: 0,
-  },
-  accepted: {
-    label: "Đã tìm được tài xế",
-    detail: "Tài xế đã nhận đơn, đang di chuyển đến điểm bốc hàng",
-    color: "text-indigo-800 bg-indigo-50 border-indigo-200",
-    stepIndex: 1,
-  },
-  rejected: {
-    label: "Tài xế từ chối nhận",
-    detail: "Tài xế từ chối, hệ thống đang điều phối xe thay thế",
-    color: "text-rose-800 bg-rose-50 border-rose-200",
-    stepIndex: 0,
-  },
-  in_progress: {
-    label: "Tài xế đang di chuyển",
-    detail: "Đang trên lộ trình vận chuyển hàng đến điểm trả",
-    color: "text-blue-800 bg-blue-50 border-blue-200",
-    stepIndex: 2,
-  },
-  delivered: {
-    label: "Đã giao hàng (Chờ chủ hàng xác nhận)",
-    detail: "Đã hạ hàng tại điểm trả, chờ chủ hàng nghiệm thu & xác nhận",
-    color: "text-teal-800 bg-teal-50 border-teal-200",
-    stepIndex: 3,
-  },
-  completed: {
-    label: "Đã hoàn thành",
-    detail: "Chủ hàng đã xác nhận, đối soát cọc & cước xong 100%",
-    color: "text-emerald-800 bg-emerald-100 border-emerald-300 font-extrabold",
-    stepIndex: 3,
-  },
-  disputed: {
-    label: "Đang giải quyết sự cố",
-    detail: "Hai bên chưa thống nhất báo cáo; chờ quản trị viên đối soát. Tài xế có thể nhận chuyến khác.",
-    color: "text-amber-800 bg-amber-50 border-amber-200",
-    stepIndex: -1,
-  },
-  cancelled: {
-    label: "Đã hủy vận đơn",
-    detail: "Chuyến xe đã bị hủy trên hệ thống",
-    color: "text-red-800 bg-red-50 border-red-200",
-    stepIndex: -1,
-  },
-};
 
 const CANCEL_REASON_LABELS: Record<string, string> = {
   accident: "Xe hư hỏng / tai nạn",
@@ -339,10 +284,11 @@ function buildOrderActivityTimeline(order: Order): OrderActivityItem[] {
   const driverName = order.driverId?.name || "Tài xế";
   const completion = order.completion || {};
   const isWaitingDriverAcceptance = order.status === "waiting_driver_acceptance";
-  const hasDriverAccepted = ["accepted", "in_progress", "delivered", "completed", "cancelled"].includes(order.status) && Boolean(order.driverId);
-  const hasPickupStarted = ["in_progress", "delivered", "completed"].includes(order.status);
-  const hasDriverDelivered = ["delivered", "completed"].includes(order.status);
-  const hasShipperCompleted = order.status === "completed";
+  const hasDriverAccepted = Boolean(order.acceptedAt);
+  const hasPickupStarted = Boolean(completion.pickupArrivedAt);
+  const hasDriverDelivered = Boolean(order.deliveredAt || completion.deliveredAt);
+  const automaticCompletion = completion.settlementTrigger === "auto_24h" || completion.autoConfirmed;
+  const hasShipperCompleted = order.status === "completed" && Boolean(completion.shipperConfirmed || automaticCompletion) && !completion.incidentResolvedAt;
 
   const timeline: OrderActivityItem[] = [
     {
@@ -363,7 +309,7 @@ function buildOrderActivityTimeline(order: Order): OrderActivityItem[] {
       description: isWaitingDriverAcceptance
         ? `${shipperName} đã gửi yêu cầu nhận chuyến cho tài xế và đang chờ phản hồi.`
         : `${shipperName} đã chọn ${driverName} cho vận đơn này.`,
-      time: order.timeoutAt || order.updatedAt || order.createdAt,
+      time: undefined,
       icon: User,
       done: hasDriverAccepted || isWaitingDriverAcceptance,
       active: isWaitingDriverAcceptance,
@@ -385,7 +331,7 @@ function buildOrderActivityTimeline(order: Order): OrderActivityItem[] {
       key: "driver-accepted",
       title: "Tài xế xác nhận nhận chuyến",
       description: `${driverName} đã xác nhận nhận vận đơn.${completion.acceptNote ? ` Ghi chú: ${completion.acceptNote}.` : ""}`,
-      time: completion.estimatedPickupTime || order.updatedAt || order.createdAt,
+      time: order.acceptedAt,
       icon: CheckCircle,
       done: true,
       active: order.status === "accepted",
@@ -409,7 +355,7 @@ function buildOrderActivityTimeline(order: Order): OrderActivityItem[] {
       key: "driver-delivered",
       title: "Tài xế xác nhận giao hàng",
       description: `${driverName} đã xác nhận giao hàng tại điểm trả, chờ chủ hàng kiểm tra và hoàn tất.`,
-      time: completion.deliveredAt || order.updatedAt,
+      time: order.deliveredAt || completion.deliveredAt,
       icon: Truck,
       done: true,
       active: order.status === "delivered",
@@ -419,13 +365,17 @@ function buildOrderActivityTimeline(order: Order): OrderActivityItem[] {
   if (hasShipperCompleted) {
     timeline.push({
       key: "shipper-completed",
-      title: "Chủ hàng xác nhận hoàn tất",
-      description: `${shipperName} đã xác nhận nhận hàng và hoàn tất vận đơn.${completion.shipperNote ? ` Ghi chú: ${completion.shipperNote}.` : ""}`,
-      time: order.updatedAt,
+      title: automaticCompletion ? "Hệ thống tự động hoàn tất" : "Chủ hàng xác nhận hoàn tất",
+      description: automaticCompletion ? "Hệ thống đã hoàn tất theo hạn xác nhận đã ghi nhận." : `${shipperName} đã xác nhận nhận hàng và hoàn tất vận đơn.${completion.shipperNote ? ` Ghi chú: ${completion.shipperNote}.` : ""}`,
+      time: completion.shipperConfirmedAt || order.financialSnapshot?.settledAt,
       icon: Shield,
       done: true,
       active: false,
     });
+  }
+
+  if (completion.incidentResolvedAt) {
+    timeline.push({ key: "incident-resolved", title: "Hoàn tất sau giải quyết sự cố", description: "Đơn hoàn tất theo kết quả xử lý sự cố; không đồng nghĩa các bước giao hàng đã được xác nhận. Đối chiếu biên bản tại Tranh chấp.", time: completion.incidentResolvedAt, icon: Shield, done: true, active: false });
   }
 
   if (order.status === "cancelled") {
@@ -497,16 +447,15 @@ interface OrderEpodDetail {
 }
 
 function getOrderEpodDetail(order: Order): OrderEpodDetail {
-  const isDelivered = ["delivered", "completed"].includes(order.status);
-  const isCompleted = order.status === "completed";
+  const isDelivered = Boolean(order.deliveredAt || order.completion?.deliveredAt);
+  const isCompleted = order.status === "completed" && Boolean(order.completion?.shipperConfirmed) && !order.completion?.incidentResolvedAt;
   const isInProgress = order.status === "in_progress";
 
   const pickupTime = order.completion?.pickupArrivedAt || null;
-  const deliveredTime = order.completion?.deliveredAt || order.updatedAt || null;
+  const deliveredTime = order.deliveredAt || order.completion?.deliveredAt || order.evidence?.dropoff?.capturedAt || null;
 
   // Real certificate code from contract or orderCode
-  const certificateCode = order.contract?.contractNumber || 
-    (order.orderCode ? `EPOD-${order.orderCode}` : null);
+  const certificateCode = order.contract?.contractNumber || null;
 
   // Real SHA-256 hash from contract or evidence
   const sha256Hash = order.contract?.hash || 
@@ -616,6 +565,8 @@ function AdminOrderRouteMap({ order }: { order: Order }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const layersRef = useRef<any[]>([]);
+  const fittedOrderRef = useRef<string | null>(null);
+  const latestBoundsRef = useRef<{ isEmpty(): boolean } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -757,6 +708,7 @@ function AdminOrderRouteMap({ order }: { order: Order }) {
         const directionsService = new google.maps.DirectionsService();
         const directionsRenderer = new google.maps.DirectionsRenderer({
           map,
+          preserveViewport: true,
           suppressMarkers: true,
           polylineOptions: { strokeColor: "#4f46e5", strokeOpacity: 0.88, strokeWeight: 5 },
         });
@@ -769,6 +721,7 @@ function AdminOrderRouteMap({ order }: { order: Order }) {
             travelMode: google.maps.TravelMode.DRIVING,
           },
           (result: any, status: any) => {
+            if (cancelled) return;
             if (status !== google.maps.DirectionsStatus.OK || !result) return;
 
             directionsRenderer.setDirections(result);
@@ -805,7 +758,9 @@ function AdminOrderRouteMap({ order }: { order: Order }) {
         );
       }
 
-      if (!bounds.isEmpty()) {
+      latestBoundsRef.current = bounds;
+      if (!bounds.isEmpty() && fittedOrderRef.current !== order._id) {
+        fittedOrderRef.current = order._id;
         map.fitBounds(bounds, { top: 64, right: 64, bottom: 64, left: 64 });
         google.maps.event.addListenerOnce(map, "idle", () => {
           const zoom = map.getZoom();
@@ -820,7 +775,7 @@ function AdminOrderRouteMap({ order }: { order: Order }) {
     };
   }, [order]);
 
-  return <div ref={containerRef} className="h-full min-h-[260px] w-full bg-slate-100" />;
+  return <div className="relative h-full min-h-[260px] w-full"><div ref={containerRef} className="h-full min-h-[260px] w-full bg-slate-100" /><button type="button" title="Thu bản đồ về toàn tuyến" onClick={() => { if (mapRef.current && latestBoundsRef.current && !latestBoundsRef.current.isEmpty()) mapRef.current.fitBounds(latestBoundsRef.current, 64); }} className="absolute right-14 top-3 rounded-lg bg-white p-2 text-slate-700 shadow"><Maximize2 className="h-4 w-4" /></button></div>;
 }
 
 export default function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -830,7 +785,8 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
-  const [copiedEscrow, setCopiedEscrow] = useState(false);
+  const detailSequenceRef = useRef(0);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   // e-POD states
   const [activeEpodTab, setActiveEpodTab] = useState<"dropoff" | "pickup" | "cargo">("dropoff");
@@ -842,63 +798,61 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   // Admin Action Toolbar states
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
-  const [isEscrowModalOpen, setIsEscrowModalOpen] = useState(false);
+  const actionSubmitRef = useRef(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
   // Modal form states
-  const [targetStatus, setTargetStatus] = useState<Order["status"]>("in_progress");
-  const [statusNote, setStatusNote] = useState("");
-  const [newDriverName, setNewDriverName] = useState("");
-  const [newDriverPhone, setNewDriverPhone] = useState("");
-  const [newDriverVehicle, setNewDriverVehicle] = useState("");
-  const [reassignMode, setReassignMode] = useState<"assign" | "reopen">("assign");
-  const [reassignReason, setReassignReason] = useState("");
-  const [escrowActionType, setEscrowActionType] = useState<"disburse" | "freeze" | "refund">("disburse");
-  const [escrowActionReason, setEscrowActionReason] = useState("");
   const [adminNotes, setAdminNotes] = useState<AdminInternalNote[]>([]);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [newNoteType, setNewNoteType] = useState<"info" | "warning" | "action">("info");
-  const [cancelReasonChoice, setCancelReasonChoice] = useState("Xe hư hỏng / tai nạn kỹ thuật");
+  const [cancelReasonChoice, setCancelReasonChoice] = useState("Chủ hàng yêu cầu hủy tìm xe");
   const [cancelReasonDetail, setCancelReasonDetail] = useState("");
-  const [releaseDriverChoice, setReleaseDriverChoice] = useState(true);
 
   // Load order data and initialize Google Map route
-  const fetchOrderDetail = useCallback(async () => {
-    setLoading(true);
+  const fetchOrderDetail = useCallback(async (silent = false) => {
+    const requestId = ++detailSequenceRef.current;
+    if (!silent) setLoading(true);
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}`);
       if (res.ok) {
         const data = await res.json();
+        if (requestId !== detailSequenceRef.current) return false;
         if (data.data?.order) {
           setOrder({
             ...data.data.order,
             reviews: data.data.reviews || [],
             contract: data.data.contract || null,
             evidence: data.data.evidence || null,
+            compensationClaims: data.data.compensationClaims || [],
+            escrowLocks: data.data.escrowLocks || [],
           });
           if (Array.isArray(data.data.order.adminNotes)) {
             setAdminNotes(data.data.order.adminNotes);
           }
           setIsOffline(false);
+          setDetailError(null);
+          return true;
         } else {
           setOrder(null);
           setIsOffline(false);
         }
       } else {
-        setOrder(null);
+        throw new Error("Không thể tải dữ liệu vận đơn từ máy chủ.");
         setIsOffline(false);
       }
     } catch (err) {
+      if (requestId !== detailSequenceRef.current) return false;
       console.warn("Backend error, order not loaded", err);
-      setOrder(null);
+      if (!silent) setOrder(null);
+      setDetailError(err instanceof Error ? err.message : "Không thể tải vận đơn.");
       setIsOffline(false);
     } finally {
-      setLoading(false);
+      if (requestId === detailSequenceRef.current) setLoading(false);
     }
+    return false;
   }, [id]);
+  useAdminPageRefresh(() => { if (!isSubmitting) void fetchOrderDetail(true); });
 
   useEffect(() => {
     fetchOrderDetail();
@@ -910,9 +864,6 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       if (e.key === "Escape") {
         setSelectedPhoto(null);
         setIsPrintModalOpen(false);
-        setIsStatusModalOpen(false);
-        setIsReassignModalOpen(false);
-        setIsEscrowModalOpen(false);
         setIsNotesModalOpen(false);
         setIsCancelModalOpen(false);
       }
@@ -934,8 +885,9 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     return (
       <div className="bg-white rounded-3xl p-10 border border-slate-200 shadow text-center space-y-4 max-w-md mx-auto mt-10">
         <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto" />
-        <h3 className="text-lg font-bold text-slate-800">Không Tìm Thấy Vận Đơn</h3>
-        <p className="text-slate-500 text-xs">Mã vận đơn này không tồn tại hoặc đã bị xóa khỏi hệ thống.</p>
+        <h3 className="text-lg font-bold text-slate-800">{detailError ? "Chưa tải được vận đơn" : "Không tìm thấy vận đơn"}</h3>
+        <p className="text-slate-500 text-xs">{detailError || "Mã vận đơn này không tồn tại hoặc đã bị xóa khỏi hệ thống."}</p>
+        {detailError && <button type="button" onClick={() => void fetchOrderDetail()} className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">Thử lại</button>}
         <button onClick={() => router.push("/admin/orders")} className="btn-primary w-full py-2.5 rounded-xl font-bold text-xs cursor-pointer">
           Quay lại danh sách
         </button>
@@ -943,63 +895,13 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     );
   }
 
-  const activeStatus = STATUS_MAP[order.status] || { label: order.status, color: "text-slate-500 bg-slate-50", stepIndex: 0 };
+  const activeStatus = getAdminOrderStatus(order);
   const orderReviews = order.reviews || [];
   const shouldShowReviews = (order.status === "completed" || order.status === "delivered") && orderReviews.length > 0;
   const activityTimeline = buildOrderActivityTimeline(order);
 
-  const totalPrice = order.offerPrice || (typeof order.budget === "number" ? order.budget : order.budget?.max || 0);
-  const platformFee = Math.round(totalPrice * 0.05);
-  const driverPayout = totalPrice > 0 ? totalPrice - platformFee : 0;
-  const escrowTxCode = `MB-TXE-${order.orderCode || order._id}`;
-
-  const handleCopyEscrow = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(escrowTxCode);
-      setCopiedEscrow(true);
-      toast.success("Đã sao chép mã giao dịch ký quỹ MB Bank");
-      setTimeout(() => setCopiedEscrow(false), 2000);
-    }
-  };
-
-  const getEscrowStatus = (status: Order["status"]) => {
-    if (status === "completed") {
-      return {
-        badge: "Đã giải ngân cho tài xế",
-        sub: "Thanh toán tự động giải ngân sau khi nghiệm thu e-POD thành công",
-        color: "text-emerald-700 bg-emerald-50 border-emerald-200",
-        icon: CheckCircle,
-        dotColor: "bg-emerald-500",
-      };
-    }
-    if (status === "in_progress" || status === "delivered" || status === "accepted") {
-      return {
-        badge: "Đã ký quỹ 100% bảo chứng",
-        sub: "Tiền phong tỏa tại MB Bank, bảo vệ quyền lợi hai bên",
-        color: "text-blue-700 bg-blue-50 border-blue-200",
-        icon: ShieldCheck,
-        dotColor: "bg-blue-500 animate-pulse",
-      };
-    }
-    if (status === "cancelled" || status === "rejected") {
-      return {
-        badge: "Đã hoàn cước / Hủy ký quỹ",
-        sub: "Cước phí đã được MB Bank hoàn về tài khoản người gửi",
-        color: "text-rose-700 bg-rose-50 border-rose-200",
-        icon: AlertTriangle,
-        dotColor: "bg-rose-500",
-      };
-    }
-    return {
-      badge: "Chờ nạp ký quỹ",
-      sub: "Đang chờ chủ hàng nạp bảo chứng cước phí",
-      color: "text-amber-700 bg-amber-50 border-amber-200",
-      icon: Clock,
-      dotColor: "bg-amber-500",
-    };
-  };
-
-  const escrowStatus = getEscrowStatus(order.status);
+  const completionNotice = getAdminCompletionNotice(order);
+  const totalPrice = order.financialSnapshot?.orderAmount ?? order.offerPrice ?? (typeof order.budget === "number" ? order.budget : order.budget?.max) ?? 0;
   const epodDetail = getOrderEpodDetail(order);
 
   const handleOpenPhoto = (photo: EpodPhotoItem) => {
@@ -1026,8 +928,9 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const handleSyncOrder = async () => {
     setIsSyncing(true);
     try {
-      await fetchOrderDetail();
-      toast.success("Đã đồng bộ dữ liệu vận đơn & tọa độ GPS mới nhất thành công");
+      const success = await fetchOrderDetail(true);
+      if (success) toast.success("Đã lấy dữ liệu vận đơn mới nhất");
+      else toast.error("Không thể làm mới dữ liệu từ máy chủ");
     } catch {
       toast.error("Không thể kết nối máy chủ để làm mới");
     } finally {
@@ -1035,261 +938,49 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     }
   };
 
-  const handleConfirmStatusChange = async () => {
-    if (!order) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: targetStatus,
-          note: statusNote.trim() || undefined,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.data?.order) {
-          setOrder((prev) => prev ? { ...prev, ...data.data.order } : null);
-          if (Array.isArray(data.data.order.adminNotes)) {
-            setAdminNotes(data.data.order.adminNotes);
-          }
-        } else {
-          setOrder((prev) => prev ? { ...prev, status: targetStatus } : null);
-        }
-        toast.success(`Đã cập nhật trạng thái vận đơn sang "${STATUS_MAP[targetStatus]?.label || targetStatus}"`);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        setOrder((prev) => prev ? { ...prev, status: targetStatus } : null);
-        toast.warning(errData.message || `Đã cập nhật trạng thái đơn (chế độ cục bộ)`);
-      }
-    } catch {
-      setOrder((prev) => prev ? { ...prev, status: targetStatus } : null);
-      toast.warning("Đã cập nhật trạng thái đơn hàng (chế độ ngoại tuyến)");
-    } finally {
-      setIsSubmitting(false);
-      setStatusNote("");
-      setIsStatusModalOpen(false);
-    }
-  };
-
-  const handleConfirmReassignDriver = async () => {
-    if (!order) return;
-    if (reassignMode === "assign" && !newDriverName.trim()) {
-      toast.warning("Vui lòng nhập họ và tên tài xế để chỉ định");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}/assign-driver`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: reassignMode,
-          driverName: newDriverName.trim() || undefined,
-          driverPhone: newDriverPhone.trim() || undefined,
-          vehicle: newDriverVehicle.trim() || undefined,
-          reason: reassignReason.trim() || undefined,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.data?.order) {
-          setOrder((prev) => prev ? { ...prev, ...data.data.order } : null);
-          if (Array.isArray(data.data.order.adminNotes)) {
-            setAdminNotes(data.data.order.adminNotes);
-          }
-        }
-        toast.success(reassignMode === "reopen" ? "Đã mở lại tìm kiếm tài xế trên sàn" : `Đã chỉ định tài xế mới: ${newDriverName}`);
-      } else {
-        if (reassignMode === "reopen") {
-          setOrder((prev) => prev ? { ...prev, driverId: undefined, status: "searching_driver" } : null);
-        } else {
-          setOrder((prev) => prev ? { ...prev, driverId: { name: newDriverName, phone: newDriverPhone || "---", email: "" }, status: "accepted" } : null);
-        }
-        toast.warning("Đã cập nhật điều phối tài xế (chế độ cục bộ)");
-      }
-    } catch {
-      if (reassignMode === "reopen") {
-        setOrder((prev) => prev ? { ...prev, driverId: undefined, status: "searching_driver" } : null);
-      } else {
-        setOrder((prev) => prev ? { ...prev, driverId: { name: newDriverName, phone: newDriverPhone || "---", email: "" }, status: "accepted" } : null);
-      }
-      toast.warning("Đã cập nhật điều phối tài xế (chế độ ngoại tuyến)");
-    } finally {
-      setIsSubmitting(false);
-      setNewDriverName("");
-      setNewDriverPhone("");
-      setNewDriverVehicle("");
-      setReassignReason("");
-      setIsReassignModalOpen(false);
-    }
-  };
-
-  const handleConfirmEscrowAction = async () => {
-    if (!order) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}/escrow`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          actionType: escrowActionType,
-          reason: escrowActionReason.trim() || undefined,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.data?.order) {
-          setOrder((prev) => prev ? { ...prev, ...data.data.order } : null);
-          if (Array.isArray(data.data.order.adminNotes)) {
-            setAdminNotes(data.data.order.adminNotes);
-          }
-        }
-        toast.success(
-          escrowActionType === "disburse"
-            ? "Đã gửi lệnh giải ngân 95% cước phí qua MB Bank thành công"
-            : escrowActionType === "freeze"
-            ? "Đã đóng băng ký quỹ MB Bank chờ giải quyết tranh chấp"
-            : "Đã gửi lệnh hoàn cước 100% về tài khoản chủ hàng"
-        );
-      } else {
-        if (escrowActionType === "disburse") {
-          setOrder((prev) => prev ? { ...prev, status: "completed" } : null);
-        } else if (escrowActionType === "refund") {
-          setOrder((prev) => prev ? { ...prev, status: "cancelled" } : null);
-        }
-        toast.warning("Đã thực thi nghiệp vụ ký quỹ (chế độ cục bộ)");
-      }
-    } catch {
-      if (escrowActionType === "disburse") {
-        setOrder((prev) => prev ? { ...prev, status: "completed" } : null);
-      } else if (escrowActionType === "refund") {
-        setOrder((prev) => prev ? { ...prev, status: "cancelled" } : null);
-      }
-      toast.warning("Đã thực thi nghiệp vụ ký quỹ (chế độ ngoại tuyến)");
-    } finally {
-      setIsSubmitting(false);
-      setEscrowActionReason("");
-      setIsEscrowModalOpen(false);
-    }
-  };
 
   const handleAddAdminNote = async () => {
-    if (!newNoteContent.trim()) {
-      toast.error("Vui lòng nhập nội dung ghi chú");
-      return;
-    }
-
+    if (!order || !newNoteContent.trim() || actionSubmitRef.current) return;
+    actionSubmitRef.current = true;
     setIsSubmitting(true);
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: newNoteContent.trim(),
-          type: newNoteType,
-        }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newNoteContent.trim(), type: newNoteType }),
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.data?.adminNotes)) {
-          setAdminNotes(data.data.adminNotes);
-        } else if (data.data?.note) {
-          setAdminNotes((prev) => [data.data.note, ...prev]);
-        }
-        toast.success("Đã lưu ghi chú nội bộ thành công");
-      } else {
-        const note: AdminInternalNote = {
-          id: `n-${Date.now()}`,
-          author: "Quản trị viên TMS",
-          role: "Admin điều hành",
-          content: newNoteContent.trim(),
-          createdAt: new Date().toISOString(),
-          type: newNoteType,
-        };
-        setAdminNotes((prev) => [note, ...prev]);
-        toast.warning("Đã lưu ghi chú vào phiên làm việc");
-      }
-    } catch {
-      const note: AdminInternalNote = {
-        id: `n-${Date.now()}`,
-        author: "Quản trị viên TMS",
-        role: "Admin điều hành",
-        content: newNoteContent.trim(),
-        createdAt: new Date().toISOString(),
-        type: newNoteType,
-      };
-      setAdminNotes((prev) => [note, ...prev]);
-      toast.warning("Đã lưu ghi chú vào phiên làm việc");
-    } finally {
-      setIsSubmitting(false);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Không thể lưu ghi chú");
+      if (!Array.isArray(data.data?.adminNotes)) throw new Error("Phản hồi thiếu ghi chú đã lưu");
+      setAdminNotes(data.data.adminNotes);
       setNewNoteContent("");
-    }
+      toast.success("Đã lưu ghi chú nội bộ");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể kết nối máy chủ; ghi chú chưa được lưu");
+    } finally { setIsSubmitting(false); actionSubmitRef.current = false; }
   };
 
+
   const handleConfirmEmergencyCancel = async () => {
-    if (!order) return;
+    if (!order?.adminOperations?.canCancelUnassigned || order.activeIncident || actionSubmitRef.current) return;
+    actionSubmitRef.current = true;
     setIsSubmitting(true);
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/users/orders/${id}/cancel`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reason: cancelReasonChoice,
-          detail: cancelReasonDetail.trim() || undefined,
-          releaseDriver: releaseDriverChoice,
-          refundEscrow: true,
-        }),
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: cancelReasonChoice, detail: cancelReasonDetail.trim() || undefined }),
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.data?.order) {
-          setOrder((prev) => prev ? { ...prev, ...data.data.order } : null);
-          if (Array.isArray(data.data.order.adminNotes)) {
-            setAdminNotes(data.data.order.adminNotes);
-          }
-        }
-        if (data.data?.driverFreed) {
-          toast.success("Vận đơn đã hủy & ĐÃ GIẢI PHÓNG TÀI XẾ về trạng thái sẵn sàng nhận chuyến mới!");
-        } else {
-          toast.warning("Vận đơn đã được chuyển sang trạng thái Đã hủy đơn");
-        }
-      } else {
-        const fullReason = `${cancelReasonChoice}${cancelReasonDetail ? `. Chi tiết: ${cancelReasonDetail}` : ""}`;
-        setOrder((prev) => prev ? {
-          ...prev,
-          status: "cancelled",
-          cancellationReason: fullReason,
-          cancelledByName: "Quản trị viên hệ thống",
-          cancelledByRole: "admin",
-          cancelledAt: new Date().toISOString(),
-        } : null);
-        toast.warning("Vận đơn đã được hủy (chế độ cục bộ)");
-      }
-    } catch {
-      const fullReason = `${cancelReasonChoice}${cancelReasonDetail ? `. Chi tiết: ${cancelReasonDetail}` : ""}`;
-      setOrder((prev) => prev ? {
-        ...prev,
-        status: "cancelled",
-        cancellationReason: fullReason,
-        cancelledByName: "Quản trị viên hệ thống",
-        cancelledByRole: "admin",
-        cancelledAt: new Date().toISOString(),
-      } : null);
-      toast.warning("Vận đơn đã được hủy (chế độ ngoại tuyến)");
-    } finally {
-      setIsSubmitting(false);
+      const data = await res.json();
+      if (!res.ok || !data.data?.order) throw new Error(data.message || "Không thể hủy yêu cầu");
+      setOrder((prev) => prev ? { ...prev, ...data.data.order } : null);
+      if (Array.isArray(data.data.order.adminNotes)) setAdminNotes(data.data.order.adminNotes);
       setCancelReasonDetail("");
       setIsCancelModalOpen(false);
-    }
+      toast.success("Đã hủy yêu cầu chưa chọn xe");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể kết nối máy chủ; yêu cầu chưa được hủy");
+    } finally { setIsSubmitting(false); actionSubmitRef.current = false; }
   };
+
 
   const currentPhotos = activeEpodTab === "dropoff"
     ? epodDetail.dropoffPhotos
@@ -1299,6 +990,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="space-y-6">
+      {detailError && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{detailError} Dữ liệu hiện tại chưa được làm mới.</div>}
       {/* Top Action Bar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/80 backdrop-blur-xl border border-slate-200/50 p-6 rounded-3xl shadow-sm">
         <div className="flex items-center gap-3">
@@ -1408,122 +1100,16 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       )}
 
       {/* Admin Action Toolbar Bar */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-5 shadow-sm border border-slate-800/80 space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-              <Sliders className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm font-bold tracking-wider uppercase text-white">
-                  Bộ Công Cụ Thao Tác Nhanh Quản Trị Viên (TMS Operations)
-                </h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-500/40">
-                  ADMIN DISPATCH CONTROL
-                </span>
-              </div>
-              <p className="text-slate-400 text-xs mt-0.5">
-                Can thiệp điều vận thời gian thực, quản trị dòng tiền MB Bank và xử lý ngoại lệ
-              </p>
-            </div>
-          </div>
-
-          {/* Action Buttons Group */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Sync / Refresh */}
-            <button
-              type="button"
-              onClick={handleSyncOrder}
-              disabled={isSyncing}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 active:bg-white/20 text-slate-200 text-xs font-bold transition-all border border-white/10 cursor-pointer disabled:opacity-50"
-              title="Đồng bộ dữ liệu thời gian thực"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-primary-400" : "text-slate-300"}`} />
-              <span>{isSyncing ? "Đang đồng bộ..." : "Làm mới"}</span>
-            </button>
-
-            {/* Status Override */}
-            <button
-              type="button"
-              onClick={() => {
-                setTargetStatus(order.status);
-                setIsStatusModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Chuyển trạng thái</span>
-            </button>
-
-            {/* Reassign Driver */}
-            <button
-              type="button"
-              onClick={() => setIsReassignModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold transition-all border border-white/10 active:scale-95 cursor-pointer"
-            >
-              <UserPlus className="w-3.5 h-3.5 text-blue-400" />
-              <span>Điều phối tài xế</span>
-            </button>
-
-            {/* Escrow Actions */}
-            <button
-              type="button"
-              onClick={() => setIsEscrowModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all active:scale-95 cursor-pointer"
-            >
-              <Lock className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Ký quỹ MB Bank</span>
-            </button>
-
-            {/* Internal Notes */}
-            <button
-              type="button"
-              onClick={() => setIsNotesModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold transition-all border border-white/10 active:scale-95 cursor-pointer relative"
-            >
-              <StickyNote className="w-3.5 h-3.5 text-amber-400" />
-              <span>Ghi chú nội bộ</span>
-              {adminNotes.length > 0 && (
-                <span className="ml-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 font-bold text-[10px] flex items-center justify-center">
-                  {adminNotes.length}
-                </span>
-              )}
-            </button>
-
-            {/* Cancel Order */}
-            <button
-              type="button"
-              onClick={() => setIsCancelModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition-all active:scale-95 cursor-pointer"
-            >
-              <Ban className="w-3.5 h-3.5 text-rose-400" />
-              <span>Hủy đơn</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Quick info ribbon */}
-        <div className="pt-3 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-400">
-          <div className="flex items-center gap-4 flex-wrap">
-            <span>Mã phiên can thiệp: <span className="text-slate-200 font-mono font-bold">TMS-SES-{(order._id || "").slice(-6).toUpperCase()}</span></span>
-            <span>•</span>
-            <span>Quyền hạn: <span className="text-emerald-400 font-bold">Full Admin Dispatcher</span></span>
-            {adminNotes.length > 0 ? (
-              <span>Ghi chú mới nhất: <span className="text-slate-200 italic">{adminNotes[0].content.slice(0, 60)}...</span></span>
-            ) : (
-              <span>Ghi chú nội bộ: <span className="text-slate-400 italic">Chưa có ghi chú</span></span>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsNotesModalOpen(true)}
-            className="text-indigo-400 hover:text-indigo-300 font-bold transition-colors cursor-pointer"
-          >
-            {adminNotes.length > 0 ? `Xem toàn bộ ${adminNotes.length} ghi chú →` : "Thêm ghi chú nội bộ →"}
-          </button>
-        </div>
-      </div>
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-sm font-bold text-slate-900">Đối soát và quản trị vận đơn</h2><div className="flex flex-wrap gap-2">
+          <button type="button" onClick={handleSyncOrder} disabled={isSyncing} className="rounded-xl bg-primary-50 px-4 py-2 text-xs font-semibold text-primary-900 disabled:opacity-50"><RefreshCw className={`mr-1 inline h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />Làm mới</button>
+          <button type="button" onClick={() => setIsNotesModalOpen(true)} className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700">Ghi chú ({adminNotes.length})</button>
+          <Link href={`/admin/incidents?orderId=${order._id}`} className="rounded-xl bg-primary-600 px-4 py-2 text-xs font-semibold text-white">Đối soát sự cố</Link>
+          {order.adminOperations?.canCancelUnassigned && !order.activeIncident && <button type="button" onClick={() => setIsCancelModalOpen(true)} className="rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white">Hủy yêu cầu chưa chọn xe</button>}
+        </div></div>
+        <p className="text-xs leading-relaxed text-slate-600">{order.adminOperations?.reason || "Trạng thái và tài chính do backend xử lý qua workflow nghiệp vụ. Không đổi trạng thái trực tiếp để giả lập nhận đơn hoặc thanh toán."}</p>
+        {completionNotice && <div className="rounded-xl bg-primary-50 p-4 text-sm text-primary-900"><p>{completionNotice.text}</p>{completionNotice.deadline && <p className="mt-2 font-semibold">Hạn xác nhận: {formatAdminDateTime(completionNotice.deadline)}</p>}</div>}
+      </section>
 
       {/* Main content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1565,155 +1151,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
 
-          {/* Section: MB Bank Escrow Breakdown */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200/50 shadow-sm space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 shrink-0">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                      Ký Quỹ & Bảo Chứng Dòng Tiền
-                    </h2>
-                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 tracking-wide">
-                      MB BANK ESCROW
-                    </span>
-                  </div>
-                  <p className="text-slate-400 text-xs mt-0.5">
-                    Tài khoản trung gian chuyên dụng phong tỏa theo hợp đồng điện tử
-                  </p>
-                </div>
-              </div>
-
-              {/* Dynamic Escrow Status Badge */}
-              <div className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border text-xs font-bold ${escrowStatus.color} self-start sm:self-auto`}>
-                <span className={`w-2 h-2 rounded-full ${escrowStatus.dotColor}`} />
-                <escrowStatus.icon className="w-3.5 h-3.5" />
-                <span>{escrowStatus.badge}</span>
-              </div>
-            </div>
-
-            {/* Escrow Transaction Code & Copy Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50/80 border border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 shrink-0">
-                  <CreditCard className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mã giao dịch ký quỹ MB Bank</p>
-                  <p className="font-mono text-xs font-bold text-slate-800">{escrowTxCode}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyEscrow}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer self-start sm:self-auto"
-              >
-                {copiedEscrow ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-emerald-700">Đã chép</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Sao chép mã</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Financial Breakdown 4-Card Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-              {/* Box 1: Tổng cước ký quỹ */}
-              <div className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <DollarSign className="w-3 h-3 text-slate-400" /> Tổng Cước Ký Quỹ
-                </span>
-                <p className="text-base font-bold text-slate-900">
-                  {totalPrice > 0 ? `${totalPrice.toLocaleString("vi-VN")} ₫` : "Chưa báo giá"}
-                </p>
-                <p className="text-[11px] text-slate-500 font-medium">
-                  {totalPrice > 0 ? "100% cước vận đơn" : "Đang chờ thỏa thuận"}
-                </p>
-              </div>
-
-              {/* Box 2: Phí dịch vụ sàn */}
-              <div className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <Banknote className="w-3 h-3 text-slate-400" /> Phí Nền Tảng (5%)
-                </span>
-                <p className="text-base font-bold text-slate-700">
-                  {totalPrice > 0 ? `${platformFee.toLocaleString("vi-VN")} ₫` : "---"}
-                </p>
-                <p className="text-[11px] text-slate-500 font-medium">Bảo trì kết nối & định vị</p>
-              </div>
-
-              {/* Box 3: Bảo hiểm hàng hóa */}
-              <div className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <Shield className="w-3 h-3 text-emerald-500" /> Bảo Hiểm Hàng Hóa
-                </span>
-                {order.insurance?.isRequested ? (
-                  <>
-                    <p className="text-base font-bold text-emerald-600">
-                      {order.insurance.fee ? `${order.insurance.fee.toLocaleString("vi-VN")} ₫` : "Đã kích hoạt"}
-                    </p>
-                    <p className="text-[11px] text-slate-500 font-medium truncate">
-                      Khai báo: {order.insurance.declaredValue ? `${order.insurance.declaredValue.toLocaleString("vi-VN")} ₫` : "Theo thỏa thuận"}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-base font-bold text-slate-500">
-                      Không yêu cầu
-                    </p>
-                    <p className="text-[11px] text-slate-400 font-medium">
-                      Chủ hàng không mua bảo hiểm
-                    </p>
-                  </>
-                )}
-              </div>
-
-              {/* Box 4: Thực nhận tài xế */}
-              <div className="p-3.5 rounded-2xl border border-emerald-100 bg-emerald-50/60 space-y-1">
-                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
-                  <Banknote className="w-3 h-3 text-emerald-600" /> Thực Nhận Tài Xế (95%)
-                </span>
-                <p className="text-base font-bold text-emerald-700">
-                  {driverPayout > 0 ? `${driverPayout.toLocaleString("vi-VN")} ₫` : "---"}
-                </p>
-                <p className="text-[11px] text-emerald-700 font-medium">Tự động sau e-POD</p>
-              </div>
-            </div>
-
-            {/* Escrow Safety Mechanism Callout & Link */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/90 via-slate-50 to-indigo-50/60 border border-blue-100/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="font-bold text-slate-900">
-                    Cơ Chế Bảo Chứng An Toàn Hai Đầu TXEPRO & MB Bank
-                  </p>
-                  <p className="text-slate-600 mt-0.5 leading-relaxed text-[11px]">
-                    Khoản tiền được phong tỏa độc lập tại Ngân hàng Quân Đội (MB Bank). Tài xế an tâm nhận chuyến chắc chắn nhận tiền, chủ hàng an tâm hàng hóa được bảo vệ toàn trình.
-                  </p>
-                </div>
-              </div>
-              <Link
-                href="/thong-tin/thanh-toan-ky-quy"
-                target="_blank"
-                className="inline-flex items-center gap-1.5 text-blue-700 hover:text-blue-800 font-bold whitespace-nowrap px-3 py-1.5 rounded-xl bg-white/90 hover:bg-white border border-blue-200/80 transition-all text-[11px] shadow-2xs self-end sm:self-auto shrink-0 cursor-pointer"
-              >
-                <span>Xem quy chế MB Bank</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
+          <OrderFinancialSummary snapshot={order.financialSnapshot} claims={order.compensationClaims} locks={order.escrowLocks} />
 
           {/* Section 2: Route Addresses */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200/50 shadow-sm space-y-4">
@@ -1986,7 +1424,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                   <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
                     <span className="text-slate-400 font-bold">Mã chứng chỉ e-POD:</span>
                     <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                      {epodDetail.certificateCode || `EPOD-${order.orderCode}`}
+                      {epodDetail.certificateCode || "Chưa ghi nhận chứng chỉ"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
@@ -2418,7 +1856,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                     Mã chứng chỉ: <span className="font-bold text-slate-900">{epodDetail.certificateCode}</span> • Mã vận đơn: <span className="font-bold text-slate-900">{order.orderCode}</span>
                   </p>
                   <p className="text-[10px] text-slate-400">
-                    Bảo chứng ký quỹ MB Bank: <span className="font-bold text-blue-700 font-mono">{escrowTxCode}</span>
+                    Tham chiếu quyết toán: <span className="font-bold text-slate-700 font-mono">{order.financialSnapshot?.settlementReference || "Chưa ghi nhận"}</span>
                   </p>
                 </div>
               </div>
@@ -2520,365 +1958,9 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
               {/* Security Footer */}
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-400">
-                <p>Chứng từ số hóa được ký nhận qua TXEPRO TMS. Mã băm: {epodDetail.sha256Hash || "---"}</p>
+                <p>Dữ liệu đối soát từ hợp đồng và bằng chứng đã ghi nhận. Mã băm: {epodDetail.sha256Hash || "Chưa ghi nhận"}.</p>
                 <p className="font-bold text-slate-600">HỆ THỐNG ĐIỀU VẬN LOGISTICS TXEPRO</p>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Modal 1: Cập Nhật Trạng Thái Vận Đơn */}
-      {isStatusModalOpen && (
-        <div 
-          className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
-          onClick={() => setIsStatusModalOpen(false)}
-        >
-          <div 
-            className="relative max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                  <Sliders className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Chuyển Trạng Thái Vận Đơn</h3>
-                  <p className="text-[11px] text-slate-400">Can thiệp vòng đời chu trình logistics</p>
-                </div>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setIsStatusModalOpen(false)} 
-                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              {order.activeIncident && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold">Lưu ý điều hành:</span> Đơn này đang có báo cáo sự cố từ {order.activeIncident.reporterRole === "driver" ? "Tài xế" : "Chủ hàng"} ({INCIDENT_TYPE_LABELS[order.activeIncident.type] || order.activeIncident.type}). Cân nhắc xử lý tranh chấp trước khi thay đổi trạng thái.
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="block text-slate-600 font-bold mb-1.5">Chọn trạng thái mới</label>
-                <select
-                  value={targetStatus}
-                  onChange={(e) => setTargetStatus(e.target.value as Order["status"])}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                  <option value="searching_driver">Đang tìm tài xế (Quét xe xung quanh)</option>
-                  <option value="waiting_driver_acceptance">Chờ tài xế xác nhận cuốc xe</option>
-                  <option value="accepted">Đã tìm được tài xế (Đang đến điểm bốc)</option>
-                  <option value="in_progress">Tài xế đang di chuyển (Vận chuyển hàng)</option>
-                  <option value="delivered">Đã giao hàng (Chờ chủ hàng xác nhận nghiệm thu)</option>
-                  <option value="completed">Đã hoàn thành (Chủ hàng đã xác nhận & đối soát xong)</option>
-                  <option value="cancelled">Đã hủy vận đơn</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-600 font-bold mb-1.5">Lý do can thiệp (Ghi log kiểm toán)</label>
-                <textarea
-                  rows={3}
-                  value={statusNote}
-                  onChange={(e) => setStatusNote(e.target.value)}
-                  placeholder="Ví dụ: Đã nhận được cuộc gọi xác nhận hoàn thành từ khách hàng..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
-                />
-              </div>
-
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 space-y-1">
-                <p className="font-bold flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" /> Lưu ý điều phối viên
-                </p>
-                <p>Hành động này sẽ cập nhật toàn trình trạng thái trên ứng dụng của cả Tài xế và Chủ hàng.</p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsStatusModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmStatusChange}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {isSubmitting && <Loader className="w-3.5 h-3.5 animate-spin" />}
-                <span>{isSubmitting ? "Đang cập nhật..." : "Xác nhận chuyển trạng thái"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 2: Điều Phối / Chỉ Định Lại Tài Xế */}
-      {isReassignModalOpen && (
-        <div 
-          className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
-          onClick={() => setIsReassignModalOpen(false)}
-        >
-          <div 
-            className="relative max-w-lg w-full bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <UserPlus className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Điều Phối & Chỉ Định Tài Xế</h3>
-                  <p className="text-[11px] text-slate-400">Thay thế tài xế hoặc mở lại tìm kiếm trên sàn</p>
-                </div>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setIsReassignModalOpen(false)} 
-                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              {/* Mode switch */}
-              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setReassignMode("assign")}
-                  className={`py-2 rounded-lg font-bold transition-all cursor-pointer ${
-                    reassignMode === "assign" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  Chỉ định tài xế trực tiếp
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReassignMode("reopen")}
-                  className={`py-2 rounded-lg font-bold transition-all cursor-pointer ${
-                    reassignMode === "reopen" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  Mở lại tìm kiếm trên sàn
-                </button>
-              </div>
-
-              {reassignMode === "assign" ? (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-slate-600 font-bold mb-1">
-                      Họ và tên tài xế mới <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={newDriverName}
-                      onChange={(e) => setNewDriverName(e.target.value)}
-                      placeholder="Ví dụ: Nguyễn Văn Hùng"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-xs"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">Số điện thoại</label>
-                      <input
-                        type="text"
-                        value={newDriverPhone}
-                        onChange={(e) => setNewDriverPhone(e.target.value)}
-                        placeholder="09xx xxx xxx"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">Biển số / Loại xe</label>
-                      <input
-                        type="text"
-                        value={newDriverVehicle}
-                        onChange={(e) => setNewDriverVehicle(e.target.value)}
-                        placeholder="51D-987.65 (Xe 15 tấn)"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 space-y-1">
-                  <p className="font-bold">Mở lại tìm kiếm trên sàn toàn mạng lưới</p>
-                  <p className="text-[11px] leading-relaxed">
-                    Vận đơn sẽ được hủy ghép nối với tài xế hiện tại và đưa trở lại sàn tìm kiếm để các tài xế khác có thể nhận đơn.
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-slate-600 font-bold mb-1.5">Lý do điều phối lại</label>
-                <input
-                  type="text"
-                  value={reassignReason}
-                  onChange={(e) => setReassignReason(e.target.value)}
-                  placeholder="Ví dụ: Tài xế báo sự cố nổ lốp, đổi sang xe 15 tấn dự phòng..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsReassignModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmReassignDriver}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {isSubmitting && <Loader className="w-3.5 h-3.5 animate-spin" />}
-                <span>{isSubmitting ? "Đang xử lý..." : "Xác nhận điều phối"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 3: Xử Lý Ký Quỹ & Bảo Chứng MB Bank */}
-      {isEscrowModalOpen && (
-        <div 
-          className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
-          onClick={() => setIsEscrowModalOpen(false)}
-        >
-          <div 
-            className="relative max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Nghiệp Vụ Ký Quỹ MB Bank</h3>
-                  <p className="text-[11px] text-slate-400">Can thiệp bảo chứng và dòng tiền giải ngân</p>
-                </div>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setIsEscrowModalOpen(false)} 
-                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3.5 text-xs">
-              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-slate-400 font-bold">Mã giao dịch ký quỹ:</span>
-                  <span className="font-mono font-bold text-slate-900">{escrowTxCode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400 font-bold">Tổng tiền bảo chứng:</span>
-                  <span className="font-bold text-slate-900">{totalPrice ? `${totalPrice.toLocaleString("vi-VN")} ₫` : "---"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400 font-bold">Thực nhận tài xế (95%):</span>
-                  <span className="font-bold text-emerald-600">{totalPrice ? `${driverPayout.toLocaleString("vi-VN")} ₫` : "---"}</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-600 font-bold mb-1.5">Chọn lệnh can thiệp dòng tiền</label>
-                <div className="space-y-2">
-                  <label className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                    escrowActionType === "disburse" ? "bg-emerald-50 border-emerald-500 text-emerald-900" : "bg-slate-50 border-slate-200 text-slate-700"
-                  }`}>
-                    <input
-                      type="radio"
-                      name="escrowAction"
-                      checked={escrowActionType === "disburse"}
-                      onChange={() => setEscrowActionType("disburse")}
-                    />
-                    <div>
-                      <p className="font-bold">Giải ngân ngay cho Tài xế (Disburse)</p>
-                      <p className="text-[11px] opacity-80">Phát lệnh chuyển 95% cước phí vào tài khoản MB Bank của tài xế</p>
-                    </div>
-                  </label>
-
-                  <label className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                    escrowActionType === "freeze" ? "bg-amber-50 border-amber-500 text-amber-900" : "bg-slate-50 border-slate-200 text-slate-700"
-                  }`}>
-                    <input
-                      type="radio"
-                      name="escrowAction"
-                      checked={escrowActionType === "freeze"}
-                      onChange={() => setEscrowActionType("freeze")}
-                    />
-                    <div>
-                      <p className="font-bold">Đóng băng tranh chấp (Freeze Escrow)</p>
-                      <p className="text-[11px] opacity-80">Khóa tiền tạm thời tại MB Bank, chờ biên bản giám định hư hỏng</p>
-                    </div>
-                  </label>
-
-                  <label className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                    escrowActionType === "refund" ? "bg-rose-50 border-rose-500 text-rose-900" : "bg-slate-50 border-slate-200 text-slate-700"
-                  }`}>
-                    <input
-                      type="radio"
-                      name="escrowAction"
-                      checked={escrowActionType === "refund"}
-                      onChange={() => setEscrowActionType("refund")}
-                    />
-                    <div>
-                      <p className="font-bold">Hoàn tiền 100% cho Chủ hàng (Refund)</p>
-                      <p className="text-[11px] opacity-80">Hoàn lại tiền cước bảo chứng vào ví/tài khoản của chủ hàng</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-600 font-bold mb-1.5">Ghi chú xác nhận nghiệp vụ</label>
-                <input
-                  type="text"
-                  value={escrowActionReason}
-                  onChange={(e) => setEscrowActionReason(e.target.value)}
-                  placeholder="Ví dụ: Phê duyệt theo biên bản e-POD số 8899..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsEscrowModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmEscrowAction}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {isSubmitting && <Loader className="w-3.5 h-3.5 animate-spin" />}
-                <span>{isSubmitting ? "Đang thực thi..." : "Xác nhận thực thi lệnh"}</span>
-              </button>
             </div>
           </div>
         </div>
@@ -2984,7 +2066,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
       )}
 
       {/* Modal 5: Hủy Vận Đơn Khẩn Cấp */}
-      {isCancelModalOpen && (
+      {isCancelModalOpen && order.adminOperations?.canCancelUnassigned && !order.activeIncident && (
         <div 
           className="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
           onClick={() => setIsCancelModalOpen(false)}
@@ -2999,8 +2081,8 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                   <Ban className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Hủy Vận Đơn Khẩn Cấp</h3>
-                  <p className="text-[11px] text-slate-400">Dành cho trường hợp bất khả kháng hoặc tranh chấp</p>
+                  <h3 className="text-sm font-bold text-slate-900">Hủy yêu cầu chưa chọn xe</h3>
+                  <p className="text-[11px] text-slate-500">Chỉ áp dụng khi chưa phát sinh nghĩa vụ tài chính</p>
                 </div>
               </div>
               <button 
@@ -3020,12 +2102,10 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                   onChange={(e) => setCancelReasonChoice(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/20"
                 >
-                  <option value="Xe hư hỏng / tai nạn kỹ thuật">Xe hư hỏng / tai nạn kỹ thuật</option>
-                  <option value="Tranh chấp giá cước hoặc phát sinh chi phí bốc dỡ">Tranh chấp giá cước hoặc chi phí phát sinh</option>
-                  <option value="Hàng hóa sai quy cách / không đảm bảo an toàn">Hàng hóa sai quy cách / không an toàn</option>
-                  <option value="Chủ hàng yêu cầu hủy chuyến">Chủ hàng yêu cầu hủy chuyến</option>
-                  <option value="Tài xế không liên hệ được / quá giờ hẹn">Tài xế không liên hệ được</option>
-                  <option value="Thời tiết bất khả kháng (bão lũ, ngập lụt)">Thời tiết bất khả kháng (bão lũ)</option>
+                  <option>Chủ hàng yêu cầu hủy tìm xe</option>
+                  <option>Thông tin yêu cầu cần chỉnh sửa</option>
+                  <option>Tin trùng lặp hoặc không còn nhu cầu</option>
+                  <option>Lý do khác</option>
                 </select>
               </div>
 
@@ -3040,41 +2120,12 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                 />
               </div>
 
-              {order?.driverId && (
-                <div className="p-3.5 rounded-2xl border border-blue-200 bg-blue-50/70 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-blue-950 text-xs flex items-center gap-1.5">
-                      <Truck className="w-4 h-4 text-blue-600" />
-                      Tài xế: {order.driverId?.name || "Tài xế"}
-                    </span>
-                    <span className="text-[10px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-blue-200">
-                      Khôi phục tự động
-                    </span>
-                  </div>
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none bg-white p-2.5 rounded-xl border border-blue-100 hover:border-blue-300 transition">
-                    <input
-                      type="checkbox"
-                      checked={releaseDriverChoice}
-                      onChange={(e) => setReleaseDriverChoice(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    />
-                    <div className="text-[11px] leading-tight">
-                      <span className="font-bold text-slate-800 block">
-                        Giải phóng tài xế ngay lập tức (Sẵn sàng nổ đơn mới)
-                      </span>
-                      <span className="text-slate-500 block mt-0.5">
-                        Tự động xóa cờ bận đơn, mở lại các tin đăng xe rỗng và giải tỏa cọc 3% trong ví tài xế.
-                      </span>
-                    </div>
-                  </label>
-                </div>
-              )}
 
               <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-[11px] text-rose-800 space-y-1">
                 <p className="font-bold flex items-center gap-1">
                   <AlertTriangle className="w-3.5 h-3.5" /> Cảnh báo hủy đơn
                 </p>
-                <p>Thao tác này sẽ chấm dứt hành trình của vận đơn và chuyển lệnh hoàn cước ký quỹ MB Bank về tài khoản chủ hàng.</p>
+                <p>Yêu cầu tìm xe sẽ kết thúc. Không tạo giao dịch hoàn tiền giả hoặc thay đổi các chuyến khác của tài xế.</p>
               </div>
             </div>
 

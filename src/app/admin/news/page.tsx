@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   Filter,
+  Eye,
   Inbox,
-  Newspaper,
   Pencil,
   Plus,
   RefreshCw,
@@ -16,6 +16,8 @@ import {
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { getServerMediaUrl, normalizePersistedImagePath } from "@/utils/media";
 import { NewsContentEditor } from "@/components/admin/NewsContentEditor";
+import { NewsThumbnail } from "@/components/admin/NewsThumbnail";
+import { useAdminPageRefresh } from "@/hooks/useAdminPageRefresh";
 
 type NewsCategory = "news" | "guide" | "community" | "promotion" | "product";
 type NewsAudience = "all" | "driver" | "shipper";
@@ -93,6 +95,7 @@ function formatDate(iso?: string | null) {
 export default function AdminNewsPage() {
   const [items, setItems] = useState<AdminNewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [publicationAsOf, setPublicationAsOf] = useState(0);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [audience, setAudience] = useState<string>("all");
@@ -107,8 +110,13 @@ export default function AdminNewsPage() {
   const [form, setForm] = useState<NewsForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const requestSequenceRef = useRef(0);
+  const [preview, setPreview] = useState<AdminNewsItem | null>(null);
+  const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const mutationRef = useRef(false);
 
   const fetchNews = useCallback(async () => {
+    const requestId = ++requestSequenceRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -125,25 +133,31 @@ export default function AdminNewsPage() {
         throw new Error("Không tải được danh sách tin tức.");
       }
       const json = await res.json();
+      if (requestId !== requestSequenceRef.current) return;
       const data = json.data || json;
       setItems(data.items || []);
+      setPublicationAsOf(Date.now());
       setTotal(data.pagination?.total || 0);
       setTotalPages(data.pagination?.totalPages || 1);
     } catch (err) {
+      if (requestId !== requestSequenceRef.current) return;
       setError(err instanceof Error ? err.message : "Không tải được danh sách tin tức.");
       setItems([]);
     } finally {
-      setLoading(false);
+      if (requestId === requestSequenceRef.current) setLoading(false);
     }
   }, [page, search, category, audience, publishedFilter]);
+  useAdminPageRefresh(() => { if (!mutationRef.current && !modalOpen) void fetchNews(); });
 
   useEffect(() => {
-    fetchNews();
+    const requests = requestSequenceRef;
+    const timer = setTimeout(() => void fetchNews(), 0);
+    return () => { clearTimeout(timer); requests.current++; };
   }, [fetchNews]);
 
   const publishedCount = useMemo(
-    () => items.filter((item) => item.published).length,
-    [items],
+    () => items.filter((item) => item.published && (!item.publishedAt || new Date(item.publishedAt).getTime() <= publicationAsOf)).length,
+    [items, publicationAsOf],
   );
 
   const openCreate = () => {
@@ -168,7 +182,7 @@ export default function AdminNewsPage() {
   };
 
   const closeModal = () => {
-    if (saving) return;
+    if (saving || uploading) return;
     setModalOpen(false);
     setEditing(null);
     setForm(EMPTY_FORM);
@@ -208,10 +222,12 @@ export default function AdminNewsPage() {
   };
 
   const handleSave = async () => {
+    if (mutationRef.current || uploading) return;
     if (!form.title.trim()) {
       setError("Vui lòng nhập tiêu đề.");
       return;
     }
+    mutationRef.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -245,21 +261,31 @@ export default function AdminNewsPage() {
       setError(err instanceof Error ? err.message : "Không lưu được bài viết.");
     } finally {
       setSaving(false);
+      mutationRef.current = false;
     }
   };
 
   const handleDelete = async (item: AdminNewsItem) => {
+    if (mutationRef.current) return;
     if (!window.confirm(`Xóa bài viết “${item.title}”? Nội dung sẽ không còn trên app.`)) return;
+    mutationRef.current = true;
+    setBusyItemId(item.id);
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/news/${item.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Không xóa được bài viết.");
       await fetchNews();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không xóa được bài viết.");
+    } finally {
+      mutationRef.current = false;
+      setBusyItemId(null);
     }
   };
 
   const handleTogglePublish = async (item: AdminNewsItem) => {
+    if (mutationRef.current) return;
+    mutationRef.current = true;
+    setBusyItemId(item.id);
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/news/${item.id}`, {
         method: "PATCH",
@@ -270,6 +296,9 @@ export default function AdminNewsPage() {
       await fetchNews();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không cập nhật được trạng thái.");
+    } finally {
+      mutationRef.current = false;
+      setBusyItemId(null);
     }
   };
 
@@ -301,7 +330,7 @@ export default function AdminNewsPage() {
           <p className="text-2xl font-bold text-amber-600 mt-1">{publishedCount}</p>
         </div>
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Bản nháp / ẩn</p>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Ẩn / Chưa đến giờ • trang này</p>
           <p className="text-2xl font-bold text-slate-700 mt-1">{items.length - publishedCount}</p>
         </div>
       </div>
@@ -356,7 +385,7 @@ export default function AdminNewsPage() {
             className="text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
           >
             <option value="all">Tất cả trạng thái</option>
-            <option value="true">Đang hiện</option>
+            <option value="true">Đã bật xuất bản (kể cả lên lịch)</option>
             <option value="false">Đang ẩn</option>
           </select>
           <button
@@ -377,9 +406,8 @@ export default function AdminNewsPage() {
 
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="py-20 text-center">
-            <RefreshCw className="w-8 h-8 text-primary-600 animate-spin mx-auto mb-2" />
-            <p className="text-sm font-semibold text-slate-500">Đang tải tin tức...</p>
+          <div aria-label="Đang tải danh sách bài viết" aria-busy="true" className="space-y-5 p-5">
+            {[0, 1, 2, 3, 4].map(row => <div key={row} className="flex items-center gap-4 animate-pulse motion-reduce:animate-none"><div className="h-14 w-14 shrink-0 rounded-xl bg-slate-200" /><div className="flex-1 space-y-3"><div className="h-4 w-3/5 rounded bg-slate-200" /><div className="h-3 w-2/5 rounded bg-slate-100" /></div><div className="h-7 w-20 rounded-full bg-slate-100" /></div>)}
           </div>
         ) : items.length === 0 ? (
           <div className="py-20 text-center">
@@ -409,14 +437,7 @@ export default function AdminNewsPage() {
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
                           <div className="w-14 h-14 rounded-xl bg-slate-100 overflow-hidden shrink-0">
-                            {image ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={image} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-slate-400">
-                                <Newspaper className="w-5 h-5" />
-                              </div>
-                            )}
+                            <NewsThumbnail key={image || item.id} src={image} title={item.title} />
                           </div>
                           <div className="min-w-0">
                             <div className="font-bold text-slate-900 truncate max-w-[360px]">{item.title}</div>
@@ -437,18 +458,20 @@ export default function AdminNewsPage() {
                       <td className="py-3.5 px-4">
                         <button
                           onClick={() => handleTogglePublish(item)}
+                          disabled={busyItemId !== null}
                           className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
                             item.published
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : "bg-slate-100 text-slate-500 border-slate-200"
                           }`}
                         >
-                          {item.published ? "Đang hiện" : "Đang ẩn"}
+                          {item.published ? item.publishedAt && new Date(item.publishedAt).getTime() > publicationAsOf ? "Đã lên lịch" : "Đang hiện" : "Đang ẩn"}
                         </button>
                         <div className="text-[11px] text-slate-400 mt-1">{formatDate(item.publishedAt)}</div>
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex justify-end gap-2">
+                          <button type="button" title="Xem trước bài viết trên app" onClick={() => setPreview(item)} className="p-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50"><Eye className="w-4 h-4" /></button>
                           <button
                             onClick={() => openEdit(item)}
                             className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -458,6 +481,7 @@ export default function AdminNewsPage() {
                           </button>
                           <button
                             onClick={() => handleDelete(item)}
+                            disabled={busyItemId !== null}
                             className="p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
                             title="Xóa"
                           >
@@ -494,6 +518,7 @@ export default function AdminNewsPage() {
         </div>
       )}
 
+      {preview && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={() => setPreview(null)}><section role="dialog" aria-modal="true" aria-label="Xem trước bài viết" className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-xl" onClick={event => event.stopPropagation()}><header className="flex items-center justify-between border-b border-slate-100 p-4"><span className="text-sm font-semibold text-slate-700">Xem trước • {AUDIENCE_LABELS[preview.audience].label}</span><button type="button" aria-label="Đóng xem trước" onClick={() => setPreview(null)} className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></header><div className="overflow-y-auto"><div className="h-52"><NewsThumbnail key={preview.imageUrl} src={getServerMediaUrl(preview.imageUrl)} title={preview.title} /></div><div className="space-y-2 p-5"><span className="text-xs font-semibold text-primary-700">{CATEGORY_LABELS[preview.category].label} • {formatDate(preview.publishedAt)}</span><h2 className="text-xl font-bold text-slate-900">{preview.title}</h2><p className="text-sm leading-relaxed text-slate-600">{preview.summary}</p></div><iframe title="Nội dung bài viết" sandbox="" referrerPolicy="no-referrer" className="h-[40vh] w-full border-0" srcDoc={`<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="referrer" content="no-referrer"><style>body{font:15px/1.7 system-ui,sans-serif;color:#334155;margin:0;padding:0 20px 20px;overflow-wrap:anywhere}img{max-width:100%;height:auto}h2,h3{color:#0f172a}a{color:#0f766e}table{max-width:100%;border-collapse:collapse}td,th{border:1px solid #e2e8f0;padding:6px}</style></head><body>${preview.content}</body></html>`} /><p className="px-5 pb-5 text-xs text-slate-500">Bản xem trước nội dung. App lọc theo đối tượng, trạng thái xuất bản và giờ đăng; khung hiển thị có thể khác theo thiết bị.</p></div></section></div>}
       {modalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl max-h-[94vh] overflow-y-auto">

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { getServerMediaUrl } from "@/utils/media";
-import { incidentRoleLabel, incidentResponderRole, incidentResponseLabel, incidentReviewActions, incidentEventLabel, incidentConfirmMessage } from "@/utils/incident-review";
+import { incidentRoleLabel, incidentResponderRole, incidentResponseLabel, incidentReviewActions, incidentEventLabel, incidentConfirmMessage, incidentFinancialDisplay, COMPENSATION_PROMO_HOLD_DAYS } from "@/utils/incident-review";
 import { useToast } from "@/context/ToastContext";
 import { PendingCancellationCompensations } from "./compensation_queue";
 import {
@@ -108,6 +108,7 @@ interface IncidentItem {
     description?: string | null;
     respondedAt?: string | null;
     responderRole?: "driver" | "shipper";
+    automatic?: boolean;
   } | null;
   submittedAt?: string;
   pendingReviewAt?: string;
@@ -118,6 +119,12 @@ interface IncidentItem {
   createdAt: string;
   updatedAt: string;
   availableActions: string[];
+  supportOnly?: boolean;
+  closesTripOnReport?: boolean;
+  noFinancialPenalty?: boolean;
+  responseDeadlineAt?: string | null;
+  financialPolicyVersion?: number;
+  supportFreeze?: { active?: boolean; reason?: string } | null;
   evidence?: IncidentEvidenceItem[];
   responseEvidence?: IncidentEvidenceItem[];
   events?: IncidentEventItem[];
@@ -133,7 +140,7 @@ interface SettlementAction {
 }
 
 interface SettlementPreview {
-  plan?: { payerMethod: string; compensationAmount: number; revokesLifetimeVoucher: boolean; fundingSource: string };
+  plan?: { payerMethod: string; compensationAmount: number; revokesLifetimeVoucher: boolean; fundingSource: string; supportOnly?: boolean; virtualCredit?: boolean; noFinancialPenalty?: boolean };
   advisoryOnly: boolean;
   executesOnReview: boolean;
   executableBy: string | null;
@@ -334,7 +341,7 @@ function IncidentEvidenceGallery({ title, evidence = [], onPreview }: {
       <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
         <Camera className="w-4 h-4 text-slate-500" /> {title} ({evidence.length})
       </h4>
-      {evidence.length === 0 ? <p className="text-xs text-slate-500 py-3">Không có bằng chứng đính kèm. Ảnh không bắt buộc khi gửi kháng cáo.</p> : (
+      {evidence.length === 0 ? <p className="text-xs text-slate-500 py-3">Không có bằng chứng đính kèm. Ảnh không bắt buộc khi gửi phản đối.</p> : (
         <div className="grid grid-cols-2 gap-3">
           {evidence.map((item, index) => {
             const url = getServerMediaUrl(item.url);
@@ -556,7 +563,7 @@ function AdminIncidentsContent() {
     action: string, path: string, payload: Record<string, string>, message: string, success: string,
   ) => {
     if (!selectedIncident || actionLock.current) return;
-    const claimAction = action === "approve" || action === "dismiss-claim";
+    const claimAction = action === "approve" || action === "dismiss-claim" || action.startsWith("support-");
     if (!claimAction && !incidentReviewActions(selectedIncident, compensationClaims).includes(action)) {
       toast.error("Hồ sơ không còn cho phép thao tác này. Vui lòng tải lại để xem trạng thái mới.");
       return;
@@ -600,7 +607,7 @@ function AdminIncidentsContent() {
     const reason = reasonForDecision();
     if (!reason) return;
     const message = action === "approve"
-      ? `Duyệt ${formatVND(claim.amount)} tiền bồi thường cho ${incidentRoleLabel(claim.recipientRole)} vào Ví khuyến mãi? Khoản tiền được giải ngân sau 30 ngày.`
+      ? `Duyệt ${formatVND(claim.amount)} tiền bồi thường cho ${incidentRoleLabel(claim.recipientRole)} vào Ví khuyến mãi? Khoản tiền được giải ngân sau ${COMPENSATION_PROMO_HOLD_DAYS} ngày.`
       : claim.fundingSource === "platform_fund"
         ? `Bác khoản chi ${formatVND(claim.amount)} từ quỹ TXE PRO? Không cộng ví người nhận và không hoàn ký quỹ giả cho bên dùng voucher; kết luận vi phạm đã ghi nhận vẫn giữ nguyên.`
         : `Bác khoản bồi thường ${formatVND(claim.amount)} và hoàn lại ký quỹ cho ${incidentRoleLabel(claim.payerRole)}?`;
@@ -631,8 +638,12 @@ function AdminIncidentsContent() {
     await runDecision("confirmed", `${API_BASE}/admin/incidents/${selectedIncident.id}/confirm`,
       { reason, faultSide: adjudicationFaultSide },
       incidentConfirmMessage(adjudicationFaultSide, settlementPreview.executesOnReview,
-        settlementPreview.compensationPolicy?.releaseAfterDays || 30, settlementPreview.plan),
-      "Đã ghi nhận kết luận. Xem kết quả xử lý ký quỹ và bồi thường trong hồ sơ.");
+        settlementPreview.compensationPolicy?.releaseAfterDays || COMPENSATION_PROMO_HOLD_DAYS, settlementPreview.plan),
+      settlementPreview.plan?.noFinancialPenalty
+        ? "Đã ghi nhận kết luận. Đóng hồ sơ để hoàn quyền lợi còn giữ của chủ hàng; không phạt hoặc bồi thường."
+        : settlementPreview.plan?.supportOnly
+        ? "Đã ghi nhận kết luận hỗ trợ. Không xử lý phạt tiền sau khi chuyến bắt đầu."
+        : "Đã ghi nhận kết luận. Xem kết quả xử lý ký quỹ và bồi thường trong hồ sơ.");
   };
 
   const handleAllocateFund = async () => {
@@ -669,7 +680,19 @@ function AdminIncidentsContent() {
     const reason = reasonForDecision();
     if (!reason) return;
     await runDecision("dismissed", `${API_BASE}/admin/incidents/${selectedIncident.id}/dismiss`,
-      { reason }, "Bác bỏ báo cáo sau khi đối chiếu bằng chứng? Hồ sơ không ghi nhận vi phạm và các khoản ký quỹ đang giữ sẽ được xử lý theo chính sách.", "Đã bác bỏ báo cáo.");
+      { reason }, selectedIncident.supportOnly
+        ? "Bác bỏ báo cáo sau khi đối chiếu? Chỉ đóng báo cáo hỗ trợ, không hoàn phí đã thu hoặc phạt tiền."
+        : "Bác bỏ báo cáo sau khi đối chiếu bằng chứng? Hồ sơ không ghi nhận vi phạm và các khoản ký quỹ đang giữ sẽ được xử lý theo chính sách.", "Đã bác bỏ báo cáo.");
+  };
+
+  const handleSupport = async (action: "freeze" | "resume" | "close") => {
+    if (!selectedIncident || selectedIncident.financialPolicyVersion !== 2) return;
+    const reason = reasonForDecision(); if (!reason) return;
+    const messages = { freeze: "Đóng băng chuyến để phối hợp xử lý? Chặn hoàn tất và dừng đồng hồ 24 giờ; không xử lý tiền.",
+      resume: "Tiếp tục chuyến sau khi giải quyết các báo cáo? Đồng hồ xác nhận tiếp tục từ thời gian còn lại.",
+      close: "Đóng chuyến đã bắt đầu sau khi hỗ trợ giải quyết? Hoàn khoản đảm bảo còn giữ đúng nguồn, không thu lại phí đã thu và không phạt tiền." };
+    await runDecision(`support-${action}`, `${API_BASE}/admin/incidents/${selectedIncident.id}/support/${action}`,
+      { reason }, messages[action], "Đã cập nhật quyết định hỗ trợ.");
   };
 
   const handleResolveIncident = async () => {
@@ -677,7 +700,13 @@ function AdminIncidentsContent() {
     const reason = reasonForDecision();
     if (!reason) return;
     await runDecision("resolved", `${API_BASE}/admin/incidents/${selectedIncident.id}/resolve`,
-      { reason }, "Đóng hồ sơ đã có kết luận? Khoản bồi thường đã vào Ví khuyến mãi vẫn giữ lịch giải ngân 30 ngày; đóng hồ sơ không giải ngân sớm.", "Đã đóng hồ sơ sự cố.");
+      { reason }, selectedIncident.noFinancialPenalty
+        ? "Đóng hồ sơ và hoàn thành đơn? Hoàn voucher/ký quỹ còn giữ của chủ hàng; không phạt, thu thêm phí hoặc bồi thường tài xế."
+        : selectedIncident.closesTripOnReport
+        ? "Đóng hồ sơ đã có kết luận và hoàn tất đơn trong lịch sử? Quyền lợi được xử lý theo giai đoạn trước/sau Bắt đầu; không thu phí chuyến đi lần nữa."
+        : selectedIncident.supportOnly
+        ? "Đóng hồ sơ hỗ trợ đã có kết luận? Nếu chuyến đang đóng băng, cần chọn Tiếp tục chuyến hoặc Đóng chuyến sau xử lý riêng."
+        : `Đóng hồ sơ đã có kết luận? Khoản bồi thường đã vào Ví khuyến mãi vẫn giữ lịch giải ngân ${COMPENSATION_PROMO_HOLD_DAYS} ngày; đóng hồ sơ không giải ngân sớm.`, "Đã đóng hồ sơ sự cố.");
   };
 
   // Reset Filters
@@ -706,7 +735,9 @@ function AdminIncidentsContent() {
 
   const reviewActions = selectedIncident ? incidentReviewActions(selectedIncident, compensationClaims) : [];
   const canAdjudicate = reviewActions.includes("confirmed");
-  const formReadOnly = actionSubmitting || (!reviewActions.length && !compensationClaims.some(c => c.status === "held"));
+  const financialDisplay = incidentFinancialDisplay(selectedIncident || {}, settlementPreview);
+  const formReadOnly = actionSubmitting || (!reviewActions.length && !compensationClaims.some(c => c.status === "held")
+    && !(selectedIncident?.financialPolicyVersion === 2 && ["accepted", "in_progress", "delivered", "disputed"].includes(selectedIncident.orderStatus || "")));
 
   const closeDetail = () => {
     if (actionLock.current) return;
@@ -736,7 +767,7 @@ function AdminIncidentsContent() {
                 </span>
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                Đối chiếu báo cáo, kháng cáo và bằng chứng hai bên; kết luận trách nhiệm và xử lý ký quỹ, bồi thường theo hồ sơ thực tế.
+                Đối chiếu báo cáo, phản đối và bằng chứng hai bên; kết luận trách nhiệm và xử lý ký quỹ, bồi thường theo hồ sơ thực tế.
               </p>
             </div>
           </div>
@@ -763,11 +794,12 @@ function AdminIncidentsContent() {
           <div>
             <span className="font-bold text-blue-950 text-sm block">Quy chuẩn phán quyết và bồi thường tiền TXE PRO</span>
             <span className="text-slate-600 leading-relaxed block mt-0.5">
-              - <strong>Hủy không hợp lệ quá 5 phút:</strong> hệ thống xử lý theo chính sách của đơn. <strong>Báo cáo sự cố:</strong> đối chiếu phản hồi, ảnh và căn cứ trước khi kết luận.<br/>
-              - <strong>Một bên báo cáo, bên còn lại phản hồi:</strong> chấp nhận là xác nhận trách nhiệm; kháng cáo được chuyển quản trị viên xem xét. Không tự coi người bị báo cáo là bên vi phạm.<br/>
-              - Bên không có lỗi được <strong>hoàn quyền lợi hợp lệ và nhận thêm tiền bồi thường</strong>. Bên có lỗi bị trừ ký quỹ hoặc thu hồi voucher đã áp dụng; nhánh voucher do <strong>quỹ TXE PRO</strong> cấp tiền, không bồi thường bằng voucher.<br/>
-              - Tiền bồi thường đủ nguồn và được duyệt vào <strong>Ví khuyến mãi</strong>, có thể giải ngân sang Ví chính sau <strong>30 ngày kể từ lúc ghi có</strong>. Thiếu nguồn thì ghi nhận chờ cấp nguồn, chưa cộng số dư.<br/>
-              - <strong>Bất khả kháng hoặc không có lỗi:</strong> cần minh chứng và kết luận phù hợp; chỉ xử lý những khoản ký quỹ thực tế đang giữ. Rút báo cáo không đồng nghĩa hủy đơn hàng.
+              - <strong>Trước Bắt đầu:</strong> hủy trong 5 phút kể từ khi tài xế chấp nhận được hoàn quyền lợi, không tính vi phạm. Hủy không hợp lệ quá 5 phút xử lý theo chính sách của đơn. Sự cố cần đối chiếu phản hồi, ảnh và căn cứ trước khi kết luận.<br/>
+              - <strong>Một bên báo cáo, bên còn lại phản hồi:</strong> chấp nhận là xác nhận trách nhiệm; phản đối được chuyển quản trị viên xem xét. Không tự coi người bị báo cáo là bên vi phạm.<br/>
+              - <strong>Bồi thường trước Bắt đầu:</strong> bên không có lỗi được hoàn quyền lợi hợp lệ và nhận thêm tiền bồi thường. Bên có lỗi bị trừ ký quỹ hoặc thu hồi voucher đã áp dụng; nhánh voucher do <strong>quỹ TXE PRO</strong> cấp tiền, không bồi thường bằng voucher.<br/>
+              - Theo quy tắc mới, khi có kết luận trách nhiệm, tiền bồi thường được ghi có vào <strong>Ví khuyến mãi</strong>, dùng ký quỹ được ngay và giải ngân sang Ví chính sau <strong>{COMPENSATION_PROMO_HOLD_DAYS} ngày kể từ lúc ghi có</strong>. Không chờ cấp nguồn, không tự chuyển tiền ngân hàng. Hồ sơ cũ giữ nguyên chính sách đã ghi nhận.<br/>
+              - <strong>Sau Bắt đầu (quy tắc mới):</strong> chỉ ghi nhận và phối hợp hỗ trợ, không phạt tiền, thu hồi voucher, hoàn phí đã thu hoặc bồi thường từ ký quỹ. Chấp nhận báo cáo không tự hoàn thành chuyến; quản trị viên xử lý đóng băng/tiếp tục/đóng chuyến.<br/>
+              - <strong>Bất khả kháng hoặc không có lỗi trước Bắt đầu:</strong> ngoài thời gian miễn phạt cần minh chứng và kết luận phù hợp; chỉ xử lý những khoản ký quỹ thực tế đang giữ. Rút báo cáo không đồng nghĩa hủy đơn hàng.
             </span>
           </div>
         </div>
@@ -821,7 +853,7 @@ function AdminIncidentsContent() {
           <p className="text-2xl font-bold text-emerald-700 mt-2">
             {summaryCounts.resolved}
           </p>
-          <span className="text-[11px] text-emerald-600 mt-1 block">Không giải ngân trước hạn 30 ngày</span>
+          <span className="text-[11px] text-emerald-600 mt-1 block">Không giải ngân trước hạn {COMPENSATION_PROMO_HOLD_DAYS} ngày</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
@@ -947,7 +979,7 @@ function AdminIncidentsContent() {
           <label className="flex items-center gap-2 text-xs text-slate-600">Phản hồi
             <select value={filterResponse} onChange={e => { setFilterResponse(e.target.value); setPage(1); }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <option value="">Tất cả phản hồi</option><option value="awaiting">Chưa phản hồi</option>
-              <option value="appealed">Đã kháng cáo</option><option value="accepted">Đã chấp nhận báo cáo</option>
+              <option value="appealed">Đã phản đối</option><option value="accepted">Đã chấp nhận báo cáo</option>
             </select>
           </label>
           <label className="flex items-center gap-2 text-xs text-slate-600">Kết luận
@@ -1316,7 +1348,10 @@ function AdminIncidentsContent() {
                   {!selectedIncident.counterpartyResponse && (
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-1">
                       <p className="font-bold text-slate-800">{incidentResponseLabel(selectedIncident)}</p>
-                      <p className="text-slate-600">{selectedIncident.status === "cancelled" ? "Người gửi đã rút báo cáo; hồ sơ được giữ để đối soát, không tiếp tục coi là tranh chấp đang chờ xử lý." : "Chưa ghi nhận lựa chọn chấp nhận hoặc kháng cáo từ bên được báo cáo. Không tự suy diễn trách nhiệm từ việc chưa phản hồi."}</p>
+                      {selectedIncident.noFinancialPenalty && selectedIncident.status === "open" && selectedIncident.responseDeadlineAt && (
+                        <p className="font-semibold text-slate-700">Hạn phản hồi: {formatDateTime(selectedIncident.responseDeadlineAt)}. Không phản hồi sau 24 giờ thì tự chấp nhận và hoàn thành đơn, hoàn quyền lợi; không phạt hoặc bồi thường.</p>
+                      )}
+                      <p className="text-slate-600">{selectedIncident.status === "cancelled" ? "Người gửi đã rút báo cáo; hồ sơ được giữ để đối soát, không tiếp tục coi là tranh chấp đang chờ xử lý." : "Chưa ghi nhận lựa chọn chấp nhận hoặc phản đối từ bên được báo cáo. Không tự suy diễn trách nhiệm từ việc chưa phản hồi."}</p>
                     </div>
                   )}
                   {selectedIncident.counterpartyResponse && (
@@ -1324,7 +1359,7 @@ function AdminIncidentsContent() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="font-bold text-amber-900 flex items-center gap-2">
                           <Scale className="w-4 h-4" />
-                          Phản hồi của {incidentRoleLabel(incidentResponderRole(selectedIncident))}
+                          Phản hồi của {selectedIncident.counterpartyResponse.automatic ? "Hệ thống" : incidentRoleLabel(incidentResponderRole(selectedIncident))}
                         </p>
                         <span className="text-xs text-amber-800">
                           {formatDateTime(selectedIncident.counterpartyResponse.respondedAt)}
@@ -1332,12 +1367,14 @@ function AdminIncidentsContent() {
                       </div>
                       <p className="font-semibold text-slate-900">
                         {selectedIncident.status === "cancelled" ? "Phản hồi được lưu để đối soát. Báo cáo đã rút lại, không tiếp tục xử lý như một tranh chấp đang chờ kết luận." : selectedIncident.counterpartyResponse.decision === "accepted"
-                          ? "Bên được báo cáo đã chấp nhận báo cáo và xác nhận trách nhiệm."
+                          ? selectedIncident.noFinancialPenalty
+                            ? `${selectedIncident.counterpartyResponse.automatic ? "Hệ thống tự động chấp nhận do chủ hàng không phản hồi trong 24 giờ." : "Chủ hàng đã chấp nhận nội dung báo cáo."} Đơn hoàn thành; hoàn voucher/ký quỹ còn giữ, không phạt hoặc bồi thường.`
+                            : `Bên được báo cáo đã chấp nhận trách nhiệm. ${selectedIncident.orderStatus === "completed" ? "Đơn đã hoàn thành theo kết quả xử lý sự cố." : "Đối chiếu trạng thái đơn và kết quả quyết toán bên dưới."} Khoản bồi thường đã ghi có không cần chờ admin cấp nguồn lần nữa.`
                           : "Bên được báo cáo phản đối và đề nghị quản trị viên xem xét."}
                       </p>
                       {selectedIncident.counterpartyResponse.appealReasonLabel && (
                         <p className="text-sm text-slate-800">
-                          <span className="font-semibold">Lý do kháng cáo: </span>
+                          <span className="font-semibold">Lý do phản đối: </span>
                           {selectedIncident.counterpartyResponse.appealReasonLabel}
                         </p>
                       )}
@@ -1347,7 +1384,7 @@ function AdminIncidentsContent() {
                         </p>
                       )}
                       <p className="text-xs text-amber-800">
-                        Đối chiếu lời khai và bằng chứng của hai bên trước khi kết luận trách nhiệm và xử lý bồi thường.
+                        {selectedIncident.noFinancialPenalty ? "Voucher/ký quỹ còn giữ của chủ hàng được hoàn ngay khi phản đối, không cần chờ admin đóng hồ sơ. Tiếp tục đối chiếu lời khai và bằng chứng để kết luận; không phạt hoặc bồi thường." : "Đối chiếu lời khai và bằng chứng của hai bên trước khi kết luận trách nhiệm và xử lý bồi thường."}
                       </p>
                     </div>
                   )}
@@ -1433,7 +1470,7 @@ function AdminIncidentsContent() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <IncidentEvidenceGallery title={`Bằng chứng báo cáo • ${incidentRoleLabel(selectedIncident.reporterRole)}`}
                       evidence={selectedIncident.evidence} onPreview={setFullPhotoUrl} />
-                    <IncidentEvidenceGallery title={`Bằng chứng kháng cáo • ${incidentRoleLabel(incidentResponderRole(selectedIncident))}`}
+                    <IncidentEvidenceGallery title={`Bằng chứng phản đối • ${incidentRoleLabel(incidentResponderRole(selectedIncident))}`}
                       evidence={selectedIncident.responseEvidence} onPreview={setFullPhotoUrl} />
                   </div>
 
@@ -1454,7 +1491,7 @@ function AdminIncidentsContent() {
                           <DollarSign className="w-4 h-4" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-indigo-950 text-sm">Dự toán ký quỹ và bồi thường bằng tiền</h4>
+                          <h4 className="font-bold text-indigo-950 text-sm">{financialDisplay.title}</h4>
                           <p className="text-slate-500 text-[11px]">
                             {settlementPreview?.note || "Chưa có dữ liệu dự toán quyết toán."}
                           </p>
@@ -1464,25 +1501,26 @@ function AdminIncidentsContent() {
 
                     {previewLoading && <p role="status" className="flex items-center gap-2 text-slate-600"><RefreshCw className="w-4 h-4 animate-spin" />Đang tính dự toán theo kết luận đã chọn...</p>}
                     {previewError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-rose-800">{previewError}</p>}
-                    {settlementPreview?.advisoryOnly && <p className="rounded-xl bg-white p-3 text-slate-600 border border-slate-200">Hồ sơ đã quyết toán hoặc đóng, không xử lý quyền lợi lần nữa. Khoản bồi thường còn chờ cấp nguồn/duyệt vẫn có thể được xử lý riêng bên dưới.</p>}
+                    {(financialDisplay.supportOnly || settlementPreview?.advisoryOnly) && <p className="rounded-xl bg-white p-3 text-slate-600 border border-slate-200">{financialDisplay.guidance}</p>}
                     {!adjudicationFaultSide && canAdjudicate && <p className="text-amber-800 font-semibold">Chưa chọn kết luận trách nhiệm. Dự toán gợi ý bên dưới không phải là phán quyết.</p>}
-                    {settlementPreview?.plan?.payerMethod === "voucher" && (
+                    {!financialDisplay.supportOnly && settlementPreview?.plan?.payerMethod === "voucher" && (
                       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 space-y-1">
                         <p className="font-semibold">{settlementPreview.plan.revokesLifetimeVoucher ? "Bên có lỗi: thu hồi toàn bộ voucher miễn ký quỹ trọn đời của Chủ hàng" : "Bên có lỗi: thu hồi voucher Tài xế đã áp dụng cho chuyến, không trừ thêm voucher chưa dùng"}</p>
                         <p>Hoàn lại lượt voucher/ký quỹ hợp lệ của bên không có lỗi. Tiền bồi thường bổ sung: {formatVND(settlementPreview.plan.compensationAmount)}, do quỹ TXE PRO chi, không lấy voucher làm nguồn tiền mặt.</p>
-                        {settlementPreview.executesOnReview && (compensationFund?.balance ?? 0) < settlementPreview.plan.compensationAmount && <p className="font-semibold">Quỹ chưa đủ nguồn. Khi kết luận, khoản chi được ghi nhận chờ cấp nguồn; chưa cộng vào ví người nhận.</p>}
+                        {settlementPreview.plan.virtualCredit && <p className="font-semibold">Khi có kết luận, ghi có ngay vào Ví khuyến mãi, không chờ cấp nguồn. Sổ quỹ nội bộ ghi nhận nghĩa vụ bồi thường của TXE PRO; không phải giao dịch ngân hàng.</p>}
+                        {!settlementPreview.plan.virtualCredit && settlementPreview.executesOnReview && (compensationFund?.balance ?? 0) < settlementPreview.plan.compensationAmount && <p className="font-semibold">Hồ sơ theo quy tắc cũ: quỹ chưa đủ nguồn, khoản chi chờ cấp nguồn và chưa cộng ví.</p>}
                       </div>
                     )}
 
-                    {settlementPreview?.actions.some((action) => action.action.startsWith("transfer_to_")) && (
+                    {!financialDisplay.supportOnly && settlementPreview?.actions.some((action) => action.action.startsWith("transfer_to_")) && (
                       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900">
                         <WalletCards className="h-4 w-4 shrink-0" />
                         <span className="font-bold">Nơi nhận: Ví khuyến mãi</span>
-                        <span className="text-emerald-700">• Bồi thường bằng tiền • Giải ngân sau {settlementPreview?.compensationPolicy?.releaseAfterDays || 30} ngày • Không thay thế bằng voucher</span>
+                        <span className="text-emerald-700">• Bồi thường bằng tiền • Giải ngân sau {settlementPreview?.compensationPolicy?.releaseAfterDays || COMPENSATION_PROMO_HOLD_DAYS} ngày • Không thay thế bằng voucher</span>
                       </div>
                     )}
 
-                    {settlementPreview?.actions && settlementPreview.actions.length > 0 ? (
+                    {!financialDisplay.supportOnly && settlementPreview?.actions && settlementPreview.actions.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {settlementPreview.actions.map((act, i) => (
                           <div key={i} className="p-3 bg-white rounded-xl border border-indigo-100 shadow-2xs space-y-1">
@@ -1499,7 +1537,7 @@ function AdminIncidentsContent() {
                                   <span className="text-rose-700 font-semibold flex items-center gap-1">
                                     <ArrowRight className="w-3 h-3" /> Chuyển tiền vào Ví khuyến mãi của Tài xế
                                   </span>
-                                  <p className="text-slate-500">Được giải ngân sau {act.releaseAfterDays || 30} ngày</p>
+                                  <p className="text-slate-500">Được giải ngân sau {act.releaseAfterDays || COMPENSATION_PROMO_HOLD_DAYS} ngày</p>
                                 </div>
                               )}
                               {act.action === "transfer_to_shipper" && (
@@ -1507,7 +1545,7 @@ function AdminIncidentsContent() {
                                   <span className="text-orange-700 font-semibold flex items-center gap-1">
                                     <ArrowRight className="w-3 h-3" /> Chuyển tiền vào Ví khuyến mãi của Chủ hàng
                                   </span>
-                                  <p className="text-slate-500">Được giải ngân sau {act.releaseAfterDays || 30} ngày</p>
+                                  <p className="text-slate-500">Được giải ngân sau {act.releaseAfterDays || COMPENSATION_PROMO_HOLD_DAYS} ngày</p>
                                 </div>
                               )}
                               {act.action === "release" && (
@@ -1519,20 +1557,16 @@ function AdminIncidentsContent() {
                           </div>
                         ))}
                       </div>
-                    ) : (
+                    ) : !financialDisplay.supportOnly && !settlementPreview?.advisoryOnly ? (
                       <div className="p-3 bg-white rounded-xl border border-indigo-100 text-slate-600 space-y-1">
-                        <p className="font-semibold text-slate-700">Quy tắc ký quỹ MB Bank 3%:</p>
-                        <p className="text-[11px] text-slate-500">
-                          - Lỗi Chủ hàng: Khấu trừ 3% cọc của Chủ hàng đền bù Tài xế, hoàn cọc 3% cho Tài xế.<br />
-                          - Lỗi Tài xế: Khấu trừ 3% cọc của Tài xế bồi hoàn Chủ hàng, hoàn cọc 3% cho Chủ hàng.<br />
-                          - Bất khả kháng: Giải tỏa cọc 100% về tài khoản ví hai bên.
-                        </p>
+                        <p className="text-[11px] text-slate-500">{financialDisplay.guidance}</p>
                       </div>
-                    )}
+                    ) : null}
 
                     <details className="rounded-xl border border-slate-200 bg-white p-3">
-                      <summary className="cursor-pointer font-semibold text-slate-800">Quỹ bồi thường TXE PRO • Khả dụng: {formatVND(compensationFund?.balance ?? 0)}</summary>
+                      <summary className="cursor-pointer font-semibold text-slate-800">Quỹ bồi thường TXE PRO • Số dư sổ quỹ: {formatVND(compensationFund?.balance ?? 0)}</summary>
                       <div className="mt-3 space-y-3">
+                        {(compensationFund?.balance ?? 0) < 0 && <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">TXE PRO đã ghi nhận chi phí bồi thường tự động vượt số nguồn đã đối soát. Người nhận vẫn đã được ghi có theo kết quả xử lý. Cấp nguồn quỹ là đối soát chi phí, không chi bồi thường lại.</p>}
                         <p className="text-xs text-slate-600">Đã cấp nguồn: {formatVND(compensationFund?.totalAllocated ?? 0)} • Đã chi: {formatVND(compensationFund?.totalPaid ?? 0)}. Chỉ ghi nhận ngân sách đã được TXE PRO cấp và đối soát; thao tác này không chuyển tiền ngân hàng, không dùng tiền nạp của khách hàng.</p>
                         <div className="grid gap-3 sm:grid-cols-2">
                           <label className="text-xs text-slate-700">Số tiền cấp nguồn (VND)<input type="number" min="1" max="1000000000" step="1" value={fundAmount} disabled={actionSubmitting} onChange={e => setFundAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
@@ -1555,11 +1589,12 @@ function AdminIncidentsContent() {
                                   {formatVND(claim.amount)} • {claim.status === "released" ? (claim.fundingSource === "platform_fund" ? "Khoản chi TXE PRO không được duyệt" : `Hoàn ký quỹ cho ${incidentRoleLabel(claim.payerRole)}`) : `${claim.fundingSource === "platform_fund" ? "Quỹ TXE PRO" : incidentRoleLabel(claim.payerRole)} → ${incidentRoleLabel(claim.recipientRole)}`}
                                 </p>
                                 <p className="mt-0.5 text-[11px] text-slate-500">
-                                  {claim.automatic ? "Xử lý tự động theo chính sách đơn • " : "Xử lý qua thẩm định • "}
+                                  {claim.automatic ? "Xử lý tự động theo chính sách đơn • " : selectedIncident.counterpartyResponse?.decision === "accepted" ? "Hai bên chấp nhận trách nhiệm • " : "Xử lý qua thẩm định • "}
+                                  {claim.status === "paid" && claim.paidAt && `Ghi có lúc ${formatDateTime(claim.paidAt)} • `}
                                   {claim.status === "held" && (claim.holdReason === "platform_fund_insufficient" ? "Chờ TXE PRO cấp nguồn • Chưa cộng tiền vào ví" : "Chờ quản trị viên đối soát • Chưa cộng tiền vào ví")}
                                   {claim.status === "paid" && !claim.promoReleasedAt && claim.promoAvailableAt && `Đã ghi nhận • Được giải ngân từ ${formatDateTime(claim.promoAvailableAt)}`}
                                   {claim.status === "paid" && claim.promoReleasedAt && `Đã giải ngân vào Ví chính lúc ${formatDateTime(claim.promoReleasedAt)}`}
-                                  {claim.status === "paid" && !claim.promoAvailableAt && !claim.promoReleasedAt && "Đã bồi thường theo cơ chế ví trước thời điểm áp dụng chính sách 30 ngày"}
+                                  {claim.status === "paid" && !claim.promoAvailableAt && !claim.promoReleasedAt && "Khoản bồi thường theo cơ chế ví cũ; không tự thu hồi tiền đã giải ngân"}
                                   {claim.status === "released" && (claim.fundingSource === "platform_fund" ? "Không duyệt khoản chi • Không tạo giao dịch hoàn ký quỹ giả" : "Không duyệt bồi thường • Đã hoàn tiền ký quỹ cho bên nộp")}
                                 </p>
                               </div>
@@ -1758,6 +1793,17 @@ function AdminIncidentsContent() {
                         </button>
                       )}
 
+                      {!selectedIncident.noFinancialPenalty && selectedIncident.financialPolicyVersion === 2 && ["accepted", "in_progress", "delivered", "disputed"].includes(selectedIncident.orderStatus || "") && (
+                        <div className="w-full rounded-xl bg-amber-50 p-3 text-amber-950 space-y-2">
+                          <p>{selectedIncident.supportOnly ? "Sau Bắt đầu: chỉ hỗ trợ, không phạt tiền hoặc thu hồi voucher." : "Trước Bắt đầu: hoàn/bồi thường theo kết luận."}</p>
+                          {selectedIncident.supportFreeze?.active && <p>Đang đóng băng: {selectedIncident.supportFreeze.reason}</p>}
+                          <div className="flex flex-wrap gap-2">
+                            <button disabled={actionSubmitting || !!selectedIncident.supportFreeze?.active || !["open", "pending_review", "confirmed"].includes(selectedIncident.status)} onClick={() => void handleSupport("freeze")} className="rounded-lg bg-amber-600 text-white px-3 py-2 disabled:opacity-40">Đóng băng</button>
+                            {!selectedIncident.closesTripOnReport && <button disabled={actionSubmitting || !selectedIncident.supportFreeze?.active || !["resolved", "cancelled", "dismissed"].includes(selectedIncident.status)} onClick={() => void handleSupport("resume")} className="rounded-lg bg-sky-600 text-white px-3 py-2 disabled:opacity-40">Tiếp tục chuyến</button>}
+                            <button disabled={actionSubmitting || !selectedIncident.supportOnly || !selectedIncident.supportFreeze?.active || !["resolved", "cancelled", "dismissed"].includes(selectedIncident.status)} onClick={() => void handleSupport("close")} className="rounded-lg bg-emerald-600 text-white px-3 py-2 disabled:opacity-40">Đóng chuyến sau xử lý</button>
+                          </div>
+                        </div>
+                      )}
                       {selectedIncident.status === "resolved" && (
                         <div className="flex items-center gap-2 text-emerald-700 font-bold bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-200">
                           <CheckCircle2 className="w-4 h-4" />

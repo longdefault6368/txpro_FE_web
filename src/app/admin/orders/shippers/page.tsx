@@ -32,6 +32,7 @@ import {
   Compass,
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { AdminOrderState, getAdminOrderStatus } from "@/utils/admin-order-state";
 
 interface UserInfo {
   name?: string;
@@ -52,7 +53,7 @@ interface LocationPoint {
   province?: string | null;
 }
 
-interface Order {
+interface Order extends AdminOrderState {
   _id: string;
   orderCode: string;
   title?: string | null;
@@ -1401,12 +1402,13 @@ export default function AdminShipperOrdersPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 text-xs">
                   {orders.map((order) => {
-                    const statusInfo = STATUS_MAP[order.status] || {
+                    const storedStatusInfo = STATUS_MAP[order.status] || {
                       label: order.status,
                       color: "text-slate-600 bg-slate-50 border-slate-200",
                       dotColor: "#64748b",
                       icon: Clock,
                     };
+                    const statusInfo = { ...storedStatusInfo, ...getAdminOrderStatus(order) };
                     const StatusIcon = statusInfo.icon;
 
                     return (

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { fetchWithAuth, API_BASE, API_FALLBACK } from "@/utils/api";
+import { AdminOrderState, getAdminOrderStatus } from "@/utils/admin-order-state";
 import { useToast } from "@/context/ToastContext";
 import {
   Users, Truck, Package, ShoppingCart, TrendingUp, AlertCircle,
@@ -37,6 +38,7 @@ interface StatusBreakdownItem {
 }
 
 interface StatusBreakdown {
+  disputed?: StatusBreakdownItem;
   completed: StatusBreakdownItem;
   in_progress: StatusBreakdownItem;
   searching_driver: StatusBreakdownItem;
@@ -87,7 +89,7 @@ interface MapData {
   };
 }
 
-interface RecentOrder {
+interface RecentOrder extends AdminOrderState {
   _id: string;
   orderCode: string;
   title: string;
@@ -153,6 +155,7 @@ const formatTimeAgo = (value?: string | null) => {
 };
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  disputed: { label: "Đang giải quyết sự cố", color: "text-amber-800 bg-amber-50", icon: AlertTriangle },
   searching_driver: { label: "Tìm tài xế", color: "text-blue-600 bg-blue-50", icon: Loader },
   waiting_driver: { label: "Đang chờ tài xế", color: "text-amber-600 bg-amber-50", icon: Clock },
   waiting_driver_acceptance: { label: "Chờ tài xế nhận", color: "text-purple-600 bg-purple-50", icon: Clock },
@@ -666,12 +669,15 @@ function AdminDashboardContent() {
   const inProgressPct = statusBreakdown?.in_progress?.percent ?? 0;
   const searchingPct = statusBreakdown?.searching_driver?.percent ?? 0;
   const cancelledPct = statusBreakdown?.cancelled?.percent ?? 0;
+  const disputedPct = statusBreakdown?.disputed?.percent ?? 0;
 
   const p1 = completedPct;
   const p2 = p1 + inProgressPct;
   const p3 = p2 + searchingPct;
+  const p4 = Math.min(100, p3 + cancelledPct);
+  const p5 = Math.min(100, p4 + disputedPct);
   const donutGradient = (metrics?.totalOrders || 0) > 0
-    ? `conic-gradient(#10b981 0% ${p1}%, #3b82f6 ${p1}% ${p2}%, #f59e0b ${p2}% ${p3}%, #ef4444 ${p3}% 100%)`
+    ? `conic-gradient(#10b981 0% ${p1}%, #3b82f6 ${p1}% ${p2}%, #f59e0b ${p2}% ${p3}%, #ef4444 ${p3}% ${p4}%, #a855f7 ${p4}% ${p5}%, #e2e8f0 ${p5}% 100%)`
     : "conic-gradient(#e2e8f0 0% 100%)";
 
   return (
@@ -1353,7 +1359,7 @@ function AdminDashboardContent() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {recentOrders.length > 0 ? recentOrders.map((order) => {
-                    const statusInfo = STATUS_MAP[order.status] || { label: order.status, color: "text-slate-500 bg-slate-50", icon: Clock };
+                    const statusInfo = { ...getAdminOrderStatus(order), icon: STATUS_MAP[order.status]?.icon || Clock };
                     const StatusIcon = statusInfo.icon;
                     const price = getOrderDisplayPrice(order);
                     return (
@@ -1491,6 +1497,7 @@ function AdminDashboardContent() {
             {/* Legend & Details */}
             {breakdownTab === "status" ? (
               <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50"><div className="flex items-center gap-2"><span className="w-2.5 h-2.5 bg-purple-500 rounded-full shrink-0" /><span className="font-semibold text-slate-600">Đang giải quyết sự cố</span></div><span className="font-bold text-slate-800">{disputedPct}% <span className="text-[11px] font-normal text-slate-400">({(statusBreakdown?.disputed?.count || 0).toLocaleString()} đơn)</span></span></div>
                 <div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full flex-shrink-0" />
@@ -1507,7 +1514,7 @@ function AdminDashboardContent() {
                 <div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 bg-blue-500 rounded-full flex-shrink-0" />
-                    <span className="font-semibold text-slate-600">Đang vận chuyển</span>
+                    <span className="font-semibold text-slate-600">Đang thực hiện / chờ xác nhận</span>
                   </div>
                   <div className="text-right">
                     <span className="font-bold text-slate-800">{inProgressPct}%</span>
@@ -1520,7 +1527,7 @@ function AdminDashboardContent() {
                 <div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 bg-amber-500 rounded-full flex-shrink-0" />
-                    <span className="font-semibold text-slate-600">Đang tìm tài xế</span>
+                    <span className="font-semibold text-slate-600">Đang tìm / chờ tài xế</span>
                   </div>
                   <div className="text-right">
                     <span className="font-bold text-slate-800">{searchingPct}%</span>
@@ -1533,7 +1540,7 @@ function AdminDashboardContent() {
                 <div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 bg-red-500 rounded-full flex-shrink-0" />
-                    <span className="font-semibold text-slate-600">Đã hủy đơn</span>
+                    <span className="font-semibold text-slate-600">Đã hủy / từ chối</span>
                   </div>
                   <div className="text-right">
                     <span className="font-bold text-slate-800">{cancelledPct}%</span>

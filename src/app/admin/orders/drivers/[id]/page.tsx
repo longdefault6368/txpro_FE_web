@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -35,6 +35,10 @@ import {
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { getServerMediaUrl } from "@/utils/media";
+import { getVehicleCapabilities } from "@/utils/vehicleCapabilities";
+import { AdminDriverPost, POST_STATUS_LABELS, formatPostCapacity } from "@/utils/admin-driver-post";
+import DriverPostOperations from "@/components/admin/DriverPostOperations";
+import { useAdminPageRefresh } from "@/hooks/useAdminPageRefresh";
 
 interface UserInfo {
   _id?: string;
@@ -78,7 +82,7 @@ interface VehicleInfo {
   images?: string[];
 }
 
-interface DriverPost {
+interface DriverPost extends AdminDriverPost {
   _id: string;
   driverId?: UserInfo;
   vehicleId?: VehicleInfo;
@@ -107,6 +111,7 @@ interface DriverPost {
   status: string;
   cargoTypes?: string[];
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface GalleryImageItem {
@@ -117,6 +122,9 @@ interface GalleryImageItem {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  expired: { label: "Hết hạn", color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200" },
+  deleted: { label: "Đã xóa", color: "text-slate-600", bg: "bg-slate-100", border: "border-slate-200" },
+  archived: { label: "Lưu trữ cũ", color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" },
   draft: { label: "Bản nháp", color: "text-slate-600", bg: "bg-slate-100", border: "border-slate-200" },
   active: { label: "Đang mở nhận đơn", color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
   paused: { label: "Tạm dừng", color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
@@ -149,102 +157,12 @@ const formatRadius = (meters?: number | null) => {
   return Number.isInteger(km) ? `${km} km` : `${km.toFixed(1)} km`;
 };
 
-const formatCapacityTon = (value?: number | null) => {
-  if (value == null || value <= 0) return null;
-  const ton = value >= 100 ? value / 1000 : value;
-  const formatted = Number.isInteger(ton) ? ton.toString() : ton.toFixed(1).replace(/\.0$/, "");
-  return `${formatted} tấn`;
-};
 
 // Helper to categorize vehicle logic
-function getVehicleCategory(typeString?: string | null): "cargo_heavy" | "passenger_car" | "other" {
-  if (!typeString) return "other";
-  const str = typeString.toLowerCase().trim();
 
-  // Nhóm xe loại trừ đặc biệt: công trình, cứu hộ, xe máy, ba gác... -> không số ghế, không tải trọng, không loại hàng hóa
-  const isExcluded =
-    str.includes("công trình") ||
-    str.includes("cong trinh") ||
-    str.includes("cứu hộ") ||
-    str.includes("cuu ho") ||
-    str.includes("ba gác") ||
-    str.includes("ba gac") ||
-    str.includes("xe máy") ||
-    str.includes("xe may") ||
-    str.includes("mô tô") ||
-    str.includes("mo to");
-
-  if (isExcluded) {
-    return "other";
-  }
-
-  // 1. Nhóm: Xe tải vs Xe công vs Xe cẩu vs Xe tải cẩu
-  const isCargoHeavy =
-    str.includes("xe tải") ||
-    str.includes("xe tai") ||
-    str.includes("tải cẩu") ||
-    str.includes("tai cau") ||
-    str.includes("xe cẩu") ||
-    str.includes("xe cau") ||
-    str.includes("cần cẩu") ||
-    str.includes("cẩu tự hành") ||
-    str.includes("xe công") ||
-    str.includes("xe cong") ||
-    str.includes("container") ||
-    str.includes("đầu kéo") ||
-    str.includes("dau keo") ||
-    str.includes("rơ moóc") ||
-    str.includes("ro mooc") ||
-    str.includes("sơ mi rơ moóc") ||
-    str.includes("so mi") ||
-    str.includes("mooc") ||
-    str.includes("thùng bạt") ||
-    str.includes("thung bat") ||
-    str.includes("thùng kín") ||
-    str.includes("thung kin") ||
-    str.includes("thùng lửng") ||
-    str.includes("thung lung") ||
-    str.includes("đông lạnh") ||
-    str.includes("dong lanh") ||
-    (str.includes("tải") && !str.includes("bán tải")) ||
-    (str.includes("tai") && !str.includes("ban tai")) ||
-    (str.includes("cẩu") && !str.includes("cuu ho"));
-
-  if (isCargoHeavy) {
-    return "cargo_heavy";
-  }
-
-  // 2. Nhóm: Ô tô
-  const isPassengerCar =
-    str.includes("ô tô") ||
-    str.includes("o to") ||
-    str.includes("oto") ||
-    str.includes("xe con") ||
-    str.includes("du lịch") ||
-    str.includes("du lich") ||
-    str.includes("xe khách") ||
-    str.includes("xe khach") ||
-    str.includes("limousine") ||
-    str.includes("chỗ") ||
-    str.includes("cho") ||
-    str.includes("ghế") ||
-    str.includes("ghe");
-
-  if (isPassengerCar) {
-    return "passenger_car";
-  }
-
-  // 3. Các xe còn lại (xe máy, ba gác, cứu hộ, công trình...)
-  return "other";
-}
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-100 py-3 text-sm">
-      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</span>
-      <span className="text-right font-bold text-slate-800">{value || "---"}</span>
-    </div>
-  );
+  return <div className="flex items-start justify-between gap-4 border-b border-slate-100 py-3 text-sm"><span className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</span><span className="text-right font-bold text-slate-800">{value || "Chưa ghi nhận"}</span></div>;
 }
 
 export default function AdminDriverPostDetailPage() {
@@ -264,9 +182,12 @@ export default function AdminDriverPostDetailPage() {
   const [selectedStatus, setSelectedStatus] = useState("active");
   const [statusNote, setStatusNote] = useState("");
   const [isSubmittingStatus, setIsSubmittingStatus] = useState(false);
+  const statusSubmitRef = useRef(false);
+  const fetchSequenceRef = useRef(0);
   const [statusSuccessToast, setStatusSuccessToast] = useState("");
 
   const fetchPost = useCallback(async (showRefreshing = false) => {
+    const requestId = ++fetchSequenceRef.current;
     if (!params.id) return;
     if (showRefreshing) setIsRefreshing(true);
     else setLoading(true);
@@ -275,6 +196,7 @@ export default function AdminDriverPostDetailPage() {
       const res = await fetchWithAuth(`${API_BASE}/admin/users/driver-posts/${params.id}`);
       if (!res.ok) throw new Error("Failed to fetch driver post detail");
       const data = await res.json();
+      if (requestId !== fetchSequenceRef.current) return;
       const currentPost = data.data?.post || null;
       setPost(currentPost);
       if (currentPost?.status) {
@@ -282,14 +204,18 @@ export default function AdminDriverPostDetailPage() {
       }
       setErrorMessage("");
     } catch (err) {
+      if (requestId !== fetchSequenceRef.current) return;
       console.warn("Driver post detail API failed", err);
-      setPost(null);
+      if (!showRefreshing) setPost(null);
       setErrorMessage("Không thể tải chi tiết tin đăng tài xế từ hệ thống.");
     } finally {
-      setLoading(false);
-      setIsRefreshing(false);
+      if (requestId === fetchSequenceRef.current) {
+        setLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, [params.id]);
+  useAdminPageRefresh(() => { if (!statusSubmitRef.current) void fetchPost(true); });
 
   useEffect(() => {
     fetchPost();
@@ -476,33 +402,32 @@ export default function AdminDriverPostDetailPage() {
   };
 
   const handleUpdateStatus = async () => {
-    if (!post?._id) return;
+    if (!post?._id || statusSubmitRef.current || statusNote.trim().length < 10 || !post.adminControl?.allowedStatuses.includes(selectedStatus)) return;
+    statusSubmitRef.current = true;
     setIsSubmittingStatus(true);
+    setErrorMessage("");
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/users/driver-posts/${post._id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: selectedStatus,
-          note: statusNote.trim() || undefined,
-        }),
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: selectedStatus, note: statusNote.trim(), expectedUpdatedAt: post.updatedAt }),
       });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Cập nhật trạng thái thất bại");
+      const data = await res.json();
+      if (!res.ok || !data.data?.post) {
+        if (res.status === 409) await fetchPost(true);
+        throw new Error(data.message || "Cập nhật trạng thái thất bại");
       }
-
-      setPost((prev) => (prev ? { ...prev, status: selectedStatus, note: statusNote.trim() || prev.note } : null));
+      setPost(data.data.post);
       setIsStatusModalOpen(false);
-      setStatusSuccessToast(`Đã chuyển trạng thái sang [${STATUS_CONFIG[selectedStatus]?.label || selectedStatus}] thành công!`);
+      setStatusSuccessToast(`Đã cập nhật: ${POST_STATUS_LABELS[data.data.post.status] || data.data.post.status}`);
       setTimeout(() => setStatusSuccessToast(""), 4000);
-    } catch (err: any) {
-      alert(err.message || "Có lỗi xảy ra khi cập nhật trạng thái");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Không thể cập nhật; dữ liệu chưa được thay đổi");
     } finally {
+      statusSubmitRef.current = false;
       setIsSubmittingStatus(false);
     }
   };
+
 
   if (loading) {
     return (
@@ -528,10 +453,8 @@ export default function AdminDriverPostDetailPage() {
 
   const driver = post.driverId;
   const vehicle = post.vehicleId;
-  const vehicleFullType = [vehicle?.vehicleTypeParent, vehicle?.vehicleTypeChild, vehicle?.type]
-    .filter(Boolean)
-    .join(" ");
-  const vehicleCategory = getVehicleCategory(vehicleFullType);
+  const capabilities = getVehicleCapabilities(vehicle);
+  const vehicleCategory = capabilities.hasSeats ? "passenger_car" : capabilities.hasCapacity ? "cargo_heavy" : "other";
   const priceText = post.price
     ? formatMoney(post.price)
     : `${formatMoney(post.pricing?.minPrice)} - ${formatMoney(post.pricing?.maxPrice)}`;
@@ -709,9 +632,11 @@ export default function AdminDriverPostDetailPage() {
           <button
             type="button"
             onClick={() => {
-              setSelectedStatus(post.status);
+              setSelectedStatus(post.adminControl?.allowedStatuses[0] || "");
+              setStatusNote("");
               setIsStatusModalOpen(true);
             }}
+            disabled={!post.adminControl?.allowedStatuses.length || isSubmittingStatus}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
           >
             <Sliders className="w-3.5 h-3.5" />
@@ -721,6 +646,7 @@ export default function AdminDriverPostDetailPage() {
       </div>
 
       {/* MAIN GRID */}
+      <DriverPostOperations post={post} />
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* LEFT COLUMN (2 COLS) */}
         <div className="xl:col-span-2 space-y-6">
@@ -869,7 +795,7 @@ export default function AdminDriverPostDetailPage() {
                     </span>
                   </div>
                   <span className="text-sm font-bold text-amber-950 mt-1 block">
-                    {formatCapacityTon(vehicle?.capacity) || "Chưa cập nhật"}
+                    {formatPostCapacity(post) || "Chưa cập nhật"}
                   </span>
                 </div>
               )}
@@ -1250,23 +1176,18 @@ export default function AdminDriverPostDetailPage() {
                   onChange={(e) => setSelectedStatus(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  <option value="active">Đang mở nhận đơn (Active)</option>
-                  <option value="paused">Tạm dừng nhận đơn (Paused)</option>
-                  <option value="scheduled">Đã lên lịch trước (Scheduled)</option>
-                  <option value="matched">Đã ghép đơn (Matched)</option>
-                  <option value="in_progress">Đang chạy vận chuyển (In Progress)</option>
-                  <option value="completed">Đã hoàn thành chuyến (Completed)</option>
-                  <option value="cancelled">Hủy tin đăng (Cancelled)</option>
+                  {(post.adminControl?.allowedStatuses || []).map(status => <option key={status} value={status}>{POST_STATUS_LABELS[status] || status}</option>)}
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                  Ghi chú quản trị viên (Tùy chọn)
+                  Lý do thao tác (bắt buộc, tối thiểu 10 ký tự)
                 </label>
                 <textarea
                   value={statusNote}
                   onChange={(e) => setStatusNote(e.target.value)}
+                  maxLength={1000}
                   placeholder="Nhập lý do hoặc hướng dẫn điều phối..."
                   rows={3}
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
@@ -1286,7 +1207,7 @@ export default function AdminDriverPostDetailPage() {
               <button
                 type="button"
                 onClick={handleUpdateStatus}
-                disabled={isSubmittingStatus}
+                disabled={isSubmittingStatus || statusNote.trim().length < 10 || !post.adminControl?.allowedStatuses.includes(selectedStatus)}
                 className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
                 {isSubmittingStatus ? (
