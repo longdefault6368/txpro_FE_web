@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, Suspense } from "react";
+import { useEffect, useEffectEvent, useMemo, useState, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -60,6 +60,7 @@ interface ChatMessage {
 
 interface SupportChat {
   _id: string;
+  supportChannel?: string;
   orderId?: { _id?: string; orderCode?: string; title?: string; status?: string } | null;
   participants?: UserInfo[];
   lastMessageAt?: string | null;
@@ -71,57 +72,6 @@ interface ChatRow {
   lastMessage?: ChatMessage | null;
 }
 
-const MOCK_TICKETS: SupportTicket[] = [
-  {
-    _id: "ticket-mock-1",
-    userId: { name: "Nguyễn Minh Thu", phone: "0933444555", email: "thu.nguyen@gmail.com", role: "chu-hang" },
-    title: "Cần hỗ trợ thanh toán đơn hàng",
-    category: "payment",
-    description: "Ví đã trừ tiền nhưng trạng thái đơn chưa cập nhật.",
-    status: "open",
-    conversation: [
-      { senderRole: "shipper", senderName: "Nguyễn Minh Thu", message: "Tôi đã thanh toán nhưng đơn chưa đổi trạng thái.", createdAt: "2026-07-10T02:00:00Z" },
-      { senderRole: "assistant", senderName: "Hệ thống hỗ trợ", message: "TXEPRO đã ghi nhận yêu cầu của bạn.", createdAt: "2026-07-10T02:01:00Z" },
-    ],
-    createdAt: "2026-07-10T02:00:00Z",
-    updatedAt: "2026-07-10T02:01:00Z",
-  },
-  {
-    _id: "ticket-mock-2",
-    userId: { name: "Vũ Quốc Khánh", phone: "0966777888", email: "khanh.vu@gmail.com", role: "tai-xe" },
-    title: "Lỗi không nhận được chuyến",
-    category: "technical",
-    description: "Ứng dụng báo lỗi khi bấm nhận chuyến.",
-    status: "pending",
-    conversation: [
-      { senderRole: "driver", senderName: "Vũ Quốc Khánh", message: "Tôi bấm nhận chuyến thì app báo lỗi.", createdAt: "2026-07-10T03:15:00Z" },
-    ],
-    createdAt: "2026-07-10T03:15:00Z",
-    updatedAt: "2026-07-10T03:15:00Z",
-  },
-];
-
-const MOCK_CHATS: ChatRow[] = [
-  {
-    chat: {
-      _id: "chat-mock-1",
-      orderId: { _id: "o-mock-2", orderCode: "ORD-20260709-002", title: "Vận chuyển thiết bị gia dụng", status: "delivered" },
-      participants: [
-        { name: "Lê Văn Hoàng", role: "chu-hang", phone: "0905111222" },
-        { name: "Phạm Minh Đức", role: "tai-xe", phone: "0977888999" },
-      ],
-      lastMessageAt: "2026-07-10T04:10:00Z",
-      updatedAt: "2026-07-10T04:10:00Z",
-    },
-    lastMessage: {
-      _id: "msg-mock-1",
-      senderId: { name: "Lê Văn Hoàng", role: "chu-hang" },
-      messageType: "text",
-      content: "Tôi đã nhận đủ hàng, cảm ơn tài xế.",
-      createdAt: "2026-07-10T04:10:00Z",
-    },
-  },
-];
 
 const CATEGORY_LABEL: Record<string, string> = {
   technical: "Lỗi kỹ thuật",
@@ -137,6 +87,11 @@ const STATUS_LABEL: Record<string, { label: string; className: string }> = {
   in_progress: { label: "Đang xử lý", className: "text-primary-700 bg-primary-50 border-primary-200" },
   resolved: { label: "Đã xử lý", className: "text-emerald-700 bg-emerald-50 border-emerald-200" },
   closed: { label: "Đã đóng", className: "text-slate-600 bg-slate-50 border-slate-200" },
+};
+
+const CHAT_CHANNEL_LABEL: Record<string, string> = {
+  technical: "Kỹ thuật & ứng dụng", payment: "Thanh toán & ví",
+  order_dispute: "Đơn & chuyến đi", accident: "Sự cố vận chuyển", other: "Hỗ trợ khác",
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -166,6 +121,7 @@ function AdminSupportContent() {
   const [selectedChat, setSelectedChat] = useState<{ chat: SupportChat; messages: ChatMessage[] } | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [channelFilter, setChannelFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
@@ -185,6 +141,10 @@ function AdminSupportContent() {
   };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatRequestVersion = useRef(0);
+  const activeChatId = useRef<string | null>(null);
+  const chatDrafts = useRef<Record<string, string>>({});
+  const lastQuery = useRef<string | null>(null);
 
   useEffect(() => {
     if (selectedChat?.messages) {
@@ -193,59 +153,24 @@ function AdminSupportContent() {
   }, [selectedChat?.messages]);
 
   const sendChatMessage = async () => {
-    if (!selectedChat || !chatMessageText.trim() || sendingChatMessage) return;
+    if (!selectedChat || detailLoading || !chatMessageText.trim() || sendingChatMessage) return;
     setSendingChatMessage(true);
     const content = chatMessageText.trim();
     const chatId = selectedChat.chat._id;
 
-    // Check if this is a mock chat ID (e.g. chat-mock-1) or invalid ObjectId
-    const isObjectId = /^[0-9a-fA-F]{24}$/.test(chatId);
-    if (!isObjectId) {
-      const mockMsg: ChatMessage = {
-        _id: `mock-msg-${Date.now()}`,
-        senderId: { name: "Admin TXEPRO", role: "admin" },
-        messageType: "text",
-        content,
-        createdAt: new Date().toISOString(),
-      };
-      setSelectedChat((prev) => prev ? {
-        ...prev,
-        messages: [...prev.messages, mockMsg],
-      } : null);
-      setChats((prev) => prev.map((row) => row.chat._id === chatId ? {
-        ...row,
-        lastMessage: mockMsg,
-        chat: { ...row.chat, lastMessageAt: new Date().toISOString() },
-      } : row));
-      setChatMessageText("");
+    if (!/^[0-9a-fA-F]{24}$/.test(chatId)) {
       setSendingChatMessage(false);
-      showToast(true, "Đã gửi tin nhắn (Hội thoại mẫu / Offline)");
+      showToast(false, "Hội thoại không hợp lệ. Vui lòng tải lại.");
       return;
     }
 
     try {
-      // Tier 1: Try dedicated admin support chat messages endpoint
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/support/chats/${chatId}/messages`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/chats/${chatId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: content, content, messageType: "text" }),
       });
 
-      // Tier 2: Fallback to common chat endpoint (which is already live on production)
-      if (res.status === 404) {
-        try {
-          const commonRes = await fetchWithAuth(`${API_BASE}/common/chats/${chatId}/messages`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content, message: content, messageType: "text" }),
-          });
-          if (commonRes.ok) {
-            res = commonRes;
-          }
-        } catch {
-          // ignore
-        }
-      }
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
@@ -261,33 +186,22 @@ function AdminSupportContent() {
         createdAt: data.data?.sentAt || new Date().toISOString(),
       };
 
-      setSelectedChat((prev) => prev ? {
+      setSelectedChat((prev) => prev?.chat._id === chatId ? {
         ...prev,
-        messages: [...prev.messages, newMsg],
-      } : null);
+        messages: prev.messages.some(message => message._id === newMsg._id) ? prev.messages : [...prev.messages, newMsg],
+      } : prev);
       setChats((prev) => prev.map((row) => row.chat._id === chatId ? {
         ...row,
         lastMessage: newMsg,
         chat: { ...row.chat, lastMessageAt: new Date().toISOString() },
       } : row));
-      setChatMessageText("");
+      if (chatDrafts.current[chatId]?.trim() === content) chatDrafts.current[chatId] = "";
+      if (activeChatId.current === chatId) setChatMessageText(current => current.trim() === content ? "" : current);
       setIsOffline(false);
       showToast(true, "Đã gửi tin nhắn tới người dùng thành công");
-    } catch (err: any) {
-      console.warn("Send chat message error, using local fallback", err);
-      const fallbackMsg: ChatMessage = {
-        _id: `fallback-msg-${Date.now()}`,
-        senderId: { name: "Admin TXEPRO", role: "admin" },
-        messageType: "text",
-        content,
-        createdAt: new Date().toISOString(),
-      };
-      setSelectedChat((prev) => prev ? {
-        ...prev,
-        messages: [...prev.messages, fallbackMsg],
-      } : null);
-      setChatMessageText("");
-      showToast(false, `Gặp sự cố khi gửi tin nhắn: ${err?.message || "Không thể kết nối"}`);
+    } catch (err) {
+      showToast(false, err instanceof Error ? err.message : "Không thể gửi. Nội dung vẫn được giữ để thử lại.");
+      setIsOffline(true);
     } finally {
       setSendingChatMessage(false);
     }
@@ -308,7 +222,7 @@ function AdminSupportContent() {
       const nextTickets = data.data?.tickets || [];
       setTickets(nextTickets);
 
-      const desiredTicketId = targetTicketId || queryTicketId;
+      const desiredTicketId = targetTicketId;
       if (desiredTicketId) {
         const found = nextTickets.find((item: SupportTicket) => item._id === desiredTicketId);
         if (found) {
@@ -318,26 +232,14 @@ function AdminSupportContent() {
           await openTicket(desiredTicketId);
         }
       } else if (nextTickets[0]) {
-        setSelectedTicket(nextTickets[0]);
+        setSelectedTicket(current => nextTickets.find((ticket: SupportTicket) => ticket._id === current?._id) || nextTickets[0]);
       } else {
         setSelectedTicket(null);
       }
       setIsOffline(false);
-    } catch (err) {
-      console.warn("Support ticket API offline, using mock data", err);
-      const queryText = search.toLowerCase();
-      let nextTickets = [...MOCK_TICKETS];
-      if (queryText) {
-        nextTickets = nextTickets.filter((ticket) =>
-          `${ticket.title} ${ticket.description} ${ticket.userId?.name || ""}`.toLowerCase().includes(queryText)
-        );
-      }
-      if (statusFilter) nextTickets = nextTickets.filter((ticket) => ticket.status === statusFilter);
-      setTickets(nextTickets);
-      const desiredTicketId = targetTicketId || queryTicketId;
-      const found = nextTickets.find((t) => t._id === desiredTicketId);
-      setSelectedTicket(found || nextTickets[0] || null);
+    } catch {
       setIsOffline(true);
+      showToast(false, "Không thể tải yêu cầu hỗ trợ. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -348,6 +250,7 @@ function AdminSupportContent() {
     const query = new URLSearchParams({
       limit: "50",
       ...(search ? { search } : {}),
+      ...(channelFilter ? { channel: channelFilter } : {}),
     });
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/users/support/chats?${query.toString()}`);
@@ -356,8 +259,8 @@ function AdminSupportContent() {
       const nextChats: ChatRow[] = data.data?.chats || [];
       setChats(nextChats);
 
-      const desiredChatId = targetChatId || queryChatId;
-      const desiredUserId = targetUserId || queryUserId;
+      const desiredChatId = targetChatId;
+      const desiredUserId = targetUserId;
 
       let chatToOpen: string | null = null;
       if (desiredChatId) {
@@ -365,7 +268,7 @@ function AdminSupportContent() {
         chatToOpen = found ? found.chat._id : desiredChatId;
       } else if (desiredUserId) {
         const foundByUser = nextChats.find((c) =>
-          c.chat.participants?.some((p) => p._id === desiredUserId || (p as any).id === desiredUserId)
+          c.chat.participants?.some((p) => p._id === desiredUserId || p.id === desiredUserId)
         );
         if (foundByUser) {
           chatToOpen = foundByUser.chat._id;
@@ -375,41 +278,44 @@ function AdminSupportContent() {
       if (chatToOpen) {
         await openChat(chatToOpen, false);
       } else if (nextChats[0]) {
-        await openChat(nextChats[0].chat._id, false);
+        const previous = nextChats.find(row => row.chat._id === activeChatId.current);
+        await openChat((previous || nextChats[0]).chat._id, false);
       } else {
+        activeChatId.current = null;
+        setChatMessageText("");
         setSelectedChat(null);
       }
       setIsOffline(false);
-    } catch (err) {
-      console.warn("Support chat API offline, using mock data", err);
-      setChats(MOCK_CHATS);
-      const desiredChatId = targetChatId || queryChatId;
-      const row = MOCK_CHATS.find((c) => c.chat._id === desiredChatId) || MOCK_CHATS[0];
-      setSelectedChat({
-        chat: row.chat,
-        messages: row.lastMessage ? [row.lastMessage] : [],
-      });
+    } catch {
       setIsOffline(true);
+      showToast(false, "Không thể tải hội thoại hỗ trợ. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
+  const refreshFromQuery = useEffectEvent(() => {
+    const queryKey = JSON.stringify([queryTab, queryChatId, queryUserId, queryTicketId]);
+    const queryChanged = lastQuery.current !== queryKey;
+    lastQuery.current = queryKey;
     const isChatMode = queryTab === "chats" || Boolean(queryChatId) || Boolean(queryUserId);
     const isTicketMode = queryTab === "tickets" || Boolean(queryTicketId);
 
-    if (isChatMode) {
+    if (queryChanged && isChatMode) {
       if (tab !== "chats") setTab("chats");
       fetchChats(queryChatId, queryUserId);
-    } else if (isTicketMode) {
+    } else if (queryChanged && isTicketMode) {
       if (tab !== "tickets") setTab("tickets");
       fetchTickets(queryTicketId);
     } else {
       if (tab === "tickets") fetchTickets();
       else fetchChats();
     }
-  }, [queryTab, queryChatId, queryUserId, queryTicketId, search, statusFilter]);
+  });
+  useEffect(() => {
+    const timer = window.setTimeout(() => refreshFromQuery(), 0);
+    return () => window.clearTimeout(timer);
+  }, [queryTab, queryChatId, queryUserId, queryTicketId, search, statusFilter, channelFilter]);
 
   const handleTabChange = (nextTab: SupportTab) => {
     setTab(nextTab);
@@ -420,7 +326,7 @@ function AdminSupportContent() {
     }
   };
 
-  const openTicket = async (ticketId: string) => {
+  async function openTicket(ticketId: string) {
     if (tab !== "tickets") setTab("tickets");
     setDetailLoading(true);
     try {
@@ -437,52 +343,19 @@ function AdminSupportContent() {
     }
   };
 
-  const openChat = async (chatId: string, showLoading = true) => {
+  async function openChat(chatId: string, showLoading = true) {
+    const version = ++chatRequestVersion.current;
     if (tab !== "chats") setTab("chats");
     if (showLoading) setDetailLoading(true);
     try {
-      let res = await fetchWithAuth(`${API_BASE}/admin/users/support/chats/${chatId}`);
-      if (!res.ok && res.status === 404) {
-        // Fallback to common chat detail endpoint
-        try {
-          const commonRes = await fetchWithAuth(`${API_BASE}/common/chats/${chatId}`);
-          if (commonRes.ok) {
-            const commonData = await commonRes.json();
-            const msgRes = await fetchWithAuth(`${API_BASE}/common/chats/${chatId}/messages?limit=100`);
-            const msgData = msgRes.ok ? await msgRes.json() : { data: [] };
-            const customChat: SupportChat = {
-              _id: commonData.data?.id || chatId,
-              orderId: commonData.data?.orderId ? { _id: commonData.data.orderId } : null,
-              participants: commonData.data?.participants,
-              lastMessageAt: commonData.data?.lastMessageAt,
-              updatedAt: commonData.data?.lastMessageAt || new Date().toISOString(),
-            };
-            const chatMessages: ChatMessage[] = (msgData.data || []).map((m: any) => ({
-              _id: m.id || m._id,
-              senderId: m.sender || { name: m.senderName, role: m.senderRole },
-              messageType: m.messageType || "text",
-              content: m.content || "",
-              createdAt: m.sentAt || m.createdAt,
-            }));
-            setSelectedChat({
-              chat: customChat,
-              messages: chatMessages,
-            });
-            setChats((prev) => {
-              if (!prev.some((c) => c.chat._id === customChat._id)) {
-                return [{ chat: customChat, lastMessage: chatMessages[chatMessages.length - 1] || null }, ...prev];
-              }
-              return prev;
-            });
-            setIsOffline(false);
-            return;
-          }
-        } catch {}
-      }
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/chats/${chatId}`);
       if (!res.ok) throw new Error("Failed to fetch chat detail");
       const data = await res.json();
       const loadedChat = data.data.chat;
       const loadedMessages = data.data.messages || [];
+      if (version !== chatRequestVersion.current) return;
+      activeChatId.current = loadedChat._id;
+      setChatMessageText(chatDrafts.current[loadedChat._id] || "");
       setSelectedChat({ chat: loadedChat, messages: loadedMessages });
       setChats((prev) => {
         if (!prev.some((c) => c.chat._id === loadedChat._id)) {
@@ -491,56 +364,105 @@ function AdminSupportContent() {
         return prev;
       });
       setIsOffline(false);
-    } catch (err) {
-      console.warn("Chat detail API offline", err);
-      const row = chats.find((item) => item.chat._id === chatId) || MOCK_CHATS.find((item) => item.chat._id === chatId) || MOCK_CHATS[0];
-      setSelectedChat({ chat: row.chat, messages: row.lastMessage ? [row.lastMessage] : [] });
+    } catch {
+      setIsOffline(true);
+      showToast(false, "Không thể tải hội thoại. Vui lòng thử lại.");
     } finally {
-      if (showLoading) setDetailLoading(false);
+      if (showLoading && version === chatRequestVersion.current) setDetailLoading(false);
     }
   };
 
-  const sendTicketReply = async () => {
-    if (!selectedTicket || !replyMessage.trim()) return;
+  const sendTicketReply = async (status: SupportTicket["status"] = "in_progress", statusOnly = false) => {
+    if (!selectedTicket || sendingReply || (!statusOnly && !replyMessage.trim())) return;
+    const ticketId = selectedTicket._id;
+    const message = replyMessage.trim();
     setSendingReply(true);
     try {
-      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets/${selectedTicket._id}/reply`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets/${ticketId}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: replyMessage.trim(), status: "in_progress" }),
+        body: JSON.stringify({ ...(!statusOnly ? { message } : {}), status }),
       });
-      if (!res.ok) throw new Error("Failed to reply ticket");
+      if (!res.ok) throw new Error("Không thể cập nhật yêu cầu hỗ trợ.");
       const data = await res.json();
-      setSelectedTicket(data.data.ticket);
-      setTickets((current) => current.map((ticket) => ticket._id === data.data.ticket._id ? data.data.ticket : ticket));
-      setReplyMessage("");
+      const updated: SupportTicket = data.data.ticket;
+      setSelectedTicket(current => current?._id === ticketId ? updated : current);
+      setTickets(current => current.map(ticket => ticket._id === ticketId ? updated : ticket));
+      if (!statusOnly) setReplyMessage(current => current.trim() === message ? "" : current);
       setIsOffline(false);
-      showToast(true, "Đã gửi phản hồi ticket thành công");
-    } catch (err) {
-      console.warn("Reply ticket API offline", err);
-      const nextTicket: SupportTicket = {
-        ...selectedTicket,
-        status: "in_progress",
-        conversation: [
-          ...selectedTicket.conversation,
-          {
-            senderRole: "admin",
-            senderName: "Admin TXEPRO",
-            message: replyMessage.trim(),
-            createdAt: new Date().toISOString(),
-          },
-        ],
-        updatedAt: new Date().toISOString(),
-      };
-      setSelectedTicket(nextTicket);
-      setTickets((current) => current.map((ticket) => ticket._id === nextTicket._id ? nextTicket : ticket));
-      setReplyMessage("");
+      showToast(true, statusOnly ? "Đã cập nhật trạng thái" : "Đã gửi phản hồi tới người dùng");
+    } catch {
       setIsOffline(true);
-      showToast(true, "Đã lưu phản hồi cục bộ");
+      showToast(false, "Chưa gửi được tới người dùng. Nội dung vẫn được giữ để thử lại.");
     } finally {
       setSendingReply(false);
     }
   };
+
+  // Poll only while visible; do not reset the selected ticket or overwrite drafts.
+  useEffect(() => {
+    if (tab !== "tickets") return;
+    let disposed = false;
+    let busy = false;
+    const refresh = async () => {
+      if (busy || document.hidden || sendingReply) return;
+      busy = true;
+      try {
+        const query = new URLSearchParams({ limit: "50", ...(search ? { search } : {}), ...(statusFilter ? { status: statusFilter } : {}) });
+        const response = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets?${query}`);
+        if (!response.ok) throw new Error("offline");
+        const payload = await response.json();
+        if (!disposed) { setTickets(payload.data?.tickets || []); setIsOffline(false); }
+        if (selectedTicket?._id) {
+          const detail = await fetchWithAuth(`${API_BASE}/admin/users/support/tickets/${selectedTicket._id}`);
+          if (!detail.ok) throw new Error("offline");
+          const data = await detail.json();
+          if (!disposed) setSelectedTicket(current =>
+            current && current._id === data.data.ticket._id && new Date(data.data.ticket.updatedAt) >= new Date(current.updatedAt)
+              ? data.data.ticket : current);
+        }
+      } catch {
+        if (!disposed) setIsOffline(true);
+      } finally { busy = false; }
+    };
+    const timer = window.setInterval(refresh, 5000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [tab, selectedTicket?._id, search, statusFilter, sendingReply]);
+
+  // Refresh the real conversation without resetting selection, drafts or scroll.
+  useEffect(() => {
+    if (tab !== "chats") return;
+    let disposed = false;
+    let busy = false;
+    const refresh = async () => {
+      if (busy || document.hidden || sendingChatMessage || detailLoading) return;
+      busy = true;
+      try {
+        const query = new URLSearchParams({ limit: "50", ...(search ? { search } : {}), ...(channelFilter ? { channel: channelFilter } : {}) });
+        const response = await fetchWithAuth(`${API_BASE}/admin/users/support/chats?${query}`);
+        if (!response.ok) throw new Error("offline");
+        const data = await response.json();
+        if (disposed) return;
+        setChats(data.data?.chats || []);
+        if (selectedChat?.chat._id) {
+          const detail = await fetchWithAuth(`${API_BASE}/admin/users/support/chats/${selectedChat.chat._id}`);
+          if (!detail.ok) throw new Error("offline");
+          const payload = await detail.json();
+          if (!disposed) setSelectedChat(current => {
+            if (!current || current.chat._id !== payload.data.chat._id) return current;
+            const messages: ChatMessage[] = payload.data.messages || [];
+            if (JSON.stringify(current.messages) === JSON.stringify(messages)) return current;
+            return { chat: payload.data.chat, messages };
+          });
+        }
+        if (!disposed) setIsOffline(false);
+      } catch {
+        if (!disposed) setIsOffline(true);
+      } finally { busy = false; }
+    };
+    const timer = window.setInterval(refresh, 3000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [tab, selectedChat?.chat._id, search, channelFilter, sendingChatMessage, detailLoading]);
 
   const supportStats = useMemo(() => ({
     pending: tickets.filter((ticket) => ticket.status === "pending" || ticket.status === "open").length,
@@ -552,7 +474,7 @@ function AdminSupportContent() {
     <div className="space-y-6">
       {isOffline && (
         <div className="bg-amber-50 border border-amber-100 text-amber-700 p-3 rounded-2xl flex items-center gap-2 text-xs font-semibold">
-          <AlertTriangle className="w-4 h-4" /> Backend đang offline, dữ liệu hiển thị là dữ liệu mẫu hoặc trạng thái cục bộ.
+          <AlertTriangle className="w-4 h-4" /> Chưa kết nối được hệ thống. Dữ liệu có thể chưa cập nhật; phản hồi chưa gửi sẽ được giữ lại để thử lại.
         </div>
       )}
 
@@ -616,6 +538,14 @@ function AdminSupportContent() {
           </select>
         )}
 
+        {tab === "chats" && (
+          <select aria-label="Kênh hỗ trợ" value={channelFilter} onChange={event => setChannelFilter(event.target.value)}
+            className="w-full lg:w-48 px-4 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold bg-white">
+            <option value="">Tất cả kênh hỗ trợ</option>
+            {Object.entries(CHAT_CHANNEL_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        )}
+
         <button
           onClick={() => tab === "tickets" ? fetchTickets() : fetchChats()}
           className="px-4 py-3 border border-slate-200 rounded-2xl text-slate-500 hover:text-primary-600 hover:bg-primary-50 transition-colors cursor-pointer"
@@ -670,6 +600,7 @@ function AdminSupportContent() {
                 const otherUser = row.chat.participants?.find((p) => p.role !== "admin") || row.chat.participants?.[0];
                 const displayTitle = otherUser?.name || row.chat.orderId?.orderCode || "Hỗ trợ người dùng";
                 const displaySubtitle = [
+                  CHAT_CHANNEL_LABEL[row.chat.supportChannel || ""] || "Hỗ trợ chung",
                   otherUser ? (ROLE_LABEL[otherUser.role || ""] || otherUser.role) : null,
                   otherUser?.phone,
                   row.chat.orderId?.orderCode ? `Đơn: ${row.chat.orderId.orderCode}` : null,
@@ -724,6 +655,7 @@ function AdminSupportContent() {
                     : (() => {
                         const otherP = selectedChat?.chat.participants?.find((p) => p.role !== "admin") || selectedChat?.chat.participants?.[0];
                         return [
+                          CHAT_CHANNEL_LABEL[selectedChat?.chat.supportChannel || ""] || "Hỗ trợ chung",
                           otherP ? (ROLE_LABEL[otherP.role || ""] || otherP.role) : null,
                           otherP?.phone,
                           selectedChat?.chat.orderId?.orderCode ? `Đơn: ${selectedChat.chat.orderId.orderCode}` : null,
@@ -733,9 +665,12 @@ function AdminSupportContent() {
               </div>
             </div>
             {tab === "tickets" && selectedTicket && (
-              <span className={`border rounded-xl px-3 py-1.5 text-xs font-bold ${(STATUS_LABEL[selectedTicket.status] || STATUS_LABEL.pending).className}`}>
-                {(STATUS_LABEL[selectedTicket.status] || STATUS_LABEL.pending).label}
-              </span>
+              <select aria-label="Trạng thái yêu cầu hỗ trợ" value={selectedTicket.status}
+                disabled={sendingReply || detailLoading}
+                onChange={event => sendTicketReply(event.target.value as SupportTicket['status'], true)}
+                className="border rounded-xl px-3 py-2 text-xs font-bold bg-white text-slate-800">
+                {Object.entries(STATUS_LABEL).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}
+              </select>
             )}
           </div>
 
@@ -749,6 +684,15 @@ function AdminSupportContent() {
                     <p><span className="font-bold text-slate-400 uppercase">Liên hệ:</span> <span className="font-bold text-slate-800">{selectedTicket.userId?.phone || selectedTicket.userId?.email || "---"}</span></p>
                   </div>
                   <p className="mt-3 text-slate-600 font-semibold leading-relaxed">{selectedTicket.description}</p>
+                  {!!selectedTicket.images?.length && <div className="flex gap-2 mt-3">
+                    {selectedTicket.images.filter(image => typeof image === 'string' && image.startsWith('/uploads/')).map((image, index) => {
+                      const url = `${API_BASE.replace(/\/api\/v1\/?$/, '')}${image}`;
+                      return <a href={url} target="_blank" rel="noopener noreferrer" key={image}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Ảnh đính kèm ${index + 1}`} className="w-24 h-24 rounded-xl object-cover border" />
+                      </a>;
+                    })}
+                  </div>}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/40">
@@ -776,7 +720,7 @@ function AdminSupportContent() {
                       className="flex-1 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-primary-500 resize-none"
                     />
                     <button
-                      onClick={sendTicketReply}
+                      onClick={() => sendTicketReply()}
                       disabled={sendingReply || !replyMessage.trim()}
                       className="px-5 rounded-2xl bg-primary-600 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-700 transition-colors cursor-pointer"
                       title="Gửi phản hồi"
@@ -825,7 +769,12 @@ function AdminSupportContent() {
                         <p className={`text-[10px] font-bold uppercase mb-1 ${fromAdmin ? "text-primary-100" : "text-slate-400"}`}>
                           {message.senderId?.name || message.senderId?.phone || "Người dùng"} · {ROLE_LABEL[message.senderId?.role || ""] || message.senderId?.role || "---"}
                         </p>
-                        <p className="text-sm font-semibold leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                        {message.messageType === "image" && /^\/uploads\/[a-zA-Z0-9_.-]+$/.test(message.content) ? (
+                          <a href={`${API_BASE.replace(/\/api\/v1\/?$/, '')}${message.content}`} target="_blank" rel="noopener noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={`${API_BASE.replace(/\/api\/v1\/?$/, '')}${message.content}`} alt="Ảnh người dùng gửi hỗ trợ" className="max-w-64 max-h-64 rounded-xl object-contain" />
+                          </a>
+                        ) : <p className="text-sm font-semibold leading-relaxed whitespace-pre-wrap">{message.content}</p>}
                         <p className={`text-[10px] font-bold mt-2 ${fromAdmin ? "text-primary-100" : "text-slate-400"}`}>
                           {formatDateTime(message.createdAt)}
                         </p>
@@ -841,7 +790,11 @@ function AdminSupportContent() {
                 <div className="flex gap-3 items-end">
                   <textarea
                     value={chatMessageText}
-                    onChange={(e) => setChatMessageText(e.target.value)}
+                    onChange={(e) => {
+                      chatDrafts.current[selectedChat.chat._id] = e.target.value;
+                      setChatMessageText(e.target.value);
+                    }}
+                    disabled={detailLoading}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
