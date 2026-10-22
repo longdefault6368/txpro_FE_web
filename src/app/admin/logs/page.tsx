@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, RefreshCw, Search, TerminalSquare } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import OtpInbox from "./otp-inbox";
 
 interface LogEntry {
   id: string;
@@ -78,6 +79,7 @@ export default function AdminLogsPage() {
 
   return (
     <div className="space-y-6">
+      <OtpInbox />
       <div className="flex flex-col gap-4 rounded-3xl border border-slate-200/60 bg-white p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
