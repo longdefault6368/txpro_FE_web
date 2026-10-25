@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
+import RoleSwitchButton from "@/components/account/RoleSwitchButton";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { getServerMediaUrl } from "@/utils/media";
 import { useToast } from "@/context/ToastContext";
@@ -569,20 +570,12 @@ function UserProfileContent() {
     return list;
   }, [allOrdersList, ordersSearch, ordersStatusFilter, ordersSortKey, ordersSortDir]);
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showKycWarningModal, setShowKycWarningModal] = useState(false);
   const [showEmailOtpModal, setShowEmailOtpModal] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
   const [emailOtpLoading, setEmailOtpLoading] = useState(false);
   const [emailOtpError, setEmailOtpError] = useState("");
   const [emailOtpDevHint, setEmailOtpDevHint] = useState("");
-  const [orderTitle, setOrderTitle] = useState("");
-  const [orderCargoType, setOrderCargoType] = useState("Hàng tiêu dùng");
-  const [orderPickupAddress, setOrderPickupAddress] = useState("");
-  const [orderDropoffAddress, setOrderDropoffAddress] = useState("");
-  const [orderWeight, setOrderWeight] = useState("1");
-  const [orderBudget, setOrderBudget] = useState("500000");
 
   const normalizedRole = normalizeRole(profile?.role);
 
@@ -762,8 +755,8 @@ function UserProfileContent() {
         const mockProfile: ProfileData = {
           name: session.name || "Khách hàng TXEPRO",
           role: normalizeRole(session.rawRole || session.role),
-          phone: session.phone || "0900000000",
-          email: session.email || "user@txepro.vn",
+          phone: session.phone || "",
+          email: session.email || "",
           language: "vi",
           kycStatus: "draft",
           isActive: true,
@@ -854,72 +847,11 @@ function UserProfileContent() {
       });
       setOrdersList(currentTabOrders);
     } catch {
-      setSummaryData({ waitingOrders: 2, inProgressOrders: 1, completedOrders: 5, historyOrders: 6 });
-
-      const mockList: OrderSummary[] = [
-        {
-          _id: "mock-waiting",
-          orderCode: "ORD-WAIT-01",
-          title: "Vận chuyển hàng hóa nội thành",
-          status: "searching_driver",
-          budget: { max: 1500000 },
-          pickup: { address: "Quận 1, TP.HCM" },
-          dropoff: { address: "Thành phố Thủ Đức, TP.HCM" },
-          cargoType: "Hàng tiêu dùng",
-          weight: 2,
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-        },
-        {
-          _id: "mock-in-progress",
-          orderCode: "ORD-RUN-02",
-          title: "Vận chuyển thiết bị điện tử",
-          status: "in_transit",
-          budget: { max: 2500000 },
-          pickup: { address: "Quận 3, TP.HCM" },
-          dropoff: { address: "Quận 7, TP.HCM" },
-          cargoType: "Hàng công nghệ",
-          weight: 1.5,
-          createdAt: new Date(Date.now() - 7200000).toISOString(),
-        },
-        {
-          _id: "mock-history",
-          orderCode: "ORD-DONE-03",
-          title: "Chuyến hàng đã hoàn thành",
-          status: "completed",
-          budget: { max: 3200000 },
-          pickup: { address: "Quận 10, TP.HCM" },
-          dropoff: { address: "Biên Hòa, Đồng Nai" },
-          cargoType: "Hàng tiêu dùng",
-          weight: 3,
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-        }
-      ];
-
-      setAllOrdersList(mockList);
-      setDriverPostsList(normalizedRole === "tai-xe" ? [
-        {
-          id: "mock-driver-post",
-          route: {
-            from: "Quận 1, TP.HCM",
-            to: "Thành phố Thủ Đức, TP.HCM",
-            pickupRadiusMeters: 3000,
-            dropoffRadiusMeters: 3000,
-          },
-          status: "active",
-          price: 1500000,
-          scheduleType: "active",
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-        },
-      ] : []);
-
-      const currentTabOrders = mockList.filter((order) => {
-        const status = order.status || "";
-        if (workspaceTab === "waiting") return status === "searching_driver";
-        if (workspaceTab === "in_progress") return status === "in_transit";
-        if (workspaceTab === "history") return status === "completed";
-        return false;
-      });
-      setOrdersList(currentTabOrders);
+      setSummaryData({});
+      setAllOrdersList([]);
+      setDriverPostsList([]);
+      setOrdersList([]);
+      showToast(false, 'Không tải được danh sách. Vui lòng thử lại; không có dữ liệu mẫu thay thế.');
     }
   };
 
@@ -948,11 +880,7 @@ function UserProfileContent() {
     setActionLoading(true);
     try {
       if (isOffline) {
-        const updatedProfile = { ...profile!, name: name.trim(), email: normalizedEmail, language };
-        setProfile(updatedProfile);
-        showToast(true, "Cập nhật hồ sơ thành công");
-        setEditing(false);
-        return;
+        throw new Error('Chưa kết nối được backend. Vui lòng thử lại trước khi lưu.');
       }
 
       const res = await fetchWithAuth(`${API_BASE}/auth/profile`, {
@@ -985,62 +913,14 @@ function UserProfileContent() {
     }
   };
 
-  const handleCreateOrder = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!orderTitle.trim()) return showToast(false, "Vui lòng nhập tên hàng hóa");
-    if (!orderPickupAddress.trim()) return showToast(false, "Vui lòng nhập địa chỉ bốc hàng");
-    if (!orderDropoffAddress.trim()) return showToast(false, "Vui lòng nhập địa chỉ giao hàng");
-
-    setActionLoading(true);
-    const payload = {
-      title: orderTitle.trim(),
-      cargoType: orderCargoType.trim(),
-      pickup: { address: orderPickupAddress.trim(), lat: 10.762622, lng: 106.660172 },
-      dropoff: { address: orderDropoffAddress.trim(), lat: 10.823099, lng: 106.629664 },
-      vehicleType: "xe-tai",
-      weight: Number(orderWeight) || 1,
-      volume: Number(orderWeight) * 3 || 3,
-      pickupTimeType: "now",
-      budget: {
-        min: Math.floor(Number(orderBudget) * 0.9) || 100000,
-        max: Number(orderBudget) || 120000,
-      },
-    };
-
-    try {
-      if (isOffline) {
-        showToast(true, "Đã gửi đơn hàng lên hệ thống");
-        setShowCreateModal(false);
-        return;
-      }
-
-      const res = await fetchWithAuth(`${API_BASE}/chu-hang/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Không thể tạo đơn hàng");
-      }
-
-      showToast(true, "Đăng tin vận chuyển thành công");
-      setShowCreateModal(false);
-      fetchWorkspaceData();
-    } catch (err) {
-      showToast(false, err instanceof Error ? err.message : "Không thể tạo đơn hàng");
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const handleCancelOrder = async (orderId: string) => {
     if (!window.confirm("Bạn có chắc chắn muốn hủy đơn hàng này không?")) return;
 
     setActionLoading(true);
     try {
-      if (!isOffline) {
+      if (isOffline) throw new Error('Chưa kết nối được backend. Vui lòng thử lại.');
+      {
         const res = await fetchWithAuth(`${API_BASE}/chu-hang/orders/${orderId}/cancel`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1062,7 +942,8 @@ function UserProfileContent() {
 
     setActionLoading(true);
     try {
-      if (!isOffline) {
+      if (isOffline) throw new Error('Chưa kết nối được backend. Vui lòng thử lại.');
+      {
         const res = await fetchWithAuth(`${API_BASE}/tai-xe/orders/${orderId}/accept`, { method: "POST" });
         if (!res.ok) throw new Error("Lỗi nhận đơn chạy");
       }
@@ -1179,15 +1060,12 @@ function UserProfileContent() {
                 </div>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
+                <RoleSwitchButton currentRole={normalizedRole} disabled={isOffline} />
+                {normalizedRole === 'tai-xe' && <Link href='/tai-xe/phuong-tien' className='inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-3 text-sm font-bold text-white'>Quản lý phương tiện</Link>}
                 {normalizedRole === "chu-hang" && (
                   <button
                     onClick={(e) => {
-                      if (!isVerified) {
-                        e.preventDefault();
-                        setShowKycWarningModal(true);
-                      } else {
-                        router.push("/chu-hang/form-tao-don");
-                      }
+                      router.push("/chu-hang/form-tao-don");
                     }}
                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-primary-700"
                   >
@@ -1723,140 +1601,6 @@ function UserProfileContent() {
         </div>
       </main>
 
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
-          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-bold text-slate-950">Đăng tin vận chuyển mới</h3>
-                <p className="mt-1 text-sm text-slate-500">Nhập thông tin cơ bản để tài xế có thể nhận chuyến.</p>
-              </div>
-              <button onClick={() => setShowCreateModal(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateOrder} className="space-y-4">
-              <Field label="Tên hàng hóa">
-                <input
-                  value={orderTitle}
-                  onChange={(e) => setOrderTitle(e.target.value)}
-                  placeholder="Ví dụ: 10 tấn xi măng"
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-primary-500"
-                  required
-                />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Loại hàng">
-                  <select
-                    value={orderCargoType}
-                    onChange={(e) => setOrderCargoType(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-primary-500"
-                  >
-                    <option value="Hàng tiêu dùng">Hàng tiêu dùng</option>
-                    <option value="Nông sản">Nông sản</option>
-                    <option value="Vật liệu xây dựng">Vật liệu xây dựng</option>
-                    <option value="Điện tử">Điện tử</option>
-                    <option value="Máy móc thiết bị">Máy móc thiết bị</option>
-                  </select>
-                </Field>
-                <Field label="Trọng lượng (tấn)">
-                  <input
-                    type="number"
-                    min="1"
-                    value={orderWeight}
-                    onChange={(e) => setOrderWeight(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-primary-500"
-                    required
-                  />
-                </Field>
-              </div>
-              <Field label="Điểm nhận hàng">
-                <input
-                  value={orderPickupAddress}
-                  onChange={(e) => setOrderPickupAddress(e.target.value)}
-                  placeholder="Ví dụ: KCN Sóng Thần, Bình Dương"
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-primary-500"
-                  required
-                />
-              </Field>
-              <Field label="Điểm giao hàng">
-                <input
-                  value={orderDropoffAddress}
-                  onChange={(e) => setOrderDropoffAddress(e.target.value)}
-                  placeholder="Ví dụ: Cảng Cát Lái, TP.HCM"
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-primary-500"
-                  required
-                />
-              </Field>
-              <Field label="Cước phí mong muốn (VND)">
-                <input
-                  type="number"
-                  min="50000"
-                  value={orderBudget}
-                  onChange={(e) => setOrderBudget(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-primary-500"
-                  required
-                />
-              </Field>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="w-1/2 rounded-lg border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="w-1/2 rounded-lg bg-primary-600 px-4 py-3 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-60"
-                >
-                  Đăng tin ngay
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showKycWarningModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white p-6 shadow-2xl transition-all">
-            <div className="flex flex-col items-center text-center">
-              {/* Warning/Shield Icon */}
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-600 mb-4">
-                <ShieldAlert className="h-6 w-6" />
-              </div>
-
-              <h3 className="text-lg font-bold text-slate-900">Yêu cầu xác minh tài khoản</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Để đăng đơn vận chuyển mới, bạn cần hoàn thành xác minh danh tính điện tử (eKYC) thành công.
-              </p>
-
-              <div className="mt-4 rounded-xl bg-slate-50 border border-slate-100 p-4 text-xs font-bold text-slate-650 leading-5 text-left">
-                Bạn có thể xác minh giấy tờ ngay trên web bằng CCCD mặt trước, mặt sau và ảnh chân dung. Hệ thống sẽ gọi VNPT eKYC theo cùng flow với app mobile.
-              </div>
-
-              <div className="mt-6 flex w-full flex-col gap-2">
-                <Link
-                  href="/user/ekyc"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-primary-700"
-                >
-                  <FileCheck2 className="h-4 w-4" />
-                  Xác minh giấy tờ ngay
-                </Link>
-                <button
-                  onClick={() => setShowKycWarningModal(false)}
-                  className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Để sau
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showEmailOtpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">

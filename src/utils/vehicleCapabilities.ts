@@ -1,4 +1,4 @@
-export type VehicleCategory = "passenger_car" | "cargo_truck" | "container_or_tractor" | "cargo_crane" | "other";
+export type VehicleCategory = "passenger_car" | "motorcycle" | "cargo_truck" | "container_or_tractor" | "cargo_crane" | "construction" | "other";
 
 export interface VehicleCapabilities {
   category: VehicleCategory;
@@ -34,8 +34,11 @@ export function getVehicleCapabilities(input?: {
   const child = normalize(input.vehicleTypeChild);
   const type = normalize(input.type);
   const all = [parent, child, type].filter(Boolean).join(" ");
+  if (["xe may", "motorcycle"].includes(parent || type)) {
+    return { category: "motorcycle", hasSeats: false, hasCapacity: false, hasCargoTypes: false };
+  }
 
-  // Container / xe đầu kéo: có tải trọng và loại hàng hóa, không có số chỗ.
+  // Container registration keeps cargo preferences, without tonnage or seats.
   const isContainerOrTractor =
     parent.includes("container") ||
     parent.includes("dau keo") ||
@@ -48,8 +51,8 @@ export function getVehicleCapabilities(input?: {
     return {
       category: "container_or_tractor",
       hasSeats: false,
-      hasCapacity: true,
-      hasCargoTypes: true,
+      hasCapacity: false,
+      hasCargoTypes: ![parent, type].includes('xe tai container long cho o to'),
     };
   }
 
@@ -72,6 +75,8 @@ export function getVehicleCapabilities(input?: {
     };
   }
 
+  if (all.includes('cong trinh')) return { category: 'construction', hasSeats: false, hasCapacity: true, hasCargoTypes: true };
+
   // Other/special vehicles which can contain ambiguous words such as
   // `o to` or `xe tai`, but do not support seats, capacity or cargo types.
   const isSpecialOrOther =
@@ -91,6 +96,7 @@ export function getVehicleCapabilities(input?: {
     (
       parent === "o to" ||
       parent === "oto" ||
+      parent === "xe o to" || parent === "xe oto" || parent === "o to cho nguoi" ||
       parent === "xe khach" ||
       parent === "o to cho khach" ||
       parent === "xe du lich" ||

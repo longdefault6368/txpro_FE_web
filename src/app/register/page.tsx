@@ -7,6 +7,9 @@ import { ArrowLeft, Lock, Mail, Phone, ShieldCheck, User, ArrowRight, KeyRound, 
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
 import { API_BASE } from "@/utils/api";
+import { createRegistrationClient, commitRegistrationSession } from '@/utils/web-registration';
+import { safePostingReturn } from '@/utils/posting-contract';
+const registrationRequest = createRegistrationClient(API_BASE);
 
 interface ValidationErrors {
   fullName?: string;
@@ -23,12 +26,17 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("chu-hang");
+  useEffect(() => {
+    const next = safePostingReturn(new URLSearchParams(window.location.search).get('next'));
+    if (next?.startsWith('/tai-xe/') || next?.startsWith('/user/ekyc')) setRole('tai-xe');
+  }, []);
   
   // OTP flow state
   const [step, setStep] = useState<"form" | "otp">("form");
   const [otp, setOtp] = useState("");
   const [otpTimer, setOtpTimer] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const requestLock = useRef(false);
 
   // Loading & Error States
   const [loading, setLoading] = useState(false);
@@ -94,147 +102,41 @@ export default function RegisterPage() {
 
   const handleRegisterOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setGeneralError(null);
-    
-    // Run validation first
-    if (!validateForm()) return;
-
-    setLoading(true);
-
-    const payload = {
-      name: fullName.trim(),
-      phone: phone.trim().replace(/\s+/g, ""),
-      email: email.trim() || undefined,
-      password: password,
-      role: role
-    };
-
+    if (requestLock.current || !validateForm()) return;
+    requestLock.current = true; setLoading(true); setGeneralError(null);
     try {
-      const res = await fetch(`${API_BASE}/auth/register-otp`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        setStep("otp");
-        setOtpTimer(60);
-      } else {
-        const errData = await res.json();
-        // Parse backend errors (such as phone already registered)
-        if (res.status === 409 || errData.message?.includes("đã được đăng ký")) {
-          setErrors({ phone: "Số điện thoại này đã tồn tại trên hệ thống" });
-          throw new Error("Số điện thoại này đã được đăng ký từ trước. Vui lòng đăng nhập hoặc sử dụng số điện thoại khác.");
-        }
-        throw new Error(errData.message || "Không thể yêu cầu mã OTP đăng ký.");
-      }
-    } catch (err: any) {
-      console.warn("Backend connection failed or registration error. Checking fallback...", err);
-      if (err.message?.includes("đã được đăng ký") || err.message?.includes("tồn tại")) {
-        setGeneralError(err.message);
-      } else {
-        // Fallback mock flow in development/offline mode
-        setTimeout(() => {
-          setStep("otp");
-          setOtpTimer(60);
-        }, 800);
-      }
-    } finally {
-      setLoading(false);
-    }
+      await registrationRequest('/auth/register-otp', { name: fullName.trim(), phone: phone.trim().replace(/\s+/g, ''), email: email.trim() || undefined, password, role });
+      setStep('otp'); setOtpTimer(60);
+    } catch (err) { setGeneralError(err instanceof Error ? err.message : 'Không gửi được OTP đăng ký.'); }
+    finally { requestLock.current = false; setLoading(false); }
   };
 
   const handleVerifyOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setGeneralError(null);
-    setErrors({});
-
-    if (!otp.trim() || otp.trim().length !== 6) {
-      setErrors({ otp: "Mã OTP phải gồm đúng 6 chữ số" });
-      return;
-    }
-
-    setLoading(true);
-
-    const payload = {
-      phone: phone.trim().replace(/\s+/g, ""),
-      otp: otp.trim()
-    };
-
+    if (requestLock.current) return;
+    if (!/^\d{6}$/.test(otp.trim())) { setErrors({ otp: 'Mã OTP phải gồm đúng 6 chữ số' }); return; }
+    requestLock.current = true; setLoading(true); setErrors({}); setGeneralError(null);
+    const expectedSession = localStorage.getItem('txpro_user_session');
     try {
-      const res = await fetch(`${API_BASE}/auth/verify-otp`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem("txpro_token", data.data.tokens?.accessToken || "");
-        localStorage.setItem("txpro_user_session", JSON.stringify({
-          name: data.data.user?.name || fullName || "Khách Hàng TXEPRO",
-          role: data.data.user?.role === "admin" ? "Admin" : data.data.user?.role === "tai-xe" ? "Tài Xế" : "Chủ Hàng",
-          rawRole: data.data.user?.role
-        }));
-        setSuccess(true);
-        const targetRoute = data.data.user?.role === "admin" ? "/admin" : "/user";
-        setTimeout(() => router.push(targetRoute), 1200);
-      } else {
-        const errData = await res.json();
-        throw new Error(errData.message || "Mã OTP xác thực không chính xác");
-      }
-    } catch (err: any) {
-      console.warn("Backend offline or verify error. Offline validation check...", err);
-      if (err.message?.includes("không chính xác") || err.message?.includes("hết hạn")) {
-        setErrors({ otp: err.message });
-      } else {
-        // Simulating verify OTP success locally
-        setTimeout(() => {
-          const isMockAdmin = fullName.toLowerCase().includes("admin");
-          const mockUser = {
-            name: fullName || "Người Dùng Mới",
-            role: isMockAdmin ? "Admin" : (role === "chu-hang" ? "Chủ Hàng" : "Tài Xế"),
-            rawRole: isMockAdmin ? "admin" : role
-          };
-          localStorage.setItem("txpro_user_session", JSON.stringify(mockUser));
-          setSuccess(true);
-          const targetRoute = isMockAdmin ? "/admin" : "/user";
-          setTimeout(() => router.push(targetRoute), 1200);
-        }, 800);
-      }
-    } finally {
-      setLoading(false);
-    }
+      let deviceId = localStorage.getItem('txpro_device_id');
+      if (!deviceId) { deviceId = crypto.randomUUID(); localStorage.setItem('txpro_device_id', deviceId); }
+      const data = await registrationRequest<Parameters<typeof commitRegistrationSession>[1]>('/auth/verify-otp', { phone: phone.trim().replace(/\s+/g, ''), otp: otp.trim(), deviceId });
+      const destination = commitRegistrationSession(localStorage, data, expectedSession);
+      setSuccess(true); window.dispatchEvent(new Event('txpro_session_updated'));
+      const next = safePostingReturn(new URLSearchParams(window.location.search).get('next'));
+      router.replace(next || destination);
+    } catch (err) { setGeneralError(err instanceof Error ? err.message : 'Chưa xác thực được tài khoản.'); }
+    finally { requestLock.current = false; setLoading(false); }
   };
 
   const handleResendOtp = async () => {
-    if (otpTimer > 0) return;
-    setLoading(true);
-    setGeneralError(null);
+    if (otpTimer > 0 || requestLock.current) return;
+    requestLock.current = true; setLoading(true); setGeneralError(null);
     try {
-      const res = await fetch(`${API_BASE}/auth/resend-otp`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ phone: phone.trim().replace(/\s+/g, "") })
-      });
-      if (res.ok) {
-        setOtpTimer(60);
-      } else {
-        const errData = await res.json();
-        throw new Error(errData.message || "Không thể gửi lại mã OTP");
-      }
-    } catch (err: any) {
-      console.warn("Backend offline. Simulating resend OTP locally...", err);
+      await registrationRequest('/auth/resend-otp', { phone: phone.trim().replace(/\s+/g, ''), purpose: 'register' });
       setOtpTimer(60);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setGeneralError(err instanceof Error ? err.message : 'Chưa gửi lại được OTP.'); }
+    finally { requestLock.current = false; setLoading(false); }
   };
 
   return (
@@ -275,11 +177,11 @@ export default function RegisterPage() {
                   <ShieldCheck className="w-10 h-10" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-950">Đăng Ký Thành Công!</h3>
-                <p className="text-slate-400 text-sm">Hệ thống đang chuyển hướng bạn về trang chủ...</p>
+                <p className="text-slate-400 text-sm">Đang chuyển đến bước tiếp theo...</p>
               </div>
             ) : step === "form" ? (
               /* Step 1: Registration form */
-              <form onSubmit={handleRegisterOtpSubmit} className="space-y-5">
+              <form onSubmit={handleRegisterOtpSubmit}><fieldset disabled={loading} className="space-y-5">
                 {/* Full name */}
                 <div>
                   <div className="relative group">
@@ -441,10 +343,10 @@ export default function RegisterPage() {
                     </>
                   )}
                 </button>
-              </form>
+              </fieldset></form>
             ) : (
               /* Step 2: OTP Verification form */
-              <form onSubmit={handleVerifyOtpSubmit} className="space-y-6">
+              <form onSubmit={handleVerifyOtpSubmit}><fieldset disabled={loading} className="space-y-6">
                 {/* OTP code input */}
                 <div>
                   <div className="relative group">
@@ -512,7 +414,7 @@ export default function RegisterPage() {
                     {loading ? "Đang xác thực..." : "Kích Hoạt Tài Khoản"}
                   </button>
                 </div>
-              </form>
+              </fieldset></form>
             )}
 
             <div className="border-t border-slate-100 mt-8 pt-8 text-center text-sm text-slate-500">

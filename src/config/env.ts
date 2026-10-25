@@ -13,6 +13,10 @@ export const API_BASE_URL = (
 
 export const API_BASE = `${API_BASE_URL}/api/v1`;
 
+// Public store listing URLs, supplied at build time. Empty values show download help.
+export const GOOGLE_PLAY_URL = process.env.NEXT_PUBLIC_GOOGLE_PLAY_URL || "";
+export const APP_STORE_URL = process.env.NEXT_PUBLIC_APP_STORE_URL || "";
+
 // Optional fallback API base URL if defined in environment
 export const API_FALLBACK_URL = process.env.NEXT_PUBLIC_API_FALLBACK
   ? process.env.NEXT_PUBLIC_API_FALLBACK.replace(/\/+$/, "")

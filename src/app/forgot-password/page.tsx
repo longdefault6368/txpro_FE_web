@@ -120,16 +120,7 @@ export default function ForgotPasswordPage() {
         throw new Error(errData.message || "Tài khoản chưa hoàn tất kích hoạt hoặc không tồn tại.");
       }
     } catch (err: any) {
-      console.warn("Backend connection failed or error. Handling mock fallback...", err);
-      if (err.message?.includes("chưa hoàn tất") || err.message?.includes("không tồn tại")) {
-        setGeneralError(err.message);
-      } else {
-        // Fallback mock flow
-        setTimeout(() => {
-          setStep("reset");
-          setOtpTimer(60);
-        }, 800);
-      }
+      setGeneralError(err instanceof Error ? err.message : "Chưa kết nối được backend. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -165,16 +156,7 @@ export default function ForgotPasswordPage() {
         throw new Error(errData.message || "Mã xác thực OTP không chính xác hoặc đã hết hạn.");
       }
     } catch (err: any) {
-      console.warn("Backend offline or verify error. Handling mock verify fallback...", err);
-      if (err.message?.includes("không chính xác") || err.message?.includes("hết hạn")) {
-        setErrors({ otp: err.message });
-      } else {
-        // Mock reset password success
-        setTimeout(() => {
-          setSuccess(true);
-          setTimeout(() => router.push("/login"), 1500);
-        }, 800);
-      }
+      setGeneralError(err instanceof Error ? err.message : "Chưa kết nối được backend. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -204,8 +186,7 @@ export default function ForgotPasswordPage() {
         throw new Error(errData.message || "Không thể gửi lại mã OTP.");
       }
     } catch (err: any) {
-      console.warn("Backend offline. Simulating resend OTP locally...", err);
-      setOtpTimer(60);
+      setGeneralError(err instanceof Error ? err.message : "Chưa kết nối được backend. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }

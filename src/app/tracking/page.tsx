@@ -7,6 +7,7 @@ import { Search, ArrowLeft, Package, MapPin, Phone, User, DollarSign } from "luc
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
 import { getServerMediaUrl } from "@/utils/media";
+import { fetchWithAuth } from '@/utils/api';
 
 interface OrderData {
   order: {
@@ -17,7 +18,11 @@ interface OrderData {
     pickup: { address: string; lat: number | null; lng: number | null };
     dropoff: { address: string; lat: number | null; lng: number | null };
     route: { distanceMeters: number | null; durationSeconds: number | null; polyline: string | null };
-    offerPrice: number;
+    offerPrice: number | null;
+    paymentMethod?: string | null;
+    acceptedAt?: string | null;
+    startedAt?: string | null;
+    deliveredAt?: string | null;
     createdAt: string;
     cancellationReason?: string | null;
     rejectionReason?: string | null;
@@ -366,7 +371,7 @@ function TrackingContent() {
     setError(null);
     setData(null);
     try {
-      const response = await fetch(`/api/tracking?code=${encodeURIComponent(codeStr.trim())}`);
+      const response = await fetchWithAuth(`/api/tracking?code=${encodeURIComponent(codeStr.trim())}`, { cache: 'no-store' });
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || "Không thể tải thông tin đơn hàng");
@@ -522,35 +527,9 @@ function TrackingContent() {
                   const isCompleted = activeStep >= stepItem.step;
                   const isActive = activeStep === stepItem.step;
 
-                  // Compute step timestamps dynamically
-                  const getStepTime = () => {
-                    if (stepItem.step === 1) {
-                      return data.order.createdAt ? new Date(data.order.createdAt).toLocaleString("vi-VN") : null;
-                    }
-                    if (stepItem.step === 2) {
-                      if (data.driver) {
-                        const acceptedTime = data.order.createdAt ? new Date(new Date(data.order.createdAt).getTime() + 120000) : new Date();
-                        return acceptedTime.toLocaleString("vi-VN");
-                      }
-                      return null;
-                    }
-                    if (stepItem.step === 3) {
-                      if (data.order.status === "in_progress" || data.order.status === "delivered" || data.order.status === "completed") {
-                        const pickupTime = data.order.createdAt ? new Date(new Date(data.order.createdAt).getTime() + 300000) : new Date();
-                        return pickupTime.toLocaleString("vi-VN");
-                      }
-                      return null;
-                    }
-                    if (stepItem.step === 4) {
-                      if (data.order.status === "delivered" || data.order.status === "completed") {
-                        const deliveredTime = data.order.createdAt ? new Date(new Date(data.order.createdAt).getTime() + 900000) : new Date();
-                        return deliveredTime.toLocaleString("vi-VN");
-                      }
-                      return null;
-                    }
-                    return null;
-                  };
-                  const stepTime = getStepTime();
+                  const recordedTime = [data.order.createdAt, data.order.acceptedAt, data.order.startedAt, data.order.deliveredAt][stepItem.step - 1];
+                  const date = recordedTime ? new Date(recordedTime) : null;
+                  const stepTime = date && !Number.isNaN(date.getTime()) ? date.toLocaleString("vi-VN") : null;
 
                   return (
                     <div key={stepItem.step} className="flex sm:flex-col items-center gap-4 sm:gap-6 z-10 w-full sm:w-auto relative">
@@ -662,13 +641,13 @@ function TrackingContent() {
                   </div>
                   <div className="flex justify-between py-1">
                     <span className="text-slate-400 font-semibold">Hình thức thanh toán:</span>
-                    <span className="font-bold text-slate-700">Tiền mặt tại điểm nhận</span>
+                    <span className="font-bold text-slate-700">{data.order.paymentMethod === 'cash' ? 'Tiền mặt' : data.order.paymentMethod === 'wallet' ? 'Ví điện tử' : 'Chưa có thông tin'}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 bg-primary-50 px-4 rounded-xl text-primary-700">
                     <span className="font-bold flex items-center gap-1">
                       <DollarSign className="w-4 h-4" /> Giá cước (Thương lượng)
                     </span>
-                    <span className="text-lg font-bold">{data.order.offerPrice.toLocaleString()} đ</span>
+                    <span className="text-lg font-bold">{data.order.offerPrice == null ? 'Chưa có giá' : data.order.offerPrice.toLocaleString('vi-VN') + ' đ'}</span>
                   </div>
                 </div>
               </div>

@@ -2,18 +2,22 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const API_KEY = "sk-sp-D.IDDM.oDxW.MEYCIQDhPtvvznvTTwQCcGvDBMFiox0JyQ21xmT642lyscggOwIhAOw03L0/wOehMvWyLIrcdJ/XK395O1WEhlpjEj4gGAiI";
-const BASE_URL = "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1";
-const MODEL = "deepseek-v4-flash";
+const API_KEY = process.env.CHAT_API_KEY || "";
+const BASE_URL = process.env.CHAT_API_BASE_URL || "";
+const MODEL = process.env.CHAT_MODEL || "";
 
 export async function POST(req: Request) {
+  if (!API_KEY || !BASE_URL || !MODEL) return NextResponse.json({ error: "Trợ lý chưa được cấu hình. Vui lòng sử dụng trang Liên hệ." }, { status: 503 });
   try {
     const { messages } = await req.json();
+    if (!Array.isArray(messages) || messages.length > 30 || messages.some(message => !message || !['user', 'assistant'].includes(message.role) || typeof message.content !== 'string' || message.content.length > 10000)) {
+      return NextResponse.json({ error: 'Nội dung hội thoại chưa hợp lệ.' }, { status: 400 });
+    }
 
     const input = [
       {
         role: "system",
-        content: "Bạn là trợ lý AI thông minh của hệ thống vận tải thông minh TXEPRO. Hãy hỗ trợ trả lời các thắc mắc của chủ hàng và tài xế về việc tìm xe rỗng, đăng chuyến xe rỗng, gửi hàng, và các tính năng công nghệ (như OTP xác thực, Live GPS tracking, Radar quét, Vòng xoay giá thương lượng) của ứng dụng TXEPRO. Trả lời bằng tiếng Việt lịch sự, thân thiện, ngắn gọn và hữu ích. Hãy nêu bật tính năng miễn phí 0đ và 0% chiết khấu của TXEPRO để thu hút người dùng."
+        content: "Bạn là trợ lý TXEPRO. Trả lời ngắn gọn, lịch sự. Không tự đặt số điện thoại, địa chỉ, giờ hỗ trợ, phí hoặc thời hạn xử lý. Với thông tin chưa có, hướng dẫn người dùng đến trang Liên hệ hoặc Trợ giúp. Không khẳng định mọi chuyến đều miễn phí."
       },
       ...messages
     ];
@@ -33,8 +37,7 @@ export async function POST(req: Request) {
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("Alibaba API error:", errText);
+      console.error("Chat provider returned status:", response.status);
       return NextResponse.json({ error: "Lỗi kết nối AI" }, { status: response.status });
     }
 

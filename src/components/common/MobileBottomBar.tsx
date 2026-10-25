@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Home,
@@ -13,10 +13,10 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useCompanyInfo } from "@/context/CompanyInfoContext";
+import AppStoreLinks from './AppStoreLinks';
 
 export default function MobileBottomBar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { companyInfo } = useCompanyInfo();
   const [showDownloadModal, setShowDownloadModal] = useState(false);
 
@@ -25,7 +25,7 @@ export default function MobileBottomBar() {
     return null;
   }
 
-  const hotline = companyInfo.hotline || companyInfo.phoneSupport || "0987654321";
+  const hotline = companyInfo.hotline || companyInfo.phoneSupport || '';
 
   const handleDownloadClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -59,9 +59,9 @@ export default function MobileBottomBar() {
       isActive: false,
     },
     {
-      name: "Hotline",
-      href: `tel:${hotline.replace(/\s+/g, "")}`,
-      isExternal: true,
+      name: hotline ? "Hotline" : 'Liên hệ',
+      href: hotline ? `tel:${hotline.replace(/[^+\d]/g, "")}` : '/thong-tin/lien-he',
+      isExternal: Boolean(hotline),
       icon: PhoneCall,
       highlightIcon: true,
       isActive: false,
@@ -174,7 +174,7 @@ export default function MobileBottomBar() {
             <div className="bg-primary-50/70 border border-primary-100 p-3.5 rounded-2xl text-xs space-y-1.5 text-slate-700 font-medium">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary-600 flex-shrink-0" />
-                <span>100% Miễn phí kết nối – Không cắt chiết khấu %</span>
+                <span>Kết nối chủ hàng và tài xế trên TXEPRO</span>
               </div>
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary-600 flex-shrink-0" />
@@ -183,31 +183,7 @@ export default function MobileBottomBar() {
             </div>
 
             {/* Download Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <a
-                href="#download"
-                onClick={() => {
-                  setShowDownloadModal(false);
-                  router.push("/#download");
-                }}
-                className="bg-slate-900 hover:bg-black text-white p-3 rounded-2xl flex flex-col items-center justify-center text-center transition-all shadow-md active:scale-95"
-              >
-                <span className="text-[10px] text-slate-400 font-semibold uppercase">Dành cho iPhone</span>
-                <span className="text-sm font-bold mt-0.5">App Store</span>
-              </a>
-
-              <a
-                href="#download"
-                onClick={() => {
-                  setShowDownloadModal(false);
-                  router.push("/#download");
-                }}
-                className="bg-slate-900 hover:bg-black text-white p-3 rounded-2xl flex flex-col items-center justify-center text-center transition-all shadow-md active:scale-95"
-              >
-                <span className="text-[10px] text-slate-400 font-semibold uppercase">Dành cho Android</span>
-                <span className="text-sm font-bold mt-0.5">Google Play</span>
-              </a>
-            </div>
+            <AppStoreLinks />
 
             <div className="pt-2 text-center">
               <button

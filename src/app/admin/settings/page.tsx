@@ -39,6 +39,8 @@ import {
   Inbox
 } from "lucide-react";
 import { DEFAULT_COMPANY_INFO, CompanyInfo } from "@/utils/companyInfo";
+import { normalizeCompanyInfo, COMPANY_INFO_UPDATED_KEY } from '@/utils/companyInfo';
+import { postingRequest } from '@/utils/posting-api';
 
 type SettingsTab = "company" | "sms" | "operations";
 
@@ -118,6 +120,7 @@ export default function AdminSettingsPage() {
   // 1. Company Info State
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(DEFAULT_COMPANY_INFO);
   const [savingCompany, setSavingCompany] = useState(false);
+  const [companyLoaded, setCompanyLoaded] = useState(false);
 
   // 2. SMS OTP Template State
   const [template, setTemplate] = useState("");
@@ -154,13 +157,10 @@ export default function AdminSettingsPage() {
   // Fetch Company Info
   const fetchCompanySettings = async () => {
     try {
-      const res = await fetchWithAuth(`${API_BASE}/contacts/company-info`);
-      if (res.ok) {
-        const json = await res.json();
-        setCompanyInfo({ ...DEFAULT_COMPANY_INFO, ...(json.data || {}) });
-      }
+      setCompanyInfo(normalizeCompanyInfo(await postingRequest('/contacts/company-info')));
+      setCompanyLoaded(true);
     } catch {
-      // Offline fallback
+      showError('Chưa tải được thông tin doanh nghiệp. Vui lòng tải lại trước khi lưu.');
     }
   };
 
@@ -330,29 +330,23 @@ export default function AdminSettingsPage() {
   // Handle Save Company Info
   const handleSaveCompanyInfo = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!companyLoaded || savingCompany) return;
     setSavingCompany(true);
     setErrorMsg(null);
 
     try {
-      const res = await fetchWithAuth(`${API_BASE}/contacts/company-info`, {
+      const updated = await postingRequest('/contacts/company-info', {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(companyInfo),
       });
-
-      if (res.ok) {
-        const json = await res.json();
-        setCompanyInfo({ ...DEFAULT_COMPANY_INFO, ...(json.data || companyInfo) });
+        setCompanyInfo(normalizeCompanyInfo(updated));
         if (typeof window !== "undefined") {
+          try { localStorage.setItem(COMPANY_INFO_UPDATED_KEY, String(Date.now())); } catch { /* Saving on the server already succeeded. */ }
           window.dispatchEvent(new Event("txpro_company_info_updated"));
         }
         showSuccess("Đã lưu thông tin liên hệ & doanh nghiệp thành công!");
-      } else {
-        const err = await res.json().catch(() => ({}));
-        showError(err.message || "Không thể lưu thông tin doanh nghiệp.");
-      }
-    } catch {
-      showError("Lỗi kết nối tới máy chủ khi lưu thông tin.");
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Chưa lưu được thông tin doanh nghiệp.');
     } finally {
       setSavingCompany(false);
     }
@@ -640,7 +634,7 @@ export default function AdminSettingsPage() {
               </div>
             </div>
 
-            <form onSubmit={handleSaveCompanyInfo} className="space-y-6">
+<form onSubmit={handleSaveCompanyInfo} className="space-y-6">
               {/* Nhóm 1: Tên doanh nghiệp */}
               <div className="space-y-4">
                 <h3 className="text-xs font-bold text-primary-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -650,11 +644,10 @@ export default function AdminSettingsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Tên pháp nhân doanh nghiệp *
+                      Tên pháp nhân doanh nghiệp
                     </label>
                     <input
                       type="text"
-                      required
                       value={companyInfo.companyName}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, companyName: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium"
@@ -663,11 +656,10 @@ export default function AdminSettingsPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Tên thương hiệu / Viết tắt *
+                      Tên thương hiệu / Viết tắt
                     </label>
                     <input
                       type="text"
-                      required
                       value={companyInfo.shortName}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, shortName: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium"
@@ -685,28 +677,26 @@ export default function AdminSettingsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Tổng đài khẩn cấp 24/7 (Hotline) *
+                      Số hotline
                     </label>
                     <input
                       type="text"
-                      required
                       value={companyInfo.hotline}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, hotline: e.target.value })}
-                      placeholder="1900 6868"
+                      placeholder="Nhập số hotline chính thức"
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium text-red-600 font-bold"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Số di động CSKH / Hỗ trợ kỹ thuật *
+                      Số di động CSKH / Hỗ trợ kỹ thuật
                     </label>
                     <input
                       type="text"
-                      required
                       value={companyInfo.phoneSupport}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, phoneSupport: e.target.value })}
-                      placeholder="0912 345 678"
+                      placeholder="Nhập số hỗ trợ chính thức"
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium"
                     />
                   </div>
@@ -722,11 +712,10 @@ export default function AdminSettingsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Email liên hệ chung *
+                      Email liên hệ chung
                     </label>
                     <input
                       type="email"
-                      required
                       value={companyInfo.emailGeneral}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, emailGeneral: e.target.value })}
                       placeholder="lienhe@txepro.vn"
@@ -736,11 +725,10 @@ export default function AdminSettingsPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Email hỗ trợ kỹ thuật / ví *
+                      Email hỗ trợ kỹ thuật / ví
                     </label>
                     <input
                       type="email"
-                      required
                       value={companyInfo.emailSupport}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, emailSupport: e.target.value })}
                       placeholder="hotro@txepro.vn"
@@ -750,11 +738,10 @@ export default function AdminSettingsPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Email bảo mật / DPO *
+                      Email bảo mật / DPO
                     </label>
                     <input
                       type="email"
-                      required
                       value={companyInfo.emailPrivacy}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, emailPrivacy: e.target.value })}
                       placeholder="privacy@txepro.vn"
@@ -773,28 +760,26 @@ export default function AdminSettingsPage() {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Trụ sở TP. Hồ Chí Minh *
+                      Trụ sở TP. Hồ Chí Minh
                     </label>
                     <input
                       type="text"
-                      required
                       value={companyInfo.addressHcm}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, addressHcm: e.target.value })}
-                      placeholder="Tầng 5, Tòa nhà Công nghệ Sài Gòn, Quận 1, TP. Hồ Chí Minh"
+                      placeholder="Nhập địa chỉ văn phòng chính"
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Văn phòng đại diện Hà Nội *
+                      Địa chỉ văn phòng thứ hai
                     </label>
                     <input
                       type="text"
-                      required
                       value={companyInfo.addressHn}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, addressHn: e.target.value })}
-                      placeholder="Tầng 8, Tòa nhà Logistics Tower, Cầu Giấy, Hà Nội"
+                      placeholder="Nhập địa chỉ văn phòng thứ hai"
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium"
                     />
                   </div>
@@ -810,28 +795,26 @@ export default function AdminSettingsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Khung giờ làm việc *
+                      Khung giờ làm việc
                     </label>
                     <input
                       type="text"
-                      required
                       value={companyInfo.workingHours}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, workingHours: e.target.value })}
-                      placeholder="Thứ 2 - Thứ 7: 08:00 - 18:00 (Hệ thống điều phối 24/7)"
+                      placeholder="Nhập ngày và giờ hỗ trợ thực tế"
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Mã số thuế doanh nghiệp (MST) *
+                      Mã số thuế doanh nghiệp (MST)
                     </label>
                     <input
                       type="text"
-                      required
                       value={companyInfo.taxCode}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, taxCode: e.target.value })}
-                      placeholder="0317896868"
+                      placeholder="Nhập mã số thuế nếu có"
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium"
                     />
                   </div>
@@ -864,11 +847,28 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
 
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h3 className="text-sm font-bold text-primary-700">Thông tin hiển thị thống nhất trên website</h3>
+                <p className="text-xs text-slate-500">Để trống mục chưa có dữ liệu chính thức. Website sẽ ẩn thông tin đó, không thay bằng số hay địa chỉ mẫu.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {([
+                    ['officePrimaryLabel', 'Tên văn phòng chính', 'text'],
+                    ['officeSecondaryLabel', 'Tên văn phòng thứ hai', 'text'],
+                    ['supportResponseTime', 'Thông tin thời gian phản hồi hỗ trợ', 'text'],
+                    ['websiteUrl', 'Website chính thức', 'url'],
+                    ['googlePlayUrl', 'Link ứng dụng Google Play', 'url'],
+                    ['appStoreUrl', 'Link ứng dụng App Store', 'url'],
+                  ] as const).map(([key, label, type]) => <label key={key} className="block text-xs font-semibold text-slate-700">
+                    {label}
+                    <input type={type} value={companyInfo[key]} onChange={event => setCompanyInfo(current => ({ ...current, [key]: event.target.value }))} className="mt-2 w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 font-medium" />
+                  </label>)}
+                </div>
+              </div>
               {/* Submit button */}
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
                 <button
                   type="submit"
-                  disabled={savingCompany}
+                  disabled={savingCompany || !companyLoaded}
                   className="px-8 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm shadow-md shadow-primary-600/25 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {savingCompany ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -904,7 +904,7 @@ export default function AdminSettingsPage() {
                 <div className="flex items-center gap-2.5">
                   <Phone className="w-4 h-4 text-red-400 shrink-0" />
                   <div>
-                    <span className="text-slate-400 block text-[10px]">Tổng đài 24/7:</span>
+                    <span className="text-slate-400 block text-[10px]">Hotline:</span>
                     {companyInfo.hotline ? (
                       <span className="font-bold text-white text-sm">{companyInfo.hotline}</span>
                     ) : (

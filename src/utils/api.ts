@@ -1,38 +1,11 @@
 export { API_BASE_URL, API_BASE, API_FALLBACK } from "@/config/env";
-import { API_BASE, API_FALLBACK } from "@/config/env";
+import { API_BASE } from "@/config/env";
 
 /**
  * Execute fetch with automatic token and fallback management based on environment variables
  */
-export const executeFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
-  let res: Response;
-  try {
-    res = await fetch(url, options);
-  } catch (netErr) {
-    // If request failed and a fallback API is configured in environment, retry with fallback
-    if (API_FALLBACK && url.startsWith(API_BASE)) {
-      const fallbackUrl = url.replace(API_BASE, API_FALLBACK);
-      res = await fetch(fallbackUrl, options);
-    } else {
-      throw netErr;
-    }
-  }
-
-  // If primary API returns 404 (endpoint not deployed yet) and fallback is configured, try fallback
-  if (res.status === 404 && API_FALLBACK && url.startsWith(API_BASE)) {
-    try {
-      const fallbackUrl = url.replace(API_BASE, API_FALLBACK);
-      const fallbackRes = await fetch(fallbackUrl, options);
-      if (fallbackRes.status !== 404) {
-        return fallbackRes;
-      }
-    } catch {
-      // Fallback not reachable, keep original response
-    }
-  }
-
-  return res;
-};
+// Reads, writes and token refresh all remain on the configured backend.
+export const executeFetch = (url: string, options: RequestInit = {}): Promise<Response> => fetch(url, { ...options, cache: options.cache || "no-store" });
 
 // Singleton in-flight refresh promise to prevent race conditions during token rotation
 let activeRefreshPromise: Promise<string | null> | null = null;

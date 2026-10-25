@@ -1,0 +1,17 @@
+.content{max-width:550px;margin:0 auto;color:#102c49}
+.nowButton{display:flex;align-items:center;gap:10px;width:100%;padding:16px;border:1px solid #cfdfef;border-radius:12px;background:#f0f7ff;color:#1262d2;font-size:14px;font-weight:600;min-height:55px;margin-bottom:22px;cursor:pointer}
+.nowButton>span{flex:1;text-align:left}
+.inputs{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px}
+.content .inputs label{display:block;font-size:14px;font-weight:600;color:#304b63;margin:0}
+.inputs label>span{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.content .inputs input{display:block;width:100%;min-width:0;min-height:54px;padding:12px;border:1px solid #cfdae6;border-radius:11px;background:#fff;color:#102c49;font-size:16px;font-weight:500;margin:0;color-scheme:light}
+.inputs input:focus-visible{outline:3px solid #136dec35;outline-offset:2px;border-color:#136dec}
+.inputs input[aria-invalid=true]{border-color:#c93b35}
+.error{border-radius:9px;padding:11px 13px;font-size:13px;line-height:1.7;color:#a22525;background:#fff1ef;border:1px solid #f0c8c3;margin-top:16px}
+.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:26px}
+.actions button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer}
+.cancel{border:1px solid #d4e0ec;background:#fff;color:#355774}
+.confirm{border:1px solid #136dec;background:#136dec;color:#fff}
+.confirm:hover{background:#0957c7}.cancel:hover{background:#eef4fb}
+.content button:focus-visible{outline:3px solid #136dec;outline-offset:3px}
+@media(max-width:430px){.inputs{grid-template-columns:1fr;gap:20px}.actions button{flex:1}.actions{gap:9px}}

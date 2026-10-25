@@ -3,12 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/prepare-browser-ocr.mjs",
+    "prebuild": "node scripts/prepare-browser-ocr.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test:posting": "node --test tests/web-posting.test.mjs",
+    "test:onboarding": "node --test tests/onboarding.test.mjs",
+    "test:onboarding:backend": "node --test --test-concurrency=1 tests/onboarding-backend.test.mjs",
+    "test:roles": "node --test tests/account-role-switch.test.mjs",
+    "test:roles:backend": "node --test --test-concurrency=1 tests/account-role-switch-backend.test.mjs",
+    "test:landing": "node --test tests/landing-presentation.test.mjs tests/landing-motion.test.mjs tests/ambient-motion.test.mjs tests/community.test.mjs",
+    "test:news": "node --test tests/news.test.mjs",
+    "test:home-posting": "node --test tests/home-posting.test.mjs",
+    "test:catalog": "node --test tests/catalog-picker.test.mjs",
+    "test:posting:ui": "node --test tests/posting-experience.test.mjs tests/posting-time.test.mjs",
+    "test:posting:backend": "node --test --test-concurrency=1 tests/web-posting-backend.test.mjs",
     "lint": "eslint"
   },
   "dependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/vie": "1.0.0",
     "@types/aos": "^3.0.8",
     "aos": "^2.3.4",
     "clsx": "^2.1.1",
@@ -18,7 +33,8 @@
     "nextjs-toploader": "^3.9.17",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

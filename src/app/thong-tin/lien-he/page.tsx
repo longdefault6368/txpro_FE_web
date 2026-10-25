@@ -27,7 +27,7 @@ import SubpageHeroBanner from "@/components/common/SubpageHeroBanner";
 import SubpageCtaBanner from "@/components/common/SubpageCtaBanner";
 import { useLanguage } from "@/context/LanguageContext";
 import { useCompanyInfo } from "@/context/CompanyInfoContext";
-import { executeFetch, API_BASE } from "@/utils/api";
+import { postingRequest } from "@/utils/posting-api";
 
 export default function ContactPage() {
   const { language } = useLanguage();
@@ -53,7 +53,7 @@ export default function ContactPage() {
       subtitle:
         "TXEPRO luôn sẵn sàng lắng nghe, tư vấn giải pháp vận tải công nghệ và đồng hành cùng quý đối tác, chủ hàng và tài xế trên mọi hành trình.",
       formTitle: "Gửi thông tin liên hệ",
-      formSubtitle: "Vui lòng điền thông tin bên dưới, chúng tôi sẽ phản hồi trong vòng 2 giờ làm việc.",
+      formSubtitle: "Vui lòng điền thông tin bên dưới để bộ phận hỗ trợ tiếp nhận yêu cầu.",
       fullName: "Họ và tên *",
       fullNamePlaceholder: "Nguyễn Văn A",
       phone: "Số điện thoại liên hệ *",
@@ -79,17 +79,17 @@ export default function ContactPage() {
         "Cảm ơn bạn đã liên hệ với TXEPRO. Yêu cầu của bạn đã được chuyển đến bộ phận hỗ trợ khách hàng và chúng tôi sẽ liên hệ lại sớm nhất.",
       btnSendAnother: "Gửi thêm yêu cầu khác",
       channelsTitle: "Thông tin hỗ trợ trực tiếp",
-      hotlineTitle: "Tổng đài 24/7",
-      hotlineDesc: "Hỗ trợ khẩn cấp, tra cứu đơn & cứu hộ giao thông",
+      hotlineTitle: "Tổng đài hỗ trợ",
+      hotlineDesc: "Hỗ trợ tài khoản và các vấn đề chuyến đi",
       hotlineNumber: companyInfo.hotline || "",
       emailTitle: "Hòm thư điện tử",
       emailAddress: companyInfo.emailGeneral || "",
       emailSupport: companyInfo.emailSupport || "",
       workingHoursTitle: "Thời gian làm việc",
       workingHoursDesc: companyInfo.workingHours || "",
-      hcmOfficeTitle: "Trụ sở TP. Hồ Chí Minh",
+      hcmOfficeTitle: "Văn phòng chính",
       hcmOfficeAddress: companyInfo.addressHcm || "",
-      hnOfficeTitle: "Văn phòng Hà Nội",
+      hnOfficeTitle: "Văn phòng khác",
       hnOfficeAddress: companyInfo.addressHn || "",
       quickHelpTitle: "Bạn cần giải đáp câu hỏi thường gặp?",
       quickHelpDesc: "Truy cập Trung tâm trợ giúp để xem hướng dẫn đăng đơn, ký quỹ MB Bank và tài xế.",
@@ -101,7 +101,7 @@ export default function ContactPage() {
       subtitle:
         "TXEPRO is always ready to listen, consult freight solutions, and partner with shippers and drivers across Vietnam.",
       formTitle: "Send Us a Message",
-      formSubtitle: "Fill in the form below and our team will respond within 2 business hours.",
+      formSubtitle: "Fill in the form below to submit your request to support.",
       fullName: "Full Name *",
       fullNamePlaceholder: "John Doe",
       phone: "Phone Number *",
@@ -127,17 +127,17 @@ export default function ContactPage() {
         "Thank you for contacting TXEPRO. Your inquiry has been forwarded to our support team and we will reach out shortly.",
       btnSendAnother: "Send another message",
       channelsTitle: "Direct Contact Channels",
-      hotlineTitle: "24/7 Hotline",
-      hotlineDesc: "Emergency assistance, shipment tracking & on-road support",
+      hotlineTitle: "Support hotline",
+      hotlineDesc: "Account and trip support",
       hotlineNumber: companyInfo.hotline || "",
       emailTitle: "Official Email",
       emailAddress: companyInfo.emailGeneral || "",
       emailSupport: companyInfo.emailSupport || "",
       workingHoursTitle: "Business Hours",
       workingHoursDesc: companyInfo.workingHours || "",
-      hcmOfficeTitle: "HCMC Headquarters",
+      hcmOfficeTitle: "Main office",
       hcmOfficeAddress: companyInfo.addressHcm || "",
-      hnOfficeTitle: "Hanoi Representative Office",
+      hnOfficeTitle: "Other office",
       hnOfficeAddress: companyInfo.addressHn || "",
       quickHelpTitle: "Looking for Instant Answers?",
       quickHelpDesc: "Visit our Help Center for FAQs, MB Bank escrow workflows, and trip tutorials.",
@@ -148,7 +148,7 @@ export default function ContactPage() {
       title: "联系我们",
       subtitle: "TXEPRO 随时倾听您的需求，为您提供数字化智慧物流方案，携手广大货主与司机共创高效运输。",
       formTitle: "在线留言咨询",
-      formSubtitle: "请填写以下信息，我们的专业客服将在 2 个工作小时内与您联系。",
+      formSubtitle: "请填写以下信息以提交支持请求。",
       fullName: "姓名 / 企业名称 *",
       fullNamePlaceholder: "张先生 / 某某物流",
       phone: "联系电话 *",
@@ -173,17 +173,17 @@ export default function ContactPage() {
       successDesc: "感谢您联系 TXEPRO。我们已收到您的留言，客服专员将尽快与您取得联系。",
       btnSendAnother: "再次发送留言",
       channelsTitle: "直接联络方式",
-      hotlineTitle: "24/7 服务热线",
-      hotlineDesc: "紧急求助、运单追踪及在途应急调度",
+      hotlineTitle: "服务热线",
+      hotlineDesc: "账户与行程支持",
       hotlineNumber: companyInfo.hotline || "",
       emailTitle: "官方邮箱",
       emailAddress: companyInfo.emailGeneral || "",
       emailSupport: companyInfo.emailSupport || "",
       workingHoursTitle: "工作时间",
       workingHoursDesc: companyInfo.workingHours || "",
-      hcmOfficeTitle: "胡志明市总部",
+      hcmOfficeTitle: "主要办公室",
       hcmOfficeAddress: companyInfo.addressHcm || "",
-      hnOfficeTitle: "河内办事处",
+      hnOfficeTitle: "其他办公室",
       hnOfficeAddress: companyInfo.addressHn || "",
       quickHelpTitle: "需要查找常见问题解答？",
       quickHelpDesc: "访问帮助中心查阅发布运单、MB Bank 担保及司机操作指南。",
@@ -220,17 +220,17 @@ export default function ContactPage() {
     btnSendAnother: "Gửi lại",
     channelsTitle: "Kênh hỗ trợ",
     hotlineTitle: "Hotline",
-    hotlineDesc: "24/7",
+    hotlineDesc: "",
     hotlineNumber: companyInfo.hotline || "",
     emailTitle: "Email",
     emailAddress: companyInfo.emailGeneral || "",
     emailSupport: companyInfo.emailSupport || "",
     workingHoursTitle: "Giờ làm việc",
-    workingHoursDesc: "08:00 - 18:00",
-    hcmOfficeTitle: "TP. Hồ Chí Minh",
-    hcmOfficeAddress: "Quận 1, TP. HCM",
-    hnOfficeTitle: "Hà Nội",
-    hnOfficeAddress: "Cầu Giấy, Hà Nội",
+    workingHoursDesc: companyInfo.workingHours || "",
+    hcmOfficeTitle: "Văn phòng chính",
+    hcmOfficeAddress: companyInfo.addressHcm || "",
+    hnOfficeTitle: "Văn phòng khác",
+    hnOfficeAddress: companyInfo.addressHn || "",
     quickHelpTitle: "Trung tâm trợ giúp",
     quickHelpDesc: "Xem câu hỏi thường gặp",
     btnQuickHelp: "Trợ giúp",
@@ -247,26 +247,9 @@ export default function ContactPage() {
 
     setSubmitting(true);
     try {
-      const res = await executeFetch(`${API_BASE}/contacts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success !== false) {
-        setSubmitSuccess(true);
-        setFormData({
-          fullName: "",
-          phone: "",
-          email: "",
-          category: "shipper",
-          subject: "",
-          message: "",
-        });
-      } else {
-        setErrorMessage(data.message || "Không thể gửi tin nhắn. Vui lòng kiểm tra lại thông tin.");
-      }
+      await postingRequest("/contacts", { method: "POST", body: JSON.stringify(formData) }, false);
+      setSubmitSuccess(true);
+      setFormData({ fullName: "", phone: "", email: "", category: "shipper", subject: "", message: "" });
     } catch (err) {
       console.error("Contact submit error:", err);
       // Fallback message
@@ -302,7 +285,7 @@ export default function ContactPage() {
                   {pageCopy.formTitle}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  {pageCopy.formSubtitle}
+                  {companyInfo.supportResponseTime || pageCopy.formSubtitle}
                 </p>
               </div>
 
@@ -545,7 +528,7 @@ export default function ContactPage() {
                               <MapPin className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                               <div>
                                 <h4 className="text-xs font-bold text-slate-900">
-                                  {pageCopy.hcmOfficeTitle}
+                                  {companyInfo.officePrimaryLabel || pageCopy.hcmOfficeTitle}
                                 </h4>
                                 <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                                   {companyInfo.addressHcm}
@@ -559,7 +542,7 @@ export default function ContactPage() {
                               <Building2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                               <div>
                                 <h4 className="text-xs font-bold text-slate-900">
-                                  {pageCopy.hnOfficeTitle}
+                                  {companyInfo.officeSecondaryLabel || pageCopy.hnOfficeTitle}
                                 </h4>
                                 <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                                   {companyInfo.addressHn}

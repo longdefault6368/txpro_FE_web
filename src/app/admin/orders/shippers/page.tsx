@@ -181,118 +181,6 @@ function resolvePointCoordinates(
   return null;
 }
 
-const MOCK_SHIPPER_ORDERS: Order[] = [
-  {
-    _id: "so-mock-1",
-    orderCode: "ORD-20260709-001",
-    title: "Vận chuyển 20 tấn hạt nhựa PP",
-    cargoType: "Hạt nhựa công nghiệp",
-    vehicleType: "Xe tải 20 tấn",
-    weight: 20000,
-    volume: 35,
-    status: "in_progress",
-    offerPrice: 4500000,
-    pickup: { address: "KCN Cát Lái, TP.HCM", lat: 10.776889, lng: 106.700806 },
-    dropoff: { address: "KCN Sóng Thần, Bình Dương", lat: 11.082725, lng: 106.666992 },
-    shipperId: { name: "Trần Thị Hằng", phone: "0912345678", email: "hang@gmail.com" },
-    driverId: { name: "Nguyễn Văn Tuấn", phone: "0987654321", email: "tuan.driver@gmail.com" },
-    paymentMethod: "cash",
-    pickupTimeType: "scheduled",
-    pickupTime: "2026-07-10T02:00:00Z",
-    notes: "Bốc hàng bằng xe nâng tại cổng 2.",
-    createdAt: "2026-07-09T08:30:00Z",
-  },
-  {
-    _id: "so-mock-2",
-    orderCode: "ORD-20260708-005",
-    title: "Giao 50 thùng hoa quả tươi xuất khẩu",
-    cargoType: "Nông sản đông lạnh",
-    vehicleType: "Xe tải đông lạnh 5 tấn",
-    weight: 2500,
-    volume: 12,
-    status: "searching_driver",
-    budget: { min: 1800000, max: 2500000 },
-    pickup: { address: "Chợ đầu mối Thủ Đức, TP.HCM", lat: 10.849409, lng: 106.753706 },
-    dropoff: { address: "Cảng Cát Lái, Quận 2, TP.HCM", lat: 10.768889, lng: 106.780806 },
-    shipperId: { name: "Nguyễn Minh Thu", phone: "0933444555", email: "thu.nguyen@gmail.com" },
-    paymentMethod: "wallet",
-    pickupTimeType: "now",
-    createdAt: "2026-07-08T14:00:00Z",
-  },
-  {
-    _id: "so-mock-3",
-    orderCode: "ORD-20260708-012",
-    title: "Chở thép cuộn xây dựng công trình",
-    cargoType: "Vật liệu xây dựng",
-    vehicleType: "Xe đầu kéo Container 40ft",
-    weight: 28000,
-    volume: 40,
-    status: "completed",
-    offerPrice: 8500000,
-    pickup: { address: "KCN Đình Vũ, Hải Phòng", lat: 20.844911, lng: 106.688084 },
-    dropoff: { address: "KCN Quế Võ, Bắc Ninh", lat: 21.186096, lng: 106.076317 },
-    shipperId: { name: "Công ty Thép Việt Nhật", phone: "0908889999", email: "logistics@vietnhatsteel.vn" },
-    driverId: { name: "Hoàng Văn Nam", phone: "0977112233", email: "nam.hoang@gmail.com" },
-    paymentMethod: "wallet",
-    pickupTimeType: "scheduled",
-    pickupTime: "2026-07-08T06:00:00Z",
-    notes: "Có giấy cân tải trọng tại cảng.",
-    createdAt: "2026-07-07T16:20:00Z",
-  },
-  {
-    _id: "so-mock-4",
-    orderCode: "ORD-20260707-009",
-    title: "Vận chuyển linh kiện điện tử",
-    cargoType: "Thiết bị điện tử",
-    vehicleType: "Xe tải thùng kín 8 tấn",
-    weight: 4500,
-    volume: 24,
-    status: "waiting_driver_acceptance",
-    budget: 3200000,
-    pickup: { address: "Khu Công Nghệ Cao, Quận 9, TP.HCM", lat: 10.852409, lng: 106.793706 },
-    dropoff: { address: "KCN Biên Hòa 2, Đồng Nai", lat: 10.957448, lng: 106.842712 },
-    shipperId: { name: "Phạm Hải Đăng", phone: "0944556677", email: "dang.pham@samsungsupply.vn" },
-    driverId: { name: "Lê Quốc Bảo", phone: "0938123456", email: "bao.le@gmail.com" },
-    paymentMethod: "wallet",
-    pickupTimeType: "scheduled",
-    createdAt: "2026-07-07T09:15:00Z",
-  },
-  {
-    _id: "so-mock-5",
-    orderCode: "ORD-20260706-003",
-    title: "Chở phân bón NPK và thuốc BVTV",
-    cargoType: "Nông dược phẩm",
-    vehicleType: "Xe tải thùng bạt 15 tấn",
-    weight: 15000,
-    volume: 28,
-    status: "delivered",
-    offerPrice: 6200000,
-    pickup: { address: "KCN Hiệp Phước, Nhà Bè, TP.HCM", lat: 10.6667, lng: 106.75 },
-    dropoff: { address: "KCN Trà Nóc, Cần Thơ", lat: 10.045162, lng: 105.746857 },
-    shipperId: { name: "Đoàn Văn Vĩnh", phone: "0918776655", email: "vinh.fertilizer@gmail.com" },
-    driverId: { name: "Trương Công Định", phone: "0903332211", email: "dinh.truong@gmail.com" },
-    paymentMethod: "cash",
-    pickupTimeType: "scheduled",
-    createdAt: "2026-07-06T11:45:00Z",
-  },
-  {
-    _id: "so-mock-6",
-    orderCode: "ORD-20260705-018",
-    title: "Chở gạch men và thiết bị vệ sinh",
-    cargoType: "Hàng gia dụng & VLXD",
-    vehicleType: "Xe tải cẩu 10 tấn",
-    weight: 9500,
-    volume: 18,
-    status: "searching_driver",
-    offerPrice: 5000000,
-    pickup: { address: "KCN Hòa Khánh, Liên Chiểu, Đà Nẵng", lat: 16.054407, lng: 108.202164 },
-    dropoff: { address: "KCN Điện Nam - Điện Ngọc, Quảng Nam", lat: 15.566373, lng: 108.016357 },
-    shipperId: { name: "Vũ Thị Mai", phone: "0982223344", email: "mai.ceramic@danang.vn" },
-    paymentMethod: "wallet",
-    pickupTimeType: "now",
-    createdAt: "2026-07-05T08:00:00Z",
-  },
-];
 
 const STATUS_MAP: Record<
   string,
@@ -462,37 +350,9 @@ export default function AdminShipperOrdersPage() {
       setPagination(data.data?.pagination || { page: currentPage, limit, total: fetchedOrders.length, pages: 1 });
       setIsOffline(false);
     } catch (err: any) {
-      console.warn("Orders API offline, using mock data", err);
       setIsOffline(true);
-      const query = search.toLowerCase();
-      let filtered = [...MOCK_SHIPPER_ORDERS];
-      if (query) {
-        filtered = filtered.filter(
-          (order) =>
-            order.orderCode.toLowerCase().includes(query) ||
-            order.title?.toLowerCase().includes(query) ||
-            order.cargoType?.toLowerCase().includes(query) ||
-            order.shipperId?.name?.toLowerCase().includes(query) ||
-            order.pickup?.address?.toLowerCase().includes(query) ||
-            order.dropoff?.address?.toLowerCase().includes(query)
-        );
-      }
-      if (statusFilter) filtered = filtered.filter((order) => order.status === statusFilter);
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        filtered = filtered.filter((order) => new Date(order.createdAt) >= start);
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        filtered = filtered.filter((order) => new Date(order.createdAt) <= end);
-      }
-      const total = filtered.length;
-      const pages = Math.ceil(total / limit) || 1;
-      const paginated = filtered.slice((currentPage - 1) * limit, currentPage * limit);
-      setOrders(paginated);
-      setPagination({ page: currentPage, limit, total, pages });
+      setOrders([]);
+      setPagination({ page: currentPage, limit, total: 0, pages: 1 });
     } finally {
       setLoading(false);
     }
@@ -516,8 +376,8 @@ export default function AdminShipperOrdersPage() {
       const data = await res.json();
       setMapOrders(data.data?.orders || []);
     } catch (err) {
-      console.warn("Map orders fallback to local/mock dataset", err);
-      setMapOrders(MOCK_SHIPPER_ORDERS);
+      console.warn("Cannot load map orders", err);
+      setMapOrders([]);
     } finally {
       setMapLoading(false);
     }
@@ -864,7 +724,7 @@ export default function AdminShipperOrdersPage() {
       {isOffline && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3.5 rounded-2xl flex items-center gap-2 text-xs font-semibold">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span>Hệ thống đang chạy chế độ dự phòng cục bộ (Offline Mock Data)</span>
+          <span>Chưa tải được danh sách từ backend. Vui lòng thử lại.</span>
         </div>
       )}
 

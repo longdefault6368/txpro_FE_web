@@ -83,6 +83,7 @@ const FALLBACK_VEHICLE_TREE: VehicleCatalogItem[] = [
       { name: "45 ghế", key: "seat.45", seats: 45 },
     ],
   },
+  { name: "Xe máy", key: "vehicle.motorcycle" },
   {
     name: "Container / xe đầu kéo",
     key: "vehicle.container_trailer",

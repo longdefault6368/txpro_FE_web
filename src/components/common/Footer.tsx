@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Phone, Mail, MapPin, ShieldCheck } from "lucide-react";
+import { Phone, Mail, MapPin, Clock, ShieldCheck } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useCompanyInfo } from "@/context/CompanyInfoContext";
 
@@ -14,7 +14,7 @@ const footerCopy = {
     policy: "Chính sách",
     support: "Hỗ trợ",
     rights: "Tất cả quyền được bảo lưu.",
-    hotlineLabel: "Tổng đài hỗ trợ 24/7:",
+    hotlineLabel: "Tổng đài hỗ trợ:",
     emailLabel: "Hòm thư tiếp nhận:",
     taxLabel: "Mã số thuế:",
     links: {
@@ -39,7 +39,7 @@ const footerCopy = {
     policy: "Policies",
     support: "Support",
     rights: "All rights reserved.",
-    hotlineLabel: "24/7 Support Hotline:",
+    hotlineLabel: "Support hotline:",
     emailLabel: "Official Email:",
     taxLabel: "Tax Code:",
     links: {
@@ -64,7 +64,7 @@ const footerCopy = {
     policy: "政策条款",
     support: "支持服务",
     rights: "保留所有权利。",
-    hotlineLabel: "24/7 服务热线:",
+    hotlineLabel: "服务热线:",
     emailLabel: "官方服务邮箱:",
     taxLabel: "税号:",
     links: {
@@ -136,6 +136,9 @@ export default function Footer() {
             <p className="text-slate-600 max-w-md text-sm leading-7 mt-4">
               {copy.desc}
             </p>
+            {companyInfo.companyName && <p className='mt-3 text-sm font-semibold text-slate-800'>{companyInfo.companyName}</p>}
+            {companyInfo.workingHours && <p className='mt-3 flex items-start gap-2 text-xs text-slate-600'><Clock size={15} className='shrink-0 mt-0.5' />{companyInfo.workingHours}</p>}
+            {companyInfo.addressHn && <p className='mt-3 flex items-start gap-2 text-xs text-slate-600'><MapPin size={15} className='shrink-0 mt-0.5' />{[companyInfo.officeSecondaryLabel, companyInfo.addressHn].filter(Boolean).join(': ')}</p>}
 
             {/* Direct Company Contact Info - Only render items configured by admin */}
             {(companyInfo.hotline || companyInfo.emailSupport || companyInfo.emailGeneral || companyInfo.addressHcm) && (
@@ -200,7 +203,7 @@ export default function Footer() {
 
         <div className="border-t border-slate-200 pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-xs sm:text-sm font-medium">
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-center sm:text-left">
-            <p>&copy; {new Date().getFullYear()} {companyInfo.companyName || "TXEPRO Technologies"}. {copy.rights}</p>
+            <p>&copy; {new Date().getFullYear()} {companyInfo.companyName || "TXE PRO"}. {copy.rights}</p>
             {companyInfo.taxCode && (
               <span className="text-slate-400 font-normal">
                 {copy.taxLabel} {companyInfo.taxCode}

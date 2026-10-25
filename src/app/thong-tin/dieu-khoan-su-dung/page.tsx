@@ -54,7 +54,7 @@ export default function TermsOfServicePage() {
       searchPlaceholder: "Tìm kiếm nội dung điều khoản...",
       printBtn: "In văn bản",
       contactSupport: "Bạn có thắc mắc về điều khoản?",
-      contactDesc: "Đội ngũ pháp chế và hỗ trợ khách hàng của TXEPRO luôn sẵn sàng giải đáp 24/7.",
+      contactDesc: "Xem thông tin liên hệ và giờ hỗ trợ được công bố trên website.",
       btnContact: "Liên hệ pháp chế",
       sections: [
         {
@@ -106,7 +106,7 @@ export default function TermsOfServicePage() {
             "Biểu phí sàn TXEPRO: Nền tảng áp dụng mức phí dịch vụ kết nối công khai, minh bạch theo từng loại chuyến và sẽ được khấu trừ tự động tại thời điểm giải tỏa.",
             "Hóa đơn GTGT điện tử: TXEPRO hỗ trợ xuất hóa đơn điện tử hợp pháp cho mọi giao dịch cước vận tải theo đúng quy định của Tổng cục Thuế.",
           ],
-          notes: "Tiền nạp vào ví tài xế có thể rút về tài khoản ngân hàng liên kết 24/7 qua chuẩn NAPAS nhanh chóng chỉ sau 1 - 5 phút.",
+          notes: "Điều kiện và trạng thái rút tiền được hiển thị trong ví. Thời gian nhận tiền phụ thuộc kết quả xử lý của hệ thống và ngân hàng.",
         },
         {
           id: "section-5",
@@ -188,7 +188,7 @@ export default function TermsOfServicePage() {
       searchPlaceholder: "Search terms...",
       printBtn: "Print Terms",
       contactSupport: "Have legal questions?",
-      contactDesc: "TXEPRO legal and customer support team is available 24/7.",
+      contactDesc: "See the current contact details and support hours on the website.",
       btnContact: "Contact Legal Team",
       sections: [
         {
@@ -240,7 +240,7 @@ export default function TermsOfServicePage() {
             "Platform Fee: Transparent service commission deducted automatically at the moment of payout.",
             "Official VAT Invoices: Electronic tax invoices provided for corporate shippers upon request.",
           ],
-          notes: "Wallet funds can be withdrawn 24/7 to any Vietnamese bank account via NAPAS in 1 - 5 minutes.",
+          notes: "Check withdrawal eligibility and status in your wallet. Receipt time depends on system and bank processing.",
         },
         {
           id: "section-5",
@@ -321,7 +321,7 @@ export default function TermsOfServicePage() {
       searchPlaceholder: "搜索条款内容...",
       printBtn: "打印条款",
       contactSupport: "对条款有疑问？",
-      contactDesc: "TXEPRO 法务及客服团队随时为您提供 24/7 权威解答。",
+      contactDesc: "请查看网站公布的联系方式与服务时间。",
       btnContact: "联系法务专员",
       sections: [],
     },

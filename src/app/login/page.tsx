@@ -7,6 +7,7 @@ import { ArrowLeft, Lock, Mail, ShieldCheck, ArrowRight, AlertCircle, Smartphone
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
 import { API_BASE } from "@/utils/api";
+import { safePostingReturn } from "@/utils/posting-contract";
 
 // Helper to retrieve or generate deviceId consistent with backend validator
 const getDeviceId = () => {
@@ -29,6 +30,8 @@ const maskPhone = (phone: string | null) => {
 
 export default function LoginPage() {
   const router = useRouter();
+  const [returnPath, setReturnPath] = useState<string | null>(null);
+  useEffect(() => { setReturnPath(safePostingReturn(new URLSearchParams(window.location.search).get('next'))); }, []);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -102,12 +105,16 @@ export default function LoginPage() {
         const userName = userProfile.fullName || userProfile.name || "Người dùng TXEPRO";
 
         localStorage.setItem("txpro_user_session", JSON.stringify({
+          id: userProfile.id || userProfile._id || "",
+          sessionStartedAt: new Date().toISOString(),
           name: userName,
           role: userRole === "admin" ? "Admin" : userRole === "tai-xe" ? "Tài Xế" : "Chủ Hàng",
           rawRole: userRole
         }));
         setSuccess(true);
-        const targetRoute = userRole === "admin" ? "/admin" : "/user";
+        const next = safePostingReturn(new URLSearchParams(window.location.search).get("next"));
+        const targetRoute = userRole === "admin" ? "/admin" : next || "/user";
+        window.dispatchEvent(new Event("txpro_session_updated"));
         setTimeout(() => router.push(targetRoute), 1200);
       } else {
         // If server indicates new device validation is required
@@ -333,7 +340,7 @@ export default function LoginPage() {
 
             <div className="border-t border-slate-100 mt-8 pt-8 text-center text-sm text-slate-500">
               Chưa có tài khoản?{" "}
-              <Link href="/register" className="text-primary-600 hover:text-primary-700 font-bold transition-colors">
+              <Link href={returnPath ? '/register?next=' + encodeURIComponent(returnPath) : '/register'} className="text-primary-600 hover:text-primary-700 font-bold transition-colors">
                 Đăng ký thành viên
               </Link>
             </div>

@@ -58,7 +58,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "features.f4.desc": "100% hồ sơ tài xế và doanh nghiệp chủ hàng được đối soát định danh quốc gia CCCD tự động.",
     "features.f5.title": "Tối Ưu Chi Phí 30%",
     "features.f5.desc": "Giảm thiểu tối đa lãng phí chạy xe rỗng chiều về giúp tăng thu nhập cho tài xế và hạ giá cước.",
-    "features.f6.title": "Hỗ Trợ Sự Cố Khẩn Cấp 24/7",
+    "features.f6.title": "Hỗ Trợ Sự Cố",
     "features.f6.desc": "Đường dây nóng và cứu hộ hiện trường hỗ trợ xử lý mọi trục trặc dọc tuyến đường tức thì.",
 
     // Stats Section
@@ -154,7 +154,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "features.f4.desc": "100% profiles of drivers and shippers are auto-verified with national ID identity check.",
     "features.f5.title": "30% Cost Optimization",
     "features.f5.desc": "Minimize wasteful empty backhauls to increase driver income and lower shipping costs.",
-    "features.f6.title": "24/7 Emergency Support",
+    "features.f6.title": "Incident support",
     "features.f6.desc": "Emergency hotline and road rescue team assist driver issues immediately on route.",
 
     // Stats Section
@@ -250,7 +250,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "features.f4.desc": "所有司机及货主必须通过国家身份证照、人脸识别和执照的自动化比对审核。",
     "features.f5.title": "降低30%运输成本",
     "features.f5.desc": "有效减少车辆空驶率，司机回程不空跑增加收入，货主享受更低运价。",
-    "features.f6.title": "24/7 全天候紧急救援",
+    "features.f6.title": "事件支持",
     "features.f6.desc": "设有专门的应急热线，协同路面救援队伍第一时间处理运输途中的意外事故。",
 
     // Stats Section

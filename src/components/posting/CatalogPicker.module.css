@@ -1,0 +1,38 @@
+.field{min-width:0;margin-bottom:17px;color:#102c49}
+.fieldLabel{display:block;font-size:14px;font-weight:600;line-height:1.5;margin-bottom:8px;color:#304b63}
+.trigger{display:flex;align-items:center;gap:12px;width:100%;min-height:66px;padding:9px 13px;border:1px solid #cfdae6;border-radius:12px;background:#f9fbfd;color:#102c49;text-align:left;cursor:pointer;transition:border-color .18s,background .18s}
+.trigger:hover{border-color:#136dec;background:#f0f7ff}.trigger>svg{flex-shrink:0;color:#136dec}
+.trigger>img{width:64px;height:45px;object-fit:contain;flex-shrink:0}.trigger>span{min-width:0;flex:1}
+.trigger strong{font-size:14px;font-weight:600;line-height:1.5;display:block}
+.triggerDetail{display:block;font-size:12px;font-weight:500;color:#607084;margin-top:2px}
+.trigger:disabled{opacity:.6;cursor:wait}
+.dialog{padding:0;border:1px solid #d8e4ef;border-radius:22px;width:min(820px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 48px);margin:auto;background:#f7faff;color:#102c49;box-shadow:0 28px 100px #001d4960;overflow:auto;overscroll-behavior:contain}
+.dialog::backdrop{background:#061b36a6;backdrop-filter:blur(5px)}
+.dialogContent{position:relative}
+.header{display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:2;background:#092c56;color:white;padding:20px 22px;border-bottom:1px solid #ffffff20}
+.dialog .title{flex:1;min-width:0;font-size:21px;font-weight:700;line-height:1.35;letter-spacing:-.02em;margin:0;color:white}
+.iconButton{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:42px;height:42px;border-radius:12px;color:white;background:#ffffff12;cursor:pointer}
+.iconButton:hover{background:#ffffff25}.headerIcon{display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;background:#136dec}
+.body{padding:22px}
+.vehicleGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.childGrid{grid-template-columns:1fr}.childGrid .choice{min-height:145px}.childGrid .image{width:35%;height:120px}.childGrid .choiceTitle{font-size:18px}
+.choice{position:relative;display:flex;align-items:center;min-width:0;min-height:132px;gap:12px;padding:14px;border:1px solid #d6e2ee;border-radius:16px;background:white;color:#102c49;text-align:left;cursor:pointer;transition:background .18s,border-color .18s,box-shadow .18s}
+.choice:hover{border-color:#136dec;box-shadow:0 5px 16px #103d6410}
+.choice .image{display:flex;align-items:center;justify-content:center;width:44%;height:100px;flex-shrink:0}
+.image img{height:100%;width:100%;object-fit:contain}
+.choiceText{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1}
+.choiceTitle{font-size:15px;font-weight:700;line-height:1.45}
+.description{font-size:12px;font-weight:600;color:#2365ad;border-radius:20px;padding:5px 10px;background:#eaf3ff;width:fit-content;max-width:100%}
+.chevron{color:#136dec;flex-shrink:0;width:17px}
+.choice.selected{border:2px solid #159766;background:#edf9f3;padding:13px;box-shadow:0 0 0 2px #1597660a}
+.tick{position:absolute;right:10px;top:10px;width:23px;height:23px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#159766;color:white}
+.selected .choiceText{padding-top:5px;padding-right:10px}
+.cargoGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.choice.cargo{flex-direction:column;gap:13px;padding:18px 14px;text-align:center;min-height:190px}
+.choice.cargo.selected{padding:17px 13px}
+.cargo .image{width:100%;height:122px}
+.cargo .choiceText{flex:initial}.cargo .choiceTitle{font-size:14px}
+.empty{padding:35px 15px;text-align:center;font-size:14px;color:#607084}
+.field button:focus-visible,.dialog button:focus-visible{outline:3px solid #136dec;outline-offset:4px}
+@media(max-width:650px){.vehicleGrid{grid-template-columns:1fr}.choice{min-height:125px}.choice .image{width:36%;height:100px}.cargoGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.cargo .image{width:100%;height:110px}.choice.cargo{min-height:174px}.header{padding:14px}.dialog .title{font-size:19px}.body{padding:16px}.dialog{width:calc(100vw - 20px);max-height:calc(100dvh - 24px);border-radius:18px}.choiceTitle{font-size:16px}}
+@media(prefers-reduced-motion:reduce){.trigger,.choice{transition:none}.dialog::backdrop{backdrop-filter:none}}

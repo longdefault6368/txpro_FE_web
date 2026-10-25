@@ -1,346 +1,42 @@
 "use client";
-
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Menu, X, LogOut, User, Globe } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Menu, X, Plus, ChevronDown } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import { useCompanyInfo } from "@/context/CompanyInfoContext";
-
-interface UserSession {
-  name: string;
-  role: string;
-  rawRole?: string;
-}
-
+import { API_BASE } from "@/config/env";
+import RoleSwitchButton from "@/components/account/RoleSwitchButton";
+import { ROLE_CHANGED_KEY } from "@/utils/account-role-switch";
+type Session = { name?: string; rawRole?: string };
 export default function Header() {
-  const router = useRouter();
-  const { t, language, changeLanguage } = useLanguage();
-  const { companyInfo } = useCompanyInfo();
-  const [isOpen, setIsOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [session, setSession] = useState<UserSession | null>(null);
-  const [showLangDropdown, setShowLangDropdown] = useState(false);
-  const langDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click
+  const { language, changeLanguage } = useLanguage();
+  const router = useRouter(), pathname = usePathname();
+  const [open, setOpen] = useState(false), [session, setSession] = useState<Session | null>(null), [loggingOut, setLoggingOut] = useState(false);
+  const c = (vi: string, en: string, zh: string) => language === "en" ? en : language === "zh" ? zh : vi;
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target as Node)) {
-        setShowLangDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, []);
-
-  // Load session from localStorage on client-side mount
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
-
-    const loadSession = () => {
-      const saved = localStorage.getItem("txpro_user_session");
-      if (saved) {
-        try {
-          setSession(JSON.parse(saved));
-        } catch (e) {
-          console.error("Failed to parse user session:", e);
-        }
-      } else {
-        setSession(null);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    loadSession();
-
-    // Listen for storage events (if user logs in/out in another tab)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "txpro_user_session") {
-        loadSession();
-      }
-    };
-    window.addEventListener("storage", handleStorageChange);
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("storage", handleStorageChange);
-    };
-  }, []);
-
-  const toggleMenu = () => setIsOpen(!isOpen);
-  const closeMenu = () => setIsOpen(false);
-
-  const handleLogout = () => {
-    localStorage.removeItem("txpro_user_session");
-    localStorage.removeItem("txpro_token");
-    setSession(null);
-    closeMenu();
-    window.dispatchEvent(new Event("storage")); // Trigger storage event for other components/tabs
-    router.push("/login");
-  };
-
-  return (
-    <>
-      <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled
-            ? "bg-white/75 backdrop-blur-md shadow-[0_4px_25px_rgba(0,0,0,0.12)] h-16"
-            : "bg-white/75 backdrop-blur-md shadow-[0_4px_25px_rgba(0,0,0,0.12)] h-20"
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
-          <div className="flex justify-between items-center h-full">
-            <Link href="/" className="flex-shrink-0 flex items-center group" title="TXEPRO">
-              <Image
-                src="/logo.png"
-                alt="TXEPRO Logo"
-                width={44}
-                height={44}
-                className="rounded-full object-cover shadow-md group-hover:scale-105 transition-transform"
-                priority
-              />
-            </Link>
-            
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              <Link
-                href="/#how-it-works"
-                className="text-slate-600 hover:text-primary-600 font-semibold text-sm transition-colors"
-              >
-                {t("nav.howItWorks")}
-              </Link>
-              <Link
-                href="/#features"
-                className="text-slate-600 hover:text-primary-600 font-semibold text-sm transition-colors"
-              >
-                {t("nav.features")}
-              </Link>
-              <Link
-                href="/#pricing"
-                className="text-slate-600 hover:text-primary-600 font-semibold text-sm transition-colors"
-              >
-                {t("nav.pricing")}
-              </Link>
-              <Link
-                href="/tracking"
-                className="text-slate-600 hover:text-primary-600 font-semibold text-sm transition-colors"
-              >
-                {t("nav.tracking")}
-              </Link>
-              <span className="h-4 w-px bg-slate-200"></span>
-              
-              {session ? (
-                <div className="flex items-center space-x-6">
-                  <Link href={session.rawRole === "admin" ? "/admin" : "/user"} className="flex items-center gap-2 text-slate-700 hover:text-primary-600 bg-slate-100/80 hover:bg-slate-200/50 px-3.5 py-1.5 rounded-full border border-slate-200/50 transition-colors" title="Xem hồ sơ cá nhân">
-                    <User className="w-3.5 h-3.5 text-primary-600" />
-                    <span className="text-xs font-bold truncate max-w-[120px]">
-                      {session.name}
-                    </span>
-                    <span className="text-[9px] bg-primary-600 text-white px-1.5 py-0.5 rounded font-bold uppercase">
-                      {session.role}
-                    </span>
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="text-slate-500 hover:text-red-600 font-semibold text-sm transition-colors flex items-center gap-1 cursor-pointer"
-                    title="Đăng xuất tài khoản"
-                  >
-                    <LogOut className="w-4 h-4" /> {t("nav.logout")}
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-6">
-                  <Link
-                    href="/login"
-                    className="text-slate-600 hover:text-primary-600 font-semibold text-sm transition-colors"
-                  >
-                    {t("nav.login")}
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="text-slate-600 hover:text-primary-600 font-semibold text-sm transition-colors"
-                  >
-                    {t("nav.register")}
-                  </Link>
-                </div>
-              )}
-              
-              <span className="h-4 w-px bg-slate-200"></span>
-
-              {/* Language Selector Dropdown */}
-              <div className="relative" ref={langDropdownRef}>
-                <button 
-                  onClick={() => setShowLangDropdown(!showLangDropdown)}
-                  className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200/80 px-3.5 py-2 rounded-full border border-slate-200/50 transition-all cursor-pointer focus:outline-none"
-                >
-                  <Globe className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{language === "vi" ? "Tiếng Việt" : language === "en" ? "English" : "中文"}</span>
-                </button>
-                <div 
-                  className={`absolute right-0 top-full mt-2 w-32 bg-white border border-slate-100 rounded-2xl shadow-xl py-2 transition-all origin-top-right duration-200 z-50 ${
-                    showLangDropdown 
-                      ? "opacity-100 scale-100 pointer-events-auto" 
-                      : "opacity-0 scale-95 pointer-events-none"
-                  }`}
-                >
-                  <button 
-                    onClick={() => { changeLanguage("vi"); setShowLangDropdown(false); }}
-                    className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors cursor-pointer hover:bg-slate-50 ${language === "vi" ? "text-primary-600 bg-primary-50/50" : "text-slate-700"}`}
-                  >
-                    🇻🇳 Tiếng Việt
-                  </button>
-                  <button 
-                    onClick={() => { changeLanguage("en"); setShowLangDropdown(false); }}
-                    className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors cursor-pointer hover:bg-slate-50 ${language === "en" ? "text-primary-600 bg-primary-50/50" : "text-slate-700"}`}
-                  >
-                    🇺🇸 English
-                  </button>
-                  <button 
-                    onClick={() => { changeLanguage("zh"); setShowLangDropdown(false); }}
-                    className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors cursor-pointer hover:bg-slate-50 ${language === "zh" ? "text-primary-600 bg-primary-50/50" : "text-slate-700"}`}
-                  >
-                    🇨🇳 中文
-                  </button>
-                </div>
-              </div>
-
-              <span className="h-4 w-px bg-slate-200"></span>
-              <a href="/#download" className="btn-primary shine-effect py-2.5 px-5 text-sm">
-                {t("nav.download")}
-              </a>
-            </div>
-
-            <button
-              onClick={toggleMenu}
-              className="md:hidden text-slate-600 hover:text-primary-600 transition-colors focus:outline-none"
-            >
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Mobile Navigation Menu */}
-      <div
-        onClick={closeMenu}
-        className={`md:hidden fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm transition-all duration-300 ${
-          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
-      >
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className={`absolute top-20 left-0 right-0 bg-white shadow-xl border-t border-slate-100 p-6 flex flex-col space-y-4 transition-transform duration-300 ${
-            isOpen ? "translate-y-0" : "-translate-y-4"
-          }`}
-        >
-          <Link
-            href="/#how-it-works"
-            onClick={closeMenu}
-            className="mobile-nav-link text-lg text-slate-700 hover:text-primary-600 font-semibold transition-colors py-2"
-          >
-            {t("nav.howItWorks")}
-          </Link>
-          <Link
-            href="/#features"
-            onClick={closeMenu}
-            className="mobile-nav-link text-lg text-slate-700 hover:text-primary-600 font-semibold transition-colors py-2"
-          >
-            {t("nav.features")}
-          </Link>
-          <Link
-            href="/#pricing"
-            onClick={closeMenu}
-            className="mobile-nav-link text-lg text-slate-700 hover:text-primary-600 font-semibold transition-colors py-2"
-          >
-            {t("nav.pricing")}
-          </Link>
-          <Link
-            href="/tracking"
-            onClick={closeMenu}
-            className="mobile-nav-link text-lg text-slate-700 hover:text-primary-600 font-semibold transition-colors py-2"
-          >
-            {t("nav.tracking")}
-          </Link>
-          <div className="h-px bg-slate-100 my-2"></div>
-          
-          {session ? (
-            <div className="flex flex-col space-y-3 pt-2">
-              <Link
-                href={session.rawRole === "admin" ? "/admin" : "/user"}
-                onClick={closeMenu}
-                className="flex items-center justify-between bg-slate-50 hover:bg-slate-100 p-3 rounded-xl border border-slate-100 transition-colors"
-              >
-                <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                  <User className="w-4 h-4 text-primary-600" /> {session.name}
-                </span>
-                <span className="text-[10px] bg-primary-600 text-white px-2 py-0.5 rounded font-bold uppercase">
-                  {session.role}
-                </span>
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="mobile-nav-link text-red-600 font-bold transition-colors py-2 text-center flex items-center justify-center gap-2 cursor-pointer border border-red-100 rounded-xl bg-red-50/50"
-              >
-                <LogOut className="w-4 h-4" /> {t("nav.logout")}
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col space-y-2">
-              <Link
-                href="/login"
-                onClick={closeMenu}
-                className="mobile-nav-link text-lg text-slate-700 hover:text-primary-600 font-semibold transition-colors py-2 text-center"
-              >
-                {t("nav.login")}
-              </Link>
-              <Link
-                href="/register"
-                onClick={closeMenu}
-                className="mobile-nav-link text-lg text-slate-700 hover:text-primary-600 font-semibold transition-colors py-2 text-center"
-              >
-                {t("nav.register")}
-              </Link>
-            </div>
-          )}
-          
-          {/* Mobile Language Selector */}
-          <div className="flex justify-center gap-3 py-2">
-            <button 
-              onClick={() => { changeLanguage("vi"); closeMenu(); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${language === "vi" ? "bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-600/20" : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-            >
-              🇻🇳 Tiếng Việt
-            </button>
-            <button 
-              onClick={() => { changeLanguage("en"); closeMenu(); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${language === "en" ? "bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-600/20" : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-            >
-              🇺🇸 English
-            </button>
-            <button 
-              onClick={() => { changeLanguage("zh"); closeMenu(); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${language === "zh" ? "bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-600/20" : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-            >
-              🇨🇳 中文
-            </button>
-          </div>
-
-          <div className="h-px bg-slate-100 my-2"></div>
-          <a
-            href="/#download"
-            onClick={closeMenu}
-            className="mobile-nav-link btn-primary text-center"
-          >
-            {t("nav.download")}
-          </a>
-        </div>
-      </div>
-    </>
-  );
+    const load = () => { try { const raw = localStorage.getItem("txpro_user_session"); setSession(localStorage.getItem("txpro_token") && raw ? JSON.parse(raw) : null); } catch { setSession(null); } };
+    const sync = (event: StorageEvent) => { load(); if (event.key === ROLE_CHANGED_KEY && event.newValue && localStorage.getItem("txpro_token")) window.location.replace("/user"); };
+    load(); window.addEventListener("storage", sync); window.addEventListener("txpro_session_updated", load);
+    return () => { window.removeEventListener("storage", sync); window.removeEventListener("txpro_session_updated", load); };
+  }, [pathname]);
+  useEffect(() => { const escape = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("dialog[open]")) setOpen(false); }; document.addEventListener("keydown", escape); return () => document.removeEventListener("keydown", escape); }, []);
+  async function logout() {
+    if (loggingOut) return; setLoggingOut(true);
+    try {
+      const refreshToken = localStorage.getItem("txpro_refresh_token"), deviceId = localStorage.getItem("txpro_device_id");
+      if (refreshToken && deviceId) await fetch(API_BASE + "/auth/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken, deviceId }), signal: AbortSignal.timeout(8000) });
+    } catch { /* Always clear this browser's credentials, even if offline. */ }
+    finally { for (const key of ["txpro_user_session", "txpro_token", "txpro_refresh_token"]) localStorage.removeItem(key); setSession(null); setOpen(false); setLoggingOut(false); window.dispatchEvent(new Event("txpro_session_updated")); router.push("/login"); }
+  }
+  const links = [
+    { href: "/", name: c("Trang chủ", "Home", "首页") }, { href: "/#vehicles", name: c("Dịch vụ", "Services", "服务") },
+    { href: "/chu-hang/form-tao-don", name: c("Chủ hàng", "Shippers", "货主") },
+    { href: "/tai-xe/dang-tin", name: c("Tài xế", "Drivers", "司机") },
+    { href: "/tin-tuc", name: c("Tin tức", "News", "资讯") },
+    { href: "/#for-you", name: c("Hướng dẫn", "How it works", "使用指南") }, { href: "/tro-giup", name: c("Trợ giúp", "Help", "帮助") },
+  ];
+  const navClass = "text-sm font-semibold text-slate-600 hover:text-primary-600 transition-colors py-2";
+  const languageSelect = <select aria-label={c("Ngôn ngữ", "Language", "语言")} value={language} onChange={e => changeLanguage(e.target.value as "vi" | "en" | "zh")} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-700"><option value="vi">VI</option><option value="en">EN</option><option value="zh">中文</option></select>;
+  return <><header className="fixed inset-x-0 top-0 z-50 h-20 border-b border-slate-200/80 bg-white/95 backdrop-blur-md"><nav aria-label={c("Điều hướng chính", "Main navigation", "主导航")} className="mx-auto flex h-full max-w-7xl items-center justify-between gap-5 px-5 lg:px-8"><Link href="/" className="flex shrink-0 items-center gap-3" onClick={() => setOpen(false)}><Image src="/logo.png" alt="TXE PRO" width={42} height={42} priority className="rounded-full" /><span className="text-lg font-bold tracking-tight text-slate-900">TXE <span className="text-primary-600">PRO</span></span></Link><div className="hidden items-center gap-5 xl:flex">{links.map(item => <Link key={item.href} href={item.href} className={navClass}>{item.name}</Link>)}</div><div className="hidden items-center gap-4 xl:flex">{languageSelect}{session ? <details className="relative"><summary className="flex max-w-36 cursor-pointer list-none items-center gap-1 text-sm font-bold text-slate-700"><span className="truncate">{session.name || c("Tài khoản", "Account", "账户")}</span><ChevronDown size={14} /></summary><div className="absolute right-0 top-full mt-4 grid w-52 gap-1 rounded-xl border border-slate-200 bg-white p-3 shadow-lg"><Link href="/don-cua-ban" className={navClass}>{c("Tin/đơn của tôi", "My listings & trips", "我的信息与订单")}</Link><Link href={session.rawRole === "admin" ? "/admin" : "/user"} className={navClass}>{c("Trang cá nhân", "My account", "个人中心")}</Link><span className="border-t border-slate-100 pt-2 text-xs font-semibold text-primary-700">{session.rawRole === "tai-xe" ? c("Tài xế", "Driver", "司机") : session.rawRole === "chu-hang" ? c("Chủ hàng", "Shipper", "货主") : "Admin"}</span><RoleSwitchButton currentRole={session.rawRole} variant="menu" disabled={loggingOut} /><button type="button" onClick={logout} disabled={loggingOut} className="py-2 text-left text-sm text-red-600">{loggingOut ? "..." : c("Đăng xuất", "Sign out", "退出")}</button></div></details> : <Link className={navClass} href="/login">{c("Đăng nhập", "Sign in", "登录")}</Link>}<Link href="/dang-tin" className="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-bold text-white"><Plus size={16} />{c("Đăng tin", "Post a listing", "发布信息")}</Link></div><button type="button" aria-label={c("Mở/đóng menu", "Toggle menu", "切换菜单")} aria-expanded={open} aria-controls="mobile-main-navigation" onClick={() => setOpen(!open)} className="rounded-xl border border-slate-200 p-3 text-slate-700 xl:hidden">{open ? <X size={22} /> : <Menu size={22} />}</button></nav></header>{open && <div className="fixed inset-0 top-20 z-40 bg-slate-900/30 xl:hidden" onClick={() => setOpen(false)}><nav id="mobile-main-navigation" aria-label="Menu" onClick={e => e.stopPropagation()} className="grid max-h-[calc(100dvh-5rem)] gap-3 overflow-auto border-b border-slate-200 bg-white px-6 py-6 shadow-xl">{links.map(item => <Link key={item.href} href={item.href} className={navClass} onClick={() => setOpen(false)}>{item.name}</Link>)}<Link href="/tracking" className={navClass} onClick={() => setOpen(false)}>{c("Tra cứu hành trình", "Track a journey", "查询行程")}</Link><Link href="/don-cua-ban" className={navClass} onClick={() => setOpen(false)}>{c("Tin/đơn của tôi", "My listings & trips", "我的信息与订单")}</Link>{session && <RoleSwitchButton currentRole={session.rawRole} variant="menu" disabled={loggingOut} />}<div className="flex items-center justify-between border-t border-slate-100 pt-3">{languageSelect}{session ? <><Link href="/user" onClick={() => setOpen(false)} className={navClass}>{c("Tài khoản", "Account", "账户")}</Link><button type="button" disabled={loggingOut} onClick={logout} className="text-sm text-red-600">{c("Đăng xuất", "Sign out", "退出")}</button></> : <Link href="/login" className={navClass} onClick={() => setOpen(false)}>{c("Đăng nhập", "Sign in", "登录")}</Link>}</div><Link href="/dang-tin" onClick={() => setOpen(false)} className="rounded-xl bg-primary-600 px-5 py-3 text-center font-bold text-white">{c("Đăng tin", "Post a listing", "发布信息")}</Link></nav></div>}</>;
 }

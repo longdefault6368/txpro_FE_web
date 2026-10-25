@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { fetchWithAuth, API_BASE, API_FALLBACK } from "@/utils/api";
+import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { AdminOrderState, getAdminOrderStatus } from "@/utils/admin-order-state";
 import { useToast } from "@/context/ToastContext";
 import {
@@ -255,24 +255,6 @@ function AdminDashboardContent() {
         setMapData(data.mapData || null);
         setIsOffline(false);
       } else {
-        // If primary overview request failed and a fallback API is configured in environment, try fallback
-        if (API_FALLBACK) {
-          try {
-            const fallbackRes = await fetchWithAuth(`${API_FALLBACK}/admin/users/overview`);
-            if (fallbackRes.ok) {
-              const resJson = await fallbackRes.json();
-              const data = resJson.data || {};
-              setMetrics(data.metrics || null);
-              setStatusBreakdown(data.statusBreakdown || null);
-              setTopCorridors(data.topCorridors || []);
-              setTrends(data.trends || null);
-              setRecentOrders(data.recentOrders || []);
-              setMapData(data.mapData || null);
-              setIsOffline(false);
-              return;
-            }
-          } catch {}
-        }
         setIsOffline(true);
       }
 

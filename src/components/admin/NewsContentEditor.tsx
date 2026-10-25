@@ -65,7 +65,7 @@ const TEMPLATES = [
 </ol>
 
 <hr />
-<p>Tổng đài hỗ trợ đối tác 24/7: <strong>1900 xxxx</strong> hoặc gửi yêu cầu tại mục Hỗ trợ trên ứng dụng.</p>`,
+<p>Xem thông tin liên hệ hiện hành trên website hoặc gửi yêu cầu tại mục Hỗ trợ trên ứng dụng.</p>`,
   },
   {
     name: "Mẫu Cẩm nang Hướng dẫn Vận hành",
@@ -113,7 +113,7 @@ const TEMPLATES = [
 </div>
 
 <hr />
-<p>Liên hệ bộ phận khách hàng doanh nghiệp qua hotline <strong>1900 xxxx</strong> để nhận bảng báo giá chiết khấu theo tháng.</p>`,
+<p>Liên hệ bộ phận khách hàng doanh nghiệp qua trang Liên hệ để trao đổi nhu cầu.</p>`,
   },
 ];
 

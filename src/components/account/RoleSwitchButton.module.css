@@ -1,0 +1,29 @@
+.trigger { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px 16px; background: white; color: #163a61; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .18s, border-color .18s; }
+.trigger:hover { background: #f0f7ff; border-color: #7da8d4; }
+.menu { justify-content: flex-start; width: 100%; border: 0; padding: 10px 0; border-radius: 6px; background: transparent; }
+.trigger:disabled { cursor: not-allowed; opacity: .55; }
+.intro { margin: 0 0 20px; color: #52657a; font-size: 15px; line-height: 1.65; }
+.roles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.role { position: relative; text-align: left; border: 1px solid #dce5ef; border-radius: 16px; background: #f8fafc; padding: 18px; cursor: pointer; color: #173957; transition: border-color .18s, background .18s; }
+.role[aria-pressed="true"] { border: 2px solid #16976a; padding: 17px; background: #f0fbf6; }
+.role:disabled { cursor: default; }
+.role svg { display: block; margin-bottom: 14px; color: #2870b5; }
+.role[aria-pressed="true"] > svg { color: #08754f; }
+.role strong { display: block; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+.role small { display: block; font-size: 14px; line-height: 1.5; color: #52657a; }
+.badge { display: inline-flex; align-items: center; gap: 5px; margin-top: 16px; font-size: 12px; font-weight: 600; color: #5c6f82; }
+.role[aria-pressed="true"] .badge { color: #08754f; }
+.role .badge svg { color: inherit; margin: 0; }
+.notice { display: flex; align-items: flex-start; gap: 9px; margin: 20px 0; border-radius: 12px; padding: 13px; background: #edf4fc; color: #355372; font-size: 14px; line-height: 1.6; }
+.notice svg { flex-shrink: 0; margin-top: 3px; }
+.error { margin: 16px 0; border-radius: 12px; padding: 13px; background: #fff1f2; color: #b42338; font-size: 14px; line-height: 1.6; }
+.actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.confirm { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 12px; padding: 13px 20px; background: #1764b4; color: white; font-size: 14px; font-weight: 700; cursor: pointer; }
+.confirm:hover { background: #124f90; }
+.confirm:disabled { cursor: not-allowed; opacity: .6; }
+.loading { display: flex; justify-content: center; align-items: center; gap: 10px; min-height: 170px; color: #52657a; }
+.spin { animation: spin 1s linear infinite; }
+.trigger:focus-visible, .role:focus-visible, .confirm:focus-visible { outline: 3px solid #83b9eb; outline-offset: 3px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media(max-width: 480px) { .roles { gap: 10px; } .role { padding: 13px; } .role[aria-pressed="true"] { padding: 12px; } .role strong { font-size: 16px; } .actions > * { flex: 1; } }
+@media(prefers-reduced-motion: reduce) { .trigger, .role { transition: none; } .spin { animation: none; } }

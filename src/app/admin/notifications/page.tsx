@@ -51,126 +51,7 @@ interface AdminNotificationItem {
   meta?: Record<string, any>;
 }
 
-const INITIAL_MOCK_NOTIFICATIONS: AdminNotificationItem[] = [
-  {
-    id: "notif-mock-1",
-    type: "kyc_pending",
-    title: "Hồ sơ eKYC chờ duyệt: Lê Hoàng Nam",
-    message: "Tài xế Lê Hoàng Nam (0912345678) vừa nộp hồ sơ eKYC căn cước công dân và bằng lái hạng FC cần kiểm tra đối soát.",
-    link: "/admin/users",
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    meta: { role: "tai-xe", phone: "0912345678" },
-  },
-  {
-    id: "notif-mock-2",
-    type: "chat",
-    title: "Tin nhắn hỗ trợ từ Chủ hàng: Trần Mai Anh",
-    message: "Cho mình hỏi đơn hàng ORD-20260709-001 tài xế đã nhận hàng chưa và định vị xe đang ở đâu vậy hệ thống?",
-    link: "/admin/support?tab=chats",
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-    meta: { senderRole: "chu-hang", phone: "0988776655" },
-  },
-  {
-    id: "notif-mock-3",
-    type: "order_cancelled",
-    title: "Đơn hàng đã bị hủy: ORD-20260708-004",
-    message: "Vận chuyển sắt thép công trình xây dựng bị hủy do tài xế gặp sự cố kỹ thuật dọc đường.",
-    link: "/admin/orders",
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    meta: { orderCode: "ORD-20260708-004" },
-  },
-  {
-    id: "notif-mock-4",
-    type: "user_registered",
-    title: "Thành viên mới: Đỗ Tuấn Kiệt",
-    message: "Tài xế xe tải trọng tải 15 tấn Đỗ Tuấn Kiệt (0971234888) vừa hoàn tất đăng ký tài khoản.",
-    link: "/admin/users",
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-    meta: { role: "tai-xe", phone: "0971234888" },
-  },
-  {
-    id: "notif-mock-5",
-    type: "support_ticket",
-    title: "Yêu cầu hỗ trợ #TK-9821: Đối soát tiền cước",
-    message: "Từ Công ty TNHH Vận Tải An Phát: Cần đối soát khoản tiền cước vận chuyển hạt nhựa chuyến Sài Gòn - Đà Nẵng.",
-    link: "/admin/support?tab=tickets",
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
-    meta: { ticketId: "TK-9821" },
-  },
-  {
-    id: "notif-mock-6",
-    type: "kyc_pending",
-    title: "Hồ sơ eKYC chờ duyệt: Vũ Đình Trọng",
-    message: "Chủ hàng Vũ Đình Trọng vừa nộp giấy phép đăng ký kinh doanh công ty để nâng hạn mức giao dịch.",
-    link: "/admin/users",
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
-    meta: { role: "chu-hang", phone: "0909112233" },
-  },
-  {
-    id: "notif-mock-7",
-    type: "user_registered",
-    title: "Thành viên mới: Nguyễn Phương Thảo",
-    message: "Chủ hàng doanh nghiệp nông sản sạch (0933221100) vừa tham gia hệ thống sàn vận tải.",
-    link: "/admin/users",
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    meta: { role: "chu-hang", phone: "0933221100" },
-  },
-  {
-    id: "notif-mock-8",
-    type: "chat",
-    title: "Tin nhắn từ Tài xế: Phạm Văn Bách",
-    message: "Tôi đã gửi hồ sơ xe container bổ sung, nhờ admin phê duyệt giúp để tôi nhận chuyến sớm.",
-    link: "/admin/support?tab=chats",
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 28).toISOString(),
-    meta: { senderRole: "tai-xe", phone: "0945678901" },
-  },
-  {
-    id: "notif-mock-9",
-    type: "order_cancelled",
-    title: "Đơn hàng đã bị hủy: ORD-20260707-009",
-    message: "Lý do: Chủ hàng thay đổi kế hoạch xuất kho và không kịp đóng kiện hàng đúng hẹn.",
-    link: "/admin/orders",
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(),
-    meta: { orderCode: "ORD-20260707-009" },
-  },
-  {
-    id: "notif-mock-10",
-    type: "support_ticket",
-    title: "Yêu cầu hỗ trợ #TK-9819: Hướng dẫn nạp ví",
-    message: "Chủ hàng cần hỗ trợ liên kết tài khoản ngân hàng doanh nghiệp để nạp ví tự động.",
-    link: "/admin/support?tab=tickets",
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-    meta: { ticketId: "TK-9819" },
-  },
-  {
-    id: "notif-mock-11",
-    type: "system",
-    title: "Bảo trì định kỳ hệ thống Gateway",
-    message: "Cổng thanh toán và dịch vụ Webhook ngân hàng đã hoàn tất nâng cấp bảo mật định kỳ.",
-    link: "/admin/settings",
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
-  },
-  {
-    id: "notif-mock-12",
-    type: "user_registered",
-    title: "Thành viên mới: Hoàng Nhật Minh",
-    message: "Tài xế xe tải van 1.5 tấn (0918765432) khu vực TP.HCM vừa đăng ký tham gia đội xe.",
-    link: "/admin/users",
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 96).toISOString(),
-  },
-];
+// Notifications always come from the selected backend; an empty feed stays empty.
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return "---";
@@ -284,16 +165,16 @@ export default function AdminNotificationsPage() {
           setNotifications(items);
           setIsOffline(false);
         } else {
-          setNotifications(INITIAL_MOCK_NOTIFICATIONS);
+          setNotifications([]);
           setIsOffline(false);
         }
       } else {
-        setNotifications(INITIAL_MOCK_NOTIFICATIONS);
+        setNotifications([]);
         setIsOffline(true);
       }
     } catch (e) {
       console.warn("Failed to fetch admin notifications feed, using fallback", e);
-      setNotifications(INITIAL_MOCK_NOTIFICATIONS);
+      setNotifications([]);
       setIsOffline(true);
     } finally {
       setLoading(false);
@@ -551,7 +432,7 @@ export default function AdminNotificationsPage() {
       {isOffline && (
         <div className="bg-amber-50 border border-amber-100 text-amber-700 p-3 rounded-2xl flex items-center gap-2 text-xs font-bold">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          <span>Hệ thống đang hoạt động với dữ liệu mẫu đồng bộ. Các thao tác lọc, xem chi tiết và phân trang đều được xử lý trực tiếp.</span>
+          <span>Chưa tải được thông báo từ backend. Vui lòng thử lại.</span>
         </div>
       )}
 

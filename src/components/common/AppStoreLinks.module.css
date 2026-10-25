@@ -1,0 +1,13 @@
+.wrapper { min-width: 0; }
+.links { display: flex; flex-wrap: wrap; gap: 12px; }
+.store { display: inline-flex; align-items: center; gap: 12px; min-width: 208px; padding: 13px 16px; background: #071a30; border: 1px solid #88b6df66; color: #fff; border-radius: 14px; box-shadow: 0 5px 16px #03132424; transition: background .2s, border-color .2s, transform .2s; text-decoration: none; }
+.store > svg { flex-shrink: 0; }
+.store > span { min-width: 0; }
+.store small { display: block; font-size: 11px; line-height: 1.5; color: #d0e0f1; font-weight: 500; }
+.store strong { display: block; font-size: 20px; line-height: 1.35; font-weight: 700; letter-spacing: -.02em; }
+.store .platform { margin-left: auto; padding-left: 8px; font-size: 11px; color: #bcd6ee; }
+.wrapper .hint { font-size: 12px; line-height: 1.6; margin: 14px 0 0; color: #c4d8eb; max-width: 480px; }
+.store:focus-visible { outline: 3px solid #9cd9ff; outline-offset: 5px; }
+@media(hover:hover) and (pointer:fine) { .store:hover { transform: translateY(-2px); border-color: #bce7ff; background: #102c49; } }
+@media(max-width: 480px) { .links { flex-direction: column; } .store { width: 100%; } }
+@media(prefers-reduced-motion: reduce) { .store { transition: none; } }

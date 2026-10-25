@@ -38,134 +38,16 @@ interface LiveActivity {
   orderCode?: string;
 }
 
-const FALLBACK_DATA: LiveActivity[] = [
-  {
-    id: "act-1",
-    type: "matched",
-    tag: "Vừa nhận đơn",
-    tagColor: "blue",
-    title: "Xe tải 8 tấn nhận đơn thành công",
-    from: "Hà Nội (KCN Thăng Long)",
-    to: "Hải Phòng (Cảng Đình Vũ)",
-    cargo: "15 tấn linh kiện điện tử",
-    vehicle: "Xe tải 8 tấn",
-    price: "3.500.000 ₫",
-    actor: "Tài xế Nguyễn V. T.",
-    minutesAgo: 2,
-    orderCode: "ORD-20260709-001",
-  },
-  {
-    id: "act-2",
-    type: "new_order",
-    tag: "Mới đăng tìm xe",
-    tagColor: "emerald",
-    title: "Chủ hàng tìm xe tải lạnh chuyển hoa quả",
-    from: "Đà Lạt (Lâm Đồng)",
-    to: "TP.HCM (Chợ Thủ Đức)",
-    cargo: "800 kg dâu tây & hoa tươi",
-    vehicle: "Xe lạnh 2.5 tấn",
-    price: "2.200.000 ₫",
-    actor: "Chủ vựa Minh Anh",
-    minutesAgo: 5,
-    orderCode: "ORD-20260708-005",
-  },
-  {
-    id: "act-3",
-    type: "completed",
-    tag: "Hoàn thành chuyến",
-    tagColor: "purple",
-    title: "Giao hàng thành công & đánh giá ⭐ 5.0",
-    from: "Bình Dương (KCN Sóng Thần)",
-    to: "Vũng Tàu (Cảng Cái Mép)",
-    cargo: "22 tấn hạt nhựa PP",
-    vehicle: "Xe đầu kéo Container 40ft",
-    price: "5.800.000 ₫",
-    actor: "Tài xế Lê H. N.",
-    minutesAgo: 8,
-    orderCode: "ORD-20260708-004",
-  },
-  {
-    id: "act-4",
-    type: "empty_truck",
-    tag: "Xe trống chiều về",
-    tagColor: "amber",
-    title: "Tài xế đăng tìm hàng tiện chuyến về",
-    from: "Đà Nẵng",
-    to: "TP.HCM",
-    cargo: "Nhận chở hàng khô, bách hóa",
-    vehicle: "Xe thùng bạt 10 tấn",
-    price: "Giá thương lượng -35%",
-    actor: "Tài xế Trần Đình Q.",
-    minutesAgo: 12,
-  },
-  {
-    id: "act-5",
-    type: "matched",
-    tag: "Vừa nhận đơn",
-    tagColor: "blue",
-    title: "Nhận đơn ghép hàng tiết kiệm",
-    from: "TP.HCM (Quận 12)",
-    to: "Cần Thơ (KCN Trà Nóc)",
-    cargo: "3 tấn thiết bị gia dụng",
-    vehicle: "Xe tải 3.5 tấn",
-    price: "1.900.000 ₫",
-    actor: "Tài xế Phạm M. Đ.",
-    minutesAgo: 16,
-    orderCode: "ORD-20260709-002",
-  },
-  {
-    id: "act-6",
-    type: "new_order",
-    tag: "Mới đăng tìm xe",
-    tagColor: "emerald",
-    title: "Chủ hàng tìm xe vận chuyển thép cuộn",
-    from: "Quảng Ngãi (Dung Quất)",
-    to: "Hà Nội (KCN Thường Tín)",
-    cargo: "28 tấn thép công trình",
-    vehicle: "Đầu kéo sàn lửng",
-    price: "11.500.000 ₫",
-    actor: "Công ty VLXD Miền Trung",
-    minutesAgo: 21,
-  },
-  {
-    id: "act-7",
-    type: "completed",
-    tag: "Hoàn thành chuyến",
-    tagColor: "purple",
-    title: "Giao nhận an toàn, không hao hụt",
-    from: "Tiền Giang (Mỹ Tho)",
-    to: "TP.HCM (Chợ Bình Điền)",
-    cargo: "5 tấn trái cây sầu riêng",
-    vehicle: "Xe tải thùng kín 5 tấn",
-    price: "2.400.000 ₫",
-    actor: "Tài xế Vũ Q. K.",
-    minutesAgo: 26,
-  },
-  {
-    id: "act-8",
-    type: "empty_truck",
-    tag: "Xe trống chiều về",
-    tagColor: "amber",
-    title: "Xe rỗng chiều về tìm hàng nông sản",
-    from: "Nha Trang (Khánh Hòa)",
-    to: "Đồng Nai (KCN Biên Hòa)",
-    cargo: "Nhận hàng pallet, thủy hải sản",
-    vehicle: "Xe lạnh 8 tấn",
-    price: "Giá ưu đãi -30%",
-    actor: "Tài xế Đỗ Tuấn K.",
-    minutesAgo: 32,
-  },
-];
 
 export default function LiveActivityTicker() {
-  const [activities, setActivities] = useState<LiveActivity[]>(FALLBACK_DATA);
+  const [activities, setActivities] = useState<LiveActivity[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [selectedActivity, setSelectedActivity] = useState<LiveActivity | null>(null);
   const [metrics, setMetrics] = useState({
-    onlineDrivers: 142,
-    activeOrders: 48,
-    matchedToday: 326,
+    onlineDrivers: 0,
+    activeOrders: 0,
+    matchedToday: 0,
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -176,7 +58,7 @@ export default function LiveActivityTicker() {
         const res = await fetch("/api/live-activities");
         if (res.ok) {
           const json = await res.json();
-          if (json.data?.activities && json.data.activities.length > 0) {
+          if (Array.isArray(json.data?.activities)) {
             setActivities(json.data.activities);
           }
           if (json.data?.metrics) {
@@ -256,7 +138,7 @@ export default function LiveActivityTicker() {
   };
 
   return (
-    <section className="relative py-12 bg-gradient-to-b from-white via-slate-50/70 to-white border-y border-slate-200/60 overflow-hidden">
+    activities.length === 0 ? null : <section className="relative py-12 bg-gradient-to-b from-white via-slate-50/70 to-white border-y border-slate-200/60 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Top Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
