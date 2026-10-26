@@ -24,6 +24,24 @@ thành công khi có orderId thật. ID giữ trong URL để refresh không t�
 Danh sách matches gắn đúng từng postId; xác nhận chọn xe mới giữ quyền lợi.
 Không thêm công thức giá/ngân sách giả vào payload.
 
+Đồng bộ payload với Flutter: ô tô/xe máy gửi cargoType là Hành khách; ô tô
+gửi seats, không gửi số chỗ như vehicleTypeChild. Xe tải dùng weightLabel
+đầy đủ và weight là đầu khoảng, không gửi khoảng tấn như loại thùng xe.
+Container giữ vehicleTypeChild của nhóm đã chọn. Khớp lệnh dùng cùng API
+orders/:id/matches và select-driver, bao gồm tin tự động do backend cung cấp.
+
+Trước mỗi lần xác nhận, web đọc lại trạng thái đơn và danh sách matches,
+đối chiếu đồng thời postId/driverId, thời hạn và giá. Tin không còn phù hợp
+không được gửi đặt xe; đổi giá hoặc cảnh báo lượt ghép cũ phải xem lại và
+đồng ý mới. Sau nạp QR cũng chạy lại bước này. Backend tiếp tục quyết định
+quyền lợi trong giao dịch chọn tài xế, không dùng báo giá cũ trên trình duyệt.
+Thông báo voucher hoặc số tiền ký quỹ lấy từ financialSummary của kết quả
+chọn tài xế; khi thiếu dữ liệu chỉ thông báo đã gửi yêu cầu.
+
+Danh sách cập nhật định kỳ 15 giây và khi quay lại tab trình duyệt, không
+chồng các lượt đọc. Đơn đang chờ tài xế/đã nhận không tiếp tục cho chọn xe.
+Đây là polling, không phải push realtime. Chưa có trung tâm nhận đơn web.
+
 Tài xế chọn xe sở hữu đang active, cửa sổ thời gian, giá, khoảng tải trọng
 nguyên không vượt floor tải trọng xe; ô tô/xe máy/container không gửi tải trọng.
 Bán kính mặc định 30 km, thay đổi 3–300 km. Gọi precheck-wallet, xem phí/VAT/

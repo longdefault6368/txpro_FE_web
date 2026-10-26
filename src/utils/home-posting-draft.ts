@@ -31,7 +31,7 @@ function parseDraft(value: unknown, role: PostingRole, now: number): HomePosting
   if ((role === "tai-xe" || item.scheduled) && (!Number.isFinite(from) || from <= now)) return null;
   if (role === "tai-xe" && (!Number.isFinite(to) || to <= from || !/^\d{1,12}$/.test(item.price) || Number(item.price) <= 0)) return null;
   return { role, pickup, dropoff, vehicleType: item.vehicleType, scheduled: item.scheduled,
-    ...(role === "chu-hang" ? Object.fromEntries(["child", "weightLabel", "cargo"].map(key => [key, typeof item[key] === "string" ? (item[key] as string).slice(0, 200) : ""])) : {}),
+    ...Object.fromEntries(["child", "weightLabel", "cargo"].map(key => [key, typeof item[key] === "string" ? (item[key] as string).slice(0, 200) : ""])),
     from: role === "tai-xe" || item.scheduled ? item.from : "", to: role === "tai-xe" ? item.to : "", price: role === "tai-xe" ? item.price : "" };
 }
 export function saveHomePostingDraft(storage: DraftStore, draft: HomePostingDraft, now = Date.now()) {

@@ -1,46 +1,49 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Newspaper, Search, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import { getEditorialArticles, type NewsArticle, type NewsCategory } from "@/lib/news-content";
-import { getPublicNews } from "@/lib/news-public";
+import { getEditorialArticles, type NewsCategory } from "@/lib/news-content";
+import { getPublicNews, type NewsPage } from "@/lib/news-public";
+import { paginateNews, newsPageHref, filterEditorials } from "@/lib/news-pagination";
 import NewsCard, { newsCategoryLabel } from "./NewsCard";
 import styles from "./News.module.css";
 
 export function NewsSkeleton({ compact = false }: { compact?: boolean }) {
   return <div className={compact ? styles.previewGrid : styles.grid} aria-hidden="true">
-    {Array.from({ length: compact ? 4 : 6 }, (_, index) => <div className={styles.skeleton} key={index}><div /><span /><span /><span /></div>)}
+    {Array.from({ length: compact ? 4 : 9 }, (_, index) => <div className={styles.skeleton} key={index}><div /><span /><span /><span /></div>)}
   </div>;
 }
 
-export default function NewsFeed({ compact = false }: { compact?: boolean }) {
+export default function NewsFeed({ compact = false, initialData, initialPage = 1, initialCategory = "all", initialSearch = "" }: {
+  compact?: boolean; initialData?: NewsPage | null; initialPage?: number; initialCategory?: NewsCategory | "all"; initialSearch?: string;
+}) {
   const { language } = useLanguage();
   const c = (vi: string, en: string, zh: string) => language === "en" ? en : language === "zh" ? zh : vi;
-  const [items, setItems] = useState<NewsArticle[]>([]);
-  const [loading, setLoading] = useState(true), [failed, setFailed] = useState(false);
-  const [page, setPage] = useState(1), [pages, setPages] = useState(1), [retry, setRetry] = useState(0);
-  const [category, setCategory] = useState<NewsCategory | "all">("all");
-  const [draft, setDraft] = useState(""), [search, setSearch] = useState("");
+  const [remote, setRemote] = useState<NewsPage | null>(initialData || null);
+  const [loading, setLoading] = useState(initialData === undefined), [failed, setFailed] = useState(initialData === null);
+  const [page, setPage] = useState(initialPage), [retry, setRetry] = useState(0);
+  const hydrated = useRef(initialData !== undefined);
+  const [category, setCategory] = useState<NewsCategory | "all">(initialCategory);
+  const [draft, setDraft] = useState(initialSearch), [search, setSearch] = useState(initialSearch);
   useEffect(() => {
+    if (hydrated.current) { hydrated.current = false; return; }
     const controller = new AbortController();
     setLoading(true); setFailed(false);
     getPublicNews({ page, limit: compact ? 4 : 9, category, search, signal: controller.signal })
-      .then(result => { if (!controller.signal.aborted) { setItems(result.items); setPages(result.pagination.totalPages); } })
-      .catch(() => { if (!controller.signal.aborted) { setItems([]); setPages(1); setFailed(true); } })
+      .then(result => { if (!controller.signal.aborted) setRemote(result); })
+      .catch(() => { if (!controller.signal.aborted) { setRemote(null); setFailed(true); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [page, compact, category, search, retry]);
-  const editorial = getEditorialArticles(language).filter(item =>
-    (category === "all" || item.category === category) &&
-    (item.title + " " + item.summary).toLocaleLowerCase().includes(search.toLocaleLowerCase()));
-  const articles = [...items, ...(page === 1 ? editorial : [])].slice(0, compact ? 4 : undefined);
+  const editorial = filterEditorials(getEditorialArticles(language), category, search);
+  const { items: articles, pagination: { totalPages: pages } } = paginateNews(remote, editorial, page, compact ? 4 : 9);
   const Heading = compact ? "h2" : "h1";
   return <section id="news" data-reveal={compact ? "" : undefined} className={compact ? styles.section : styles.listPage}>
     <div className={styles.heading}>
       <div><span className={styles.eyebrow}><Newspaper size={17} />{c("Kết nối & sẻ chia", "Connect & discover", "连接与分享")}</span>
-        <Heading>{c("Tin tức & cẩm nang", "News & insights", "资讯与指南")}</Heading>
-        <p>{c("Thông tin từ TXE PRO và những gợi ý hữu ích cho mỗi hành trình.", "Updates from TXE PRO and useful ideas for every journey.", "来自 TXE PRO 的信息，以及每段旅程的实用建议。")}</p>
+        <Heading>{c("Tin tức & cẩm nang vận chuyển", "News & transport guides", "资讯与运输指南")}</Heading>
+        <p>{c("Tìm đúng xe. Chuẩn bị kỹ hơn. Khám phá những hướng dẫn thực tế dành cho chủ hàng và tài xế, từ lúc lên kế hoạch đến khi kết thúc chuyến đi.", "Find the right vehicle and prepare with confidence. Practical guides for shippers and drivers, from planning to the end of a journey.", "选择合适的车辆，做好出发准备。为货主和司机提供从计划到行程结束的实用指南。")}</p>
       </div>
       {compact && <Link href="/tin-tuc" className={styles.allLink}>{c("Tất cả bài viết", "All articles", "全部文章")}<ArrowUpRight size={19} /></Link>}
     </div>
@@ -56,14 +59,14 @@ export default function NewsFeed({ compact = false }: { compact?: boolean }) {
     {!compact && failed && <div className={styles.notice} role="status"><span>{c("Chưa tải được tin mới. Bạn vẫn có thể đọc các bài cẩm nang bên dưới.", "New updates are unavailable. You can still read the guides below.", "暂时无法加载最新资讯，您仍可阅读下方指南。")}</span><button type="button" onClick={() => setRetry(value => value + 1)}><RefreshCw size={16} />{c("Thử lại", "Retry", "重试")}</button></div>}
     <div aria-busy={loading} aria-label={c("Danh sách bài viết", "Articles", "文章列表")}>
       {loading ? <><span className={styles.srOnly} role="status">{c("Đang tải bài viết", "Loading articles", "正在加载文章")}</span><NewsSkeleton compact={compact} /></> :
-        articles.length ? <div className={compact ? styles.previewGrid : styles.grid}>{articles.map((article, index) => <NewsCard key={article.id} article={article} featured={compact && index === 0} horizontal={compact && index > 0} />)}</div> :
+        articles.length ? compact ? <div className={styles.previewGrid}>{articles.map((article, index) => <NewsCard key={article.id} article={article} featured={index === 0} horizontal={index > 0} />)}</div> :
+          <div className={styles.grid}>{articles.map((article, index) => <NewsCard key={article.id} article={article} priority={index === 0} />)}</div> :
           <div className={styles.empty}><Newspaper size={34} /><h2>{c("Chưa có bài viết phù hợp", "No matching articles", "暂无匹配文章")}</h2><p>{c("Thử từ khóa khác hoặc chọn Tất cả để xem thêm nội dung.", "Try a different keyword or select All to explore more.", "请尝试其他关键词，或选择全部。")}</p></div>}
     </div>
     {!compact && pages > 1 && <nav className={styles.pagination} aria-label={c("Phân trang tin tức", "Article pages", "文章分页")}>
-      <button disabled={loading || page <= 1} onClick={() => setPage(value => value - 1)}><ChevronLeft size={17} />{c("Trước", "Previous", "上一页")}</button>
+      {page > 1 ? <Link href={newsPageHref(page - 1, category, search)}><ChevronLeft size={17} />{c("Trước", "Previous", "上一页")}</Link> : <button disabled><ChevronLeft size={17} />{c("Trước", "Previous", "上一页")}</button>}
       <span>{page} / {pages}</span>
-      <button disabled={loading || page >= pages} onClick={() => setPage(value => value + 1)}>{c("Sau", "Next", "下一页")}<ChevronRight size={17} /></button>
+      {page < pages ? <Link href={newsPageHref(page + 1, category, search)}>{c("Sau", "Next", "下一页")}<ChevronRight size={17} /></Link> : <button disabled>{c("Sau", "Next", "下一页")}<ChevronRight size={17} /></button>}
     </nav>}
-    {!compact && !loading && <p className={styles.sourceNote}>{c("Bài tin từ quản trị viên được giữ nguyên ngôn ngữ biên soạn. Cẩm nang hỗ trợ Tiếng Việt, English và 中文.", "Published updates retain their original language. Guides are available in Vietnamese, English and Chinese.", "发布的资讯保留原文语言，指南支持越南语、英语和中文。")}</p>}
   </section>;
 }

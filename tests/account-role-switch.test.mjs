@@ -204,14 +204,14 @@ test("shared dialog blocks close/Escape/backdrop during pending switch", () => {
 });
 test("all entry points connected, with no auto-switch on navigation or API fallback", () => {
   const header = readFileSync(resolve(root, "src/components/common/Header.tsx"), "utf8");
-  const profile = readFileSync(resolve(root, "src/app/user/page.tsx"), "utf8");
+  const profile = readFileSync(resolve(root, "src/components/account/AccountWorkspace.tsx"), "utf8");
   const posting = readFileSync(resolve(root, "src/components/posting/PostingWorkspace.tsx"), "utf8");
   assert.equal((header.match(/<RoleSwitchButton/g) || []).length, 2);
   assert.match(header, /event.key === ROLE_CHANGED_KEY/);
   assert.match(header, /import RoleSwitchButton from/);
   assert.match(header, /load\(\); window.addEventListener\("storage", sync\)/);
   assert.match(header, /!document.querySelector\("dialog\[open\]"\)/);
-  assert.match(profile, /<RoleSwitchButton currentRole=\{normalizedRole\} disabled=\{isOffline\}/);
+  assert.match(profile, /<RoleSwitchButton currentRole=\{normalizedRole\} disabled=\{isOffline \|\| busy \|\| Boolean\(action\)\}/);
   assert.match(posting, /auth === "wrong-role" && <RoleSwitchButton currentRole=\{accountRole\} targetRole=\{role\}/);
   const component = readFileSync(resolve(root, "src/components/account/RoleSwitchButton.tsx"), "utf8");
   assert.match(component, /window.location.replace\(/); assert.match(component, /returnTo === '\/tai-xe\/phuong-tien'/); assert.match(component, /dismissible=\{!busy\}/);

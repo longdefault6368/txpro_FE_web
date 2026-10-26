@@ -28,14 +28,14 @@ export function NewsCover({ source, alt, priority = false, sizes = "(max-width: 
   </div>;
 }
 
-export default function NewsCard({ article, featured = false, horizontal = false }: {
-  article: NewsArticle; featured?: boolean; horizontal?: boolean;
+export default function NewsCard({ article, featured = false, horizontal = false, priority = false }: {
+  article: NewsArticle; featured?: boolean; horizontal?: boolean; priority?: boolean;
 }) {
   const { language } = useLanguage();
   const label = language === "en" ? "Read article" : language === "zh" ? "阅读全文" : "Đọc bài viết";
   const date = article.publishedAt ? new Date(article.publishedAt).toLocaleDateString(language === "en" ? "en-GB" : language === "zh" ? "zh-CN" : "vi-VN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }) : null;
   return <Link href={"/tin-tuc/" + article.id} className={[styles.card, featured && styles.featured, horizontal && styles.horizontal].filter(Boolean).join(" ")}>
-    <NewsCover key={article.imageUrl} source={article.imageUrl} alt={article.title} />
+    <NewsCover key={article.imageUrl} source={article.imageUrl} alt={article.title} priority={priority} />
     <div className={styles.cardBody}>
       <div className={styles.meta}><span>{newsCategoryLabel(article.category, language)}</span>{date && <time dateTime={article.publishedAt!}>{date}</time>}</div>
       <h3>{article.title}</h3>

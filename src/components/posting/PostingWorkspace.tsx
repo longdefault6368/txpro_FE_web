@@ -14,8 +14,9 @@ import { postingRequest, PostingError } from "@/utils/posting-api";
 import { buildDriverPosting, buildShipperPosting, postingCapabilities, readPostingPage, type PostingPage, type LocationValue, type PostingOptions, type PostingVehicle } from "@/utils/posting-contract";
 import w from "./PostingExperience.module.css";
 import { takeHomePostingDraft } from "@/utils/home-posting-draft";
+import { bookingFundingNotice, canSelectVehicle, interruptionNotice, latestBookingMatch, matchFare, type BookingSelection, type VehicleMatch as Match } from "@/utils/shipper-booking";
+import { orderStatusLabel } from "@/utils/order-display";
 
-type Match = { postId: string; driverId: string; driverName: string; price: number; estimatedPrice?: number; driverNote?: string; vehicle: { type: string; plateNumber: string } };
 type Quote = { canPost: boolean; missingAmount: number; requiredAmount: number; platformFeeAmount: number; vatAmount: number; voucherEligible: boolean; paymentPolicy?: string };
 const localDate = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe" }) {
@@ -36,7 +37,7 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
   const previewUrls = useRef(new Map<string, string>());
   useEffect(() => () => { previewUrls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
   const matchRevision = useRef(0);
-  useEffect(() => { setConfirmed(false); }, [review?.postId]);
+  const matchLock = useRef(false);
   const vehicle = vehicles.find(v => (v.id || v._id) === vehicleId);
   useEffect(() => {
     let active = true;
@@ -78,8 +79,13 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
                 if (catalog.cargoTypes.includes(draft.cargo || "") && postingCapabilities(selection.vehicleType, catalog).cargo) setCargo(draft.cargo || "");
               }
               setScheduled(draft.scheduled); if (draft.scheduled) setFrom(draft.from);
-            } else { setFrom(draft.from); setTo(draft.to); setPrice(draft.price); }
-            setMessage("Đã điền thông tin từ trang chủ. Vui lòng kiểm tra và hoàn thiện trước khi đăng; chưa có tin/đơn nào được tạo.");
+            } else {
+              setFrom(draft.from); setTo(draft.to); setPrice(draft.price);
+              setType(draft.vehicleType); setChild(draft.child || ""); setWeight(draft.weightLabel || ""); setCargo(draft.cargo || "");
+            }
+            setMessage(driver && draft.vehicleType
+              ? "Đã nhận yêu cầu từ trang chủ: " + draft.vehicleType + (draft.child ? " · " + draft.child : "") + (draft.cargo ? " · " + draft.cargo : "") + ". Chọn phương tiện đã đăng ký phù hợp bên dưới. Hàng hóa và tải trọng đăng tin lấy từ phương tiện bạn chọn."
+              : "Đã điền thông tin từ trang chủ. Vui lòng kiểm tra và hoàn thiện trước khi đăng; chưa có tin/đơn nào được tạo.");
           }
           setAuth("ready");
         }
@@ -88,32 +94,34 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
     void load();
     return () => { active = false; };
   }, [driver, role]);
-  useEffect(() => { setQuote(null); setMissing(0); setConfirmed(false); }, [vehicleId, price]);
   async function loadMatches(id = orderId) {
-    if (!id) return;
+    if (!id || matchLock.current || lock.current) return;
+    matchLock.current = true;
     const revision = ++matchRevision.current;
     setMatchBusy(true);
     try {
       const detail = await postingRequest<{ status: string }>("/chu-hang/orders/" + id);
       if (revision !== matchRevision.current) return;
       setOrderStatus(detail.status);
-      if (["searching_driver", "waiting_driver"].includes(detail.status)) {
+      if (canSelectVehicle(detail.status)) {
         const data = await postingRequest<Match[]>("/chu-hang/orders/" + id + "/matches");
         if (revision === matchRevision.current) setMatches(Array.isArray(data) ? data : []);
-      } else setMatches([]);
+      } else { setMatches([]); setReview(null); setMissing(0); setConfirmed(false); }
     } catch (e) { if (revision === matchRevision.current) setError(e instanceof Error ? e.message : "Không tải được xe phù hợp."); }
-    finally { if (revision === matchRevision.current) setMatchBusy(false); }
+    finally { matchLock.current = false; if (revision === matchRevision.current) setMatchBusy(false); }
   }
   useEffect(() => {
-    if (!orderId || auth !== "ready") return;
+    if (!orderId || auth !== "ready" || uncertain) return;
+    const revisions = matchRevision;
     let stopped = false;
     const refresh = async () => { if (!stopped && !document.hidden && !lock.current) await loadMatches(orderId); };
     void refresh();
     const timer = setInterval(() => { void refresh(); }, 15000);
-    return () => { stopped = true; matchRevision.current++; clearInterval(timer); };
+    document.addEventListener("visibilitychange", refresh);
+    return () => { stopped = true; revisions.current++; clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
     // Order ID, not the form fields, owns this read-only refresh loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId, auth]);
+  }, [orderId, auth, uncertain]);
   async function upload(files: FileList | null) {
     if (!files || uploadLock.current) return;
     const selected = Array.from(files);
@@ -164,17 +172,26 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
     } finally { lock.current = false; setBusy(false); }
   }
   async function choose() {
-    if (!review || lock.current || uncertain) return;
+    if (!review || !confirmed || lock.current || uncertain || missing > 0) return;
     matchRevision.current++; setMatchBusy(false);
     lock.current = true; setBusy(true); setError("");
     try {
-      await postingRequest("/chu-hang/orders/" + orderId + "/select-driver", { method: "POST",
-        body: JSON.stringify({ driverId: review.driverId, postId: review.postId, offerPrice: review.price || review.estimatedPrice }) });
-        setReview(null); setMissing(0); setOrderStatus("waiting_driver_acceptance"); setMatches([]);
-      setMessage("Đã gửi yêu cầu và xử lý voucher/ký quỹ theo điều kiện của đơn. Đang chờ tài xế xác nhận.");
+      const latest = await latestBookingMatch(postingRequest, orderId, review);
+      if (matchFare(latest) !== matchFare(review) || interruptionNotice(latest) !== interruptionNotice(review)) {
+        setReview(latest); setConfirmed(false); setMissing(0);
+        setMessage("Tin xe vừa cập nhật. Vui lòng kiểm tra giá và thông tin mới rồi xác nhận lại.");
+        return;
+      }
+      const selected = await postingRequest<BookingSelection>("/chu-hang/orders/" + orderId + "/select-driver", { method: "POST",
+        body: JSON.stringify({ driverId: latest.driverId, postId: latest.postId, offerPrice: matchFare(latest) }) });
+      if (selected?.orderId !== orderId || selected.status !== "waiting_driver_acceptance") {
+        throw new PostingError("Chưa xác định được kết quả đặt xe. Vui lòng kiểm tra đơn của bạn trước khi thử lại.", "INVALID_RESPONSE", {}, true);
+      }
+      setReview(null); setMissing(0); setConfirmed(false); setOrderStatus(selected.status); setMatches([]);
+      setMessage(bookingFundingNotice(selected));
     } catch (e) {
       if (e instanceof PostingError && e.code === "SHIPPER_ESCROW_INSUFFICIENT_BALANCE") setMissing(Number(e.details.missingAmount) || 0);
-      else { setReview(null); void loadMatches(); }
+      else { setReview(null); setConfirmed(false); setMatches([]); }
       setUncertain(e instanceof PostingError && e.uncertain);
       setError(e instanceof Error ? e.message : "Chưa đặt được xe.");
     } finally { lock.current = false; setBusy(false); }
@@ -191,6 +208,9 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
   }
   function updateForm(patch: Partial<PostingFormValues>) {
     if (busy || uploading || uncertain) return;
+    if (patch.vehicleId !== undefined && patch.vehicleId !== vehicleId || patch.price !== undefined && patch.price !== price) {
+      setQuote(null); setMissing(0); setConfirmed(false);
+    }
     if (patch.type !== undefined && patch.type !== type) {
       setCargo(""); setChild(""); setWeight(""); setImages([]);
       previewUrls.current.forEach(url => URL.revokeObjectURL(url)); previewUrls.current.clear();
@@ -255,18 +275,18 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
           <p>Tin xe đã được đăng. Theo dõi trạng thái và quản lý tin trong danh sách của bạn.</p>
           <Link className={w.primaryButton} href="/don-cua-ban">Xem tin / đơn của tôi<ArrowRight size={17} /></Link></div>
       </section> : orderId ? <section className={w.results}>
-        <div className={w.resultsHeader}><div><h2>{["searching_driver", "waiting_driver"].includes(orderStatus) ? "Xe phù hợp với bạn" : "Đơn của bạn đã được cập nhật"}</h2>
+        <div className={w.resultsHeader}><div><h2>{canSelectVehicle(orderStatus) ? "Xe phù hợp với bạn" : orderStatusLabel(orderStatus)}</h2>
           <p>{["searching_driver", "waiting_driver"].includes(orderStatus) ? "Chọn một tin xe để xem giá và xác nhận đặt xe." : "Xem trạng thái và các bước tiếp theo trong danh sách đơn của bạn."}</p></div>
           <button type="button" className={w.secondaryButton} disabled={matchBusy || busy} onClick={() => void loadMatches()}>{matchBusy ? <Loader2 className={w.spin} size={16} /> : <RefreshCw size={16} />}Cập nhật</button>
         </div>
         {matchBusy && matches.length === 0 ? <div className={w.matchGrid} aria-busy="true" aria-label="Đang tìm xe phù hợp">{[0, 1, 2, 3].map(index => <div className={w.matchSkeleton} key={index} />)}</div>
-          : matches.length === 0 ? <div className={w.emptyState}><Search size={35} /><strong>{["searching_driver", "waiting_driver"].includes(orderStatus) ? "Đang tìm xe phù hợp" : "Thông tin đơn đã thay đổi"}</strong>
-            <p>{["searching_driver", "waiting_driver"].includes(orderStatus) ? "Bạn có thể quay lại danh sách đơn. Hệ thống tiếp tục tìm xe theo yêu cầu của bạn." : "Mở danh sách đơn để theo dõi trạng thái mới nhất."}</p></div>
+          : matches.length === 0 ? <div className={w.emptyState}><Search size={35} /><strong>{canSelectVehicle(orderStatus) ? "Đang tìm xe phù hợp" : orderStatusLabel(orderStatus)}</strong>
+            <p>{canSelectVehicle(orderStatus) ? "Bạn có thể quay lại danh sách đơn. Hệ thống tiếp tục tìm xe theo yêu cầu của bạn." : orderStatus === "waiting_driver_acceptance" ? "Yêu cầu đặt xe đã được gửi. Trang tự cập nhật khi tài xế phản hồi; quay lại danh sách không hủy yêu cầu." : "Mở danh sách đơn để theo dõi trạng thái mới nhất."}</p></div>
           : <div className={w.matchGrid} aria-busy={matchBusy}>{matches.map(item => <button type="button" key={item.postId} className={w.matchButton} disabled={busy || matchBusy || uncertain}
-            onClick={() => { setReview(item); setMissing(0); setError(""); }}>
+            onClick={() => { setReview(item); setConfirmed(false); setMissing(0); setError(""); setMessage(""); }}>
             <Image src={vehicleImage(item.vehicle.type)} alt="" width={140} height={100} sizes="100px" />
             <div><strong>{item.driverName}</strong><small>{item.vehicle.type}</small><span className={w.plate}>{item.vehicle.plateNumber}</span></div>
-            <div className={w.matchPrice}><span>{item.price || item.estimatedPrice ? (item.price || item.estimatedPrice || 0).toLocaleString("vi-VN") + " ₫" : "Chưa có giá"}</span><ArrowRight size={18} /></div>
+            <div className={w.matchPrice}><span>{matchFare(item) ? matchFare(item).toLocaleString("vi-VN") + " ₫" : "Chưa có giá"}</span><ArrowRight size={18} /></div>
           </button>)}</div>}
         <Link className={w.secondaryButton} href="/don-cua-ban"><ArrowLeft size={15} />Về tin / đơn của tôi</Link>
       </section> : options && <PostingForm driver={driver} options={options} vehicles={vehicles}
@@ -276,7 +296,8 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
       {review && <section id="posting-review" tabIndex={-1} className={w.review} aria-label="Xác nhận và đặt xe">
         <span className={w.stateBadge}><ShieldCheck size={16} />Kiểm tra trước khi đặt</span><h2>Xác nhận và đặt xe</h2>
         <p>Tài xế: <strong>{review.driverName}</strong><br />{review.vehicle.type} · {review.vehicle.plateNumber}</p>
-        <h3>{(review.price || review.estimatedPrice || 0).toLocaleString("vi-VN")} ₫</h3>
+        <h3>{matchFare(review).toLocaleString("vi-VN")} ₫</h3>
+        {interruptionNotice(review) && <p role="note">Tài xế đã sẵn sàng trở lại. {interruptionNotice(review)} Vui lòng xem xét trước khi chọn lại.</p>}
         {review.driverNote && <p>{review.driverNote}</p>}
         <p>Xác nhận sẽ gửi yêu cầu cho tài xế và giữ voucher hoặc ký quỹ theo điều kiện của đơn. Cước chuyến đi thanh toán trực tiếp theo thỏa thuận với tài xế.</p>
         <label className={w.bookingConsent}><input type="checkbox" disabled={busy || uncertain} checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /><span>Tôi đã kiểm tra thông tin và đồng ý điều khoản chuyến đi.</span></label>

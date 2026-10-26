@@ -15,6 +15,7 @@ const { Vehicle } = await import(new URL("src/models/Vehicle.model.js", server))
 const { WalletAccount } = await import(new URL("src/models/WalletAccount.model.js", server));
 const { EscrowLock } = await import(new URL("src/models/EscrowLock.model.js", server));
 const { WalletTransaction } = await import(new URL("src/models/WalletTransaction.model.js", server));
+const { creditMainBalance } = await import(new URL("src/services/wallet.service.js", server));
 const { shipperCreateOrderSchema, driverPostCreateSchema } = await import(new URL("src/validators/contract.validator.js", server));
 const source = await fs.readFile(new URL("../src/utils/posting-contract.ts", import.meta.url), "utf8");
 const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -24,6 +25,8 @@ const pickup = { address: "Điểm nhận test", lat: 10.7, lng: 106.6 }, dropof
 test.before(async () => {
   process.env.MONGODB_URI = "mongodb://127.0.0.1/not-used-web-tests";
   app = await setupTestApp({ rateLimitMax: 1000 });
+  // Finish temporary database index creation before exercising transactions.
+  await Promise.all(Object.values(mongoose.models).map(model => model.init()));
   process.env.VOUCHERS_ENABLED = "true"; process.env.VOUCHER_FINANCIAL_ENFORCEMENT_ENABLED = "true";
   const base = { password: "test-only-password", isActive: true, kycStatus: "verified", kycSummary: { verificationEligibility: "verified" } };
   [driver, shipper] = await User.create([
@@ -110,8 +113,37 @@ test("Flutter-style grouped choices create real web orders with exact matching f
     const detail = await request(app).get("/api/v1/chu-hang/orders/" + created.body.data.orderId).set("Authorization", authHeaderForUser(shipper));
     assert.equal(detail.status, 200);
     assert.equal(detail.body.data.vehicleType, selection.vehicleType);
-    if (selection.child) assert.equal(detail.body.data.vehicleTypeChild, selection.child);
+    assert.equal(detail.body.data.vehicleTypeChild || null, payload.vehicleTypeChild);
     if (selection.vehicleType === "xe tải") assert.equal(detail.body.data.weightLabel, selection.weightLabel);
   }
   assert.equal(await EscrowLock.countDocuments({ userId: shipper._id }), before);
+});
+
+test("web-created truck and passenger orders use the same matcher as Flutter, including boundary overlap and seats", async () => {
+  await creditMainBalance(driver._id, 1000000, { type: "topup", provider: "internal", idempotencyKey: "web-match-fixture-funding" });
+  const truck = await Vehicle.create({ driverId: driver._id, type: "xe tải thùng kín", vehicleTypeParent: "xe tải thùng kín", plateNumber: "WEB-TRUCK", capacity: 5, capacityMax: 5, cargoTypes: [options.cargoTypes[0]], status: "active" });
+  const car = await Vehicle.create({ driverId: driver._id, type: "ô tô", vehicleTypeParent: "ô tô", vehicleTypeChild: "7 ghế", plateNumber: "WEB-CAR", seats: 7, status: "active" });
+  const ids = [];
+  for (const vehicle of [truck, car]) {
+    const payload = buildDriverPosting({ vehicle: { ...vehicle.toObject(), id: String(vehicle._id) }, pickup, dropoff,
+      price: 100000, radius: 30, min: 2, max: 5, from: new Date(Date.now() - 60000).toISOString(), to: new Date(Date.now() + 3600000).toISOString(), note: "" }, options);
+    const posted = await request(app).post("/api/v1/tai-xe/posts").set("Authorization", authHeaderForUser(driver)).send(payload);
+    assert.equal(posted.status, 201, JSON.stringify(posted.body)); ids.push(posted.body.data.postId);
+  }
+  for (const [selection, expected] of [
+    [{ vehicleType: "xe tải", child: "1 - 5 tấn", weightLabel: "1 - 5 tấn" }, true],
+    [{ vehicleType: "xe tải", child: "5 - 10 tấn", weightLabel: "5 - 10 tấn" }, true],
+    [{ vehicleType: "xe tải", child: "10 - 40 tấn", weightLabel: "10 - 40 tấn" }, false],
+    [{ vehicleType: "ô tô", child: "7 ghế", weightLabel: "" }, true],
+    [{ vehicleType: "ô tô", child: "16 ghế", weightLabel: "" }, false],
+  ]) {
+    const payload = buildShipperPosting({ pickup, dropoff, ...selection, cargo: options.cargoTypes[0], time: "", notes: "", images: [] }, options);
+    const created = await request(app).post("/api/v1/chu-hang/orders").set("Authorization", authHeaderForUser(shipper)).send(payload);
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    const result = await request(app).get("/api/v1/chu-hang/orders/" + created.body.data.orderId + "/matches").set("Authorization", authHeaderForUser(shipper));
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    const expectedPost = selection.vehicleType === "xe tải" ? ids[0] : ids[1];
+    assert.equal(result.body.data.some(item => item.postId === expectedPost), expected, JSON.stringify(selection));
+    assert.equal(new Set(result.body.data.map(item => item.postId)).size, result.body.data.length);
+  }
 });

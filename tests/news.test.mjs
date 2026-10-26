@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { createRequire } from "node:module";
@@ -37,12 +38,14 @@ function loader({ language = "vi", fetch = async () => { throw new Error("Unexpe
   return path => load(resolve(root, path));
 }
 
-test("four complete guides and bundled covers exist in all supported languages", () => {
+test("twelve complete guides have unique URLs and bundled covers", () => {
   const { getEditorialArticles } = loader()("src/lib/news-content.ts");
   for (const language of ["vi", "en", "zh"]) {
     const articles = getEditorialArticles(language);
-    assert.equal(articles.length, 4);
-    assert.equal(new Set(articles.map(item => item.id)).size, 4);
+    assert.equal(articles.length, 12);
+    assert.equal(new Set(articles.map(item => item.id)).size, 12);
+    assert.equal(new Set(articles.map(item => item.imageUrl)).size, 12, "every article needs a different cover");
+    assert.equal(new Set(articles.map(item => createHash("sha256").update(readFileSync(resolve(root, "public", item.imageUrl.slice(1)))).digest("hex"))).size, 12, "different filenames must not hide duplicate images");
     for (const item of articles) {
       assert.ok(item.title.length >= (language === "zh" ? 8 : 10));
       assert.ok(item.summary.length > 15);
@@ -191,4 +194,101 @@ test("news styles respect the bold cap and reduced-motion preference", () => {
   assert.ok(css.includes("prefers-reduced-motion"));
   const feed = readFileSync(resolve(root, "src/components/news/NewsFeed.tsx"), "utf8");
   assert.ok(feed.includes("return () => controller.abort()"), "stale feed requests must be cancelled on navigation or filter changes");
+});
+
+test("news listing renders crawlable article links on the server, including when CMS is unavailable", () => {
+  const load = loader();
+  const Feed = load("src/components/news/NewsFeed.tsx").default;
+  const articles = load("src/lib/news-content.ts").getEditorialArticles();
+  for (const initialData of [null, { items: [], pagination: { page: 1, totalPages: 1, total: 0 } }]) {
+    const html = renderToStaticMarkup(React.createElement(Feed, { initialData }));
+    for (const article of articles.slice(0, 9)) {
+      assert.ok(html.includes(article.title));
+      assert.ok(html.includes('href="/tin-tuc/' + article.id + '"'));
+    }
+    assert.equal((html.match(/<h1[ >]/g) || []).length, 1);
+    assert.ok(!html.includes("Đang tải bài viết"));
+  }
+});
+
+test("article metadata and structured data agree on canonical URLs, images and real publication dates", () => {
+  const load = loader();
+  const { articleMetadata, articleStructuredData, siteOrigin, safeStructuredJson } = load("src/lib/news-seo.ts");
+  const article = load("src/lib/news-content.ts").getEditorialArticles()[0];
+  const origin = siteOrigin("https://www.example.com/old-path");
+  assert.equal(origin, "https://www.example.com");
+  assert.equal(siteOrigin("javascript:alert(1)"), null);
+  assert.equal(siteOrigin("https://user:pass@example.com"), null);
+  const meta = articleMetadata(article, origin);
+  const schema = articleStructuredData(article, origin);
+  assert.equal(meta.alternates.canonical, origin + "/tin-tuc/" + article.id);
+  assert.equal(meta.openGraph.url, meta.alternates.canonical);
+  assert.equal(meta.openGraph.images[0].url, origin + article.imageUrl);
+  assert.equal(schema.mainEntityOfPage, meta.alternates.canonical);
+  assert.equal(schema.datePublished, undefined);
+  assert.equal(meta.openGraph.publishedTime, undefined);
+  assert.equal(articleMetadata(article, null).alternates, undefined);
+  const payload = safeStructuredJson({ headline: "</script><img src=x onerror=alert(1)>" });
+  assert.ok(!payload.includes("<"));
+  assert.equal(JSON.parse(payload).headline, "</script><img src=x onerror=alert(1)>");
+});
+
+test("news sitemap paginates actual public CMS articles and keeps editorial links when CMS is unavailable", async () => {
+  const { buildNewsSitemap } = loader()("src/lib/news-sitemap.ts");
+  const calls = [];
+  const read = async ({ page, limit }) => {
+    calls.push([page, limit]);
+    return { items: [{ id: String(page).padStart(24, "0"), title: "Public", imageUrl: "", summary: "", content: "", category: "news", publishedAt: null }], pagination: { page, totalPages: 2, total: 2 } };
+  };
+  const entries = await buildNewsSitemap("https://www.example.com", read);
+  assert.deepEqual(calls, [[1, 24], [2, 24]]);
+  assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/000000000000000000000002")));
+  assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/chon-xe-phu-hop")));
+  assert.ok(!entries.some(item => item.url.includes("/admin")));
+  const offline = await buildNewsSitemap("https://www.example.com", async () => { throw new Error("Offline"); });
+  assert.ok(offline.some(item => item.url.endsWith("/tin-tuc/dang-xe-trong-hieu-qua")));
+  assert.equal((await buildNewsSitemap(null, read)).length, 0);
+});
+
+test("combined news pages have no gaps or duplicates at the CMS/editorial boundary", () => {
+  const load = loader();
+  const editorial = load("src/lib/news-content.ts").getEditorialArticles();
+  const { paginateNews, readNewsQuery, newsPageHref } = load("src/lib/news-pagination.ts");
+  for (const remoteTotal of [0, 2, 10, 18]) {
+    const remote = Array.from({ length: remoteTotal }, (_, i) => ({ ...editorial[0], id: "cms-" + i }));
+    const count = Math.ceil((remote.length + editorial.length) / 9);
+    const all = [];
+    for (let page = 1; page <= count; page++) {
+      const result = paginateNews({ items: remote.slice((page - 1) * 9, page * 9),
+        pagination: { page, total: remoteTotal, totalPages: Math.max(1, Math.ceil(remoteTotal / 9)) } }, editorial, page);
+      assert.ok(result.items.length <= 9);
+      assert.equal(result.pagination.totalPages, count);
+      assert.equal(result.pagination.total, remoteTotal + 12);
+      all.push(...result.items.map(item => item.id));
+    }
+    assert.deepEqual(all, [...remote, ...editorial].map(item => item.id));
+    assert.equal(new Set(all).size, all.length);
+  }
+  assert.equal(paginateNews(null, editorial, 2).items.length, 3);
+  assert.equal(readNewsQuery({ page: "-1", category: ["guide"] }).page, 1);
+  assert.equal(readNewsQuery({ category: ["guide"] }).category, "all");
+  assert.equal(newsPageHref(2, "guide", "xe trống"), "/tin-tuc?page=2&category=guide&search=xe+tr%E1%BB%91ng");
+});
+
+test("listing renders nine uniform cards, then the last three on a separate crawlable page", () => {
+  const load = loader();
+  const Feed = load("src/components/news/NewsFeed.tsx").default;
+  const editorial = load("src/lib/news-content.ts").getEditorialArticles();
+  const links = [];
+  for (const [page, expected] of [[1, 9], [2, 3]]) {
+    const html = renderToStaticMarkup(React.createElement(Feed, { initialData: null, initialPage: page }));
+    const ids = [...html.matchAll(/href="\/tin-tuc\/([^"]+)"/g)].map(item => item[1]);
+    assert.equal(ids.length, expected);
+    assert.ok(!html.includes('class="spotlight"'));
+    assert.ok(html.includes(page === 1 ? 'href="/tin-tuc?page=2"' : 'href="/tin-tuc"'));
+    links.push(...ids);
+  }
+  assert.deepEqual(links, Array.from(editorial, item => item.id));
+  const css = readFileSync(resolve(root, "src/components/news/News.module.css"), "utf8");
+  assert.match(css, /\.grid\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
 });

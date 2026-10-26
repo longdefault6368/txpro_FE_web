@@ -17,6 +17,7 @@
 .panel input,.panel select{display:block;width:100%;min-width:0;min-height:46px;font-size:15px;font-weight:500;color:#102c49;border:1px solid #cfdae6;background:#f9fbfd;padding:12px;border-radius:10px;margin-top:8px}
 .panel input:focus-visible,.panel select:focus-visible{outline:3px solid #136dec35;border-color:#136dec}
 .panel fieldset{min-width:0}
+.priceCard{border:1px solid #d6e4f1;border-radius:14px;background:#f3f8ff;padding:18px;margin-bottom:18px}.priceHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.priceHeading label{margin:0}.priceHeading output{font-size:23px;font-weight:700;color:#0c55be;font-variant-numeric:tabular-nums}.panel .priceCard input[type=range]{padding:0;border:0;background:transparent;accent-color:#136dec;min-height:38px;margin:12px 0 0;cursor:pointer}.priceLimits{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#607084}.panel .exactPrice{margin:16px 0 0;font-size:12px;font-weight:500}.exactPrice input{font-size:14px}
 .panel small{display:block;font-size:12px;line-height:1.6;margin-top:-7px;margin-bottom:12px}
 .panel input:disabled,.panel select:disabled{opacity:.6}
 .actions{display:flex;flex-wrap:wrap;gap:15px;align-items:center;margin-top:10px}

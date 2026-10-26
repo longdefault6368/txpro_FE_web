@@ -69,17 +69,16 @@ test("cleanup disconnects the observer, removes listeners and blocks stale callb
   fixture.intersect(true);
   assert.equal(fixture.root.dataset.motionRunning, "false");
 });
-test("hero decoration stays noninteractive and pause control is translated and explicit", () => {
+test("hero starts ambient motion by default without an effects button", () => {
   const hero = readFileSync(resolve(root, "src/components/sections/HeroShowcase.tsx"), "utf8");
   const css = readFileSync(resolve(root, "src/components/sections/HeroShowcase.module.css"), "utf8");
-  assert.match(hero, /className=\{styles\.orbit\} aria-hidden="true"/);
+  assert.ok(hero.includes("useAmbientMotion(showcaseRef, true)"));
   assert.ok(hero.includes('data-motion-running="false"'));
-  assert.ok(hero.includes("aria-pressed={motionEnabled}"));
-  for (const label of ["Tạm dừng hiệu ứng banner", "Pause banner animations", "暂停横幅动画"]) assert.ok(hero.includes(label));
+  assert.doesNotMatch(hero, /motionToggle|motionEnabled|Hiệu ứng|Pause banner animations/);
   assert.ok(css.includes("pointer-events: none"));
   assert.ok(css.includes("animation-play-state:paused"));
   assert.ok(css.includes("data-motion-running=true"));
-  assert.ok(css.includes(".motionToggle{display:none}"), "system reduced motion hides an irrelevant toggle");
+  assert.ok(css.includes("prefers-reduced-motion: reduce"));
 });
 test("new loops only animate transforms or opacity and add no per-frame JavaScript", () => {
   const css = readFileSync(resolve(root, "src/components/sections/HeroShowcase.module.css"), "utf8");

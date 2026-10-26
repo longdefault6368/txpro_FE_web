@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRef, useState } from "react";
-import { ArrowUpRight, MapPin, Pause, Play, Route, ShieldCheck } from "lucide-react";
+import { useRef } from "react";
+import { ArrowUpRight, MapPin, Route, ShieldCheck } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import useAmbientMotion from "@/hooks/useAmbientMotion";
 import styles from "./HeroShowcase.module.css";
@@ -11,8 +11,7 @@ import styles from "./HeroShowcase.module.css";
 /** Decorative product illustration, not a live trip. */
 export default function HeroShowcase() {
   const showcaseRef = useRef<HTMLElement>(null);
-  const [motionEnabled, setMotionEnabled] = useState(true);
-  useAmbientMotion(showcaseRef, motionEnabled);
+  useAmbientMotion(showcaseRef, true);
   const { language } = useLanguage();
   const c = (vi: string, en: string, zh: string) =>
     language === "en" ? en : language === "zh" ? zh : vi;
@@ -65,13 +64,6 @@ export default function HeroShowcase() {
         </div>
       </div>
 
-      <figcaption className={styles.caption}>
-        <button className={styles.motionToggle} type="button" aria-pressed={motionEnabled} onClick={() => setMotionEnabled(value => !value)}
-          aria-label={motionEnabled ? c("Tạm dừng hiệu ứng banner", "Pause banner animations", "暂停横幅动画") : c("Bật hiệu ứng banner", "Play banner animations", "播放横幅动画")}>
-          {motionEnabled ? <Pause size={12} /> : <Play size={12} />}
-          {c("Hiệu ứng", "Motion", "动画")}
-        </button>
-      </figcaption>
     </figure>
   );
 }

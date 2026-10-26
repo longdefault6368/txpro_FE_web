@@ -52,15 +52,14 @@ export function postingCapabilities(type: string, options?: PostingOptions) {
 export function parseWeightRange(label: string) {
   const values = (label.replace(/,/g, ".").match(/\d+(?:\.\d+)?/g) || []).map(Number);
   if (!values.length) throw new Error("Vui lòng chọn tải trọng.");
-  const below = normalizePostingText(label).includes("duoi");
-  return { weight: below ? values[0] : values.at(-1)!, weightLabel: label };
+  return { weight: values[0], weightLabel: label };
 }
 export function validLocation(value: LocationValue | null): value is LocationValue {
   return Boolean(value?.address.trim() && Number.isFinite(value.lat) && Number.isFinite(value.lng)
     && Math.abs(value.lat) <= 90 && Math.abs(value.lng) <= 180);
 }
 export function safePostingReturn(value: string | null) {
-  return value && ["/chu-hang/form-tao-don", "/tai-xe/dang-tin", "/tai-xe/phuong-tien", "/user/ekyc", "/dang-tin", "/don-cua-ban"].includes(value.split("?")[0])
+  return value && ["/chu-hang/form-tao-don", "/tai-xe/dang-tin", "/tai-xe/phuong-tien", "/user/ekyc", "/dang-tin", "/don-cua-ban", "/tracking"].includes(value.split("?")[0])
     && value.startsWith("/") && !value.startsWith("//") ? value : null;
 }
 export function buildShipperPosting(input: { pickup: LocationValue | null; dropoff: LocationValue | null; vehicleType: string; child: string; weightLabel: string; cargo: string; time: string; notes: string; images: string[] }, options: PostingOptions) {
@@ -76,8 +75,9 @@ export function buildShipperPosting(input: { pickup: LocationValue | null; dropo
   const weight = caps.capacity ? parseWeightRange(input.weightLabel) : { weight: 0 };
   return { title: input.vehicleType + " · " + input.pickup.address + " → " + input.dropoff.address,
     pickup: input.pickup, dropoff: input.dropoff, vehicleType: input.vehicleType,
-    vehicleTypeChild: input.child || null, seats: caps.passenger ? Number(input.child.match(/\d+/)?.[0]) || null : null,
-    cargoType: caps.cargo ? input.cargo : "", ...weight, volume: 0,
+    vehicleTypeChild: caps.passenger || caps.capacity && vehicleGroup(input.vehicleType) !== "construction" ? null : input.child || null,
+    seats: caps.passenger ? Number(input.child.match(/\d+/)?.[0]) || null : null,
+    cargoType: caps.passenger || caps.motorcycle ? "Hành khách" : caps.cargo ? input.cargo : "", ...weight, volume: 0,
     pickupTimeType: input.time ? "scheduled" : "now", pickupTime: input.time ? new Date(input.time).toISOString() : null,
     notes: input.notes.trim(), cargoImageUrls: caps.cargo ? input.images : [] };
 }

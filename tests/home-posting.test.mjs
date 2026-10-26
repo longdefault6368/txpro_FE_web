@@ -59,6 +59,16 @@ test("fresh role-specific drafts survive the login return path and are consumed 
     assert.equal(drafts.takeHomePostingDraft(storage, role, "?from=home", now + 6000), null);
   }
 });
+
+test("driver draft preserves vehicle, cargo and child preferences without granting a registered vehicle", () => {
+  const storage = store();
+  drafts.saveHomePostingDraft(storage, { ...draft("tai-xe"), child: "1 - 5 tấn", weightLabel: "1 - 5 tấn", cargo: "đồ gia dụng / nội thất", vehicleId: "untrusted" }, now);
+  const restored = drafts.takeHomePostingDraft(storage, "tai-xe", "?from=home", now);
+  assert.equal(restored.vehicleType, "xe tải");
+  assert.equal(restored.child, "1 - 5 tấn");
+  assert.equal(restored.cargo, "đồ gia dụng / nội thất");
+  assert.equal(restored.vehicleId, undefined);
+});
 test("ordinary visits, existing orders and the other role never consume a draft", () => {
   const storage = store();
   drafts.saveHomePostingDraft(storage, draft(), now);
@@ -103,9 +113,10 @@ test("form renders real two-tab semantics, localized copy and no submission on r
   }
 });
 
-function formHarness({ storage = store() } = {}) {
+function formHarness({ storage = store(), catalog } = {}) {
   let cursor = 0;
   const values = [];
+  if (catalog) { values[12] = catalog; values[13] = "ready"; }
   const pushed = [];
   const react = { ...React,
     useState(initial) { const index = cursor++; if (!(index in values)) values[index] = typeof initial === "function" ? initial() : initial; return [values[index], value => { values[index] = typeof value === "function" ? value(values[index]) : value; }]; },
@@ -141,6 +152,24 @@ test("switching tabs preserves route, validates input and forwards draft without
   const restored = drafts.takeHomePostingDraft(fixture.storage, "tai-xe", "?from=home");
   assert.equal(restored.pickup.address, pickup.address);
   assert.equal(restored.price, "250000");
+});
+
+test("driver uses shared vehicle and cargo pickers and slider price survives continuation", () => {
+  const catalog = { vehicleTypes: ["xe tải thùng kín"], cargoTypes: ["đồ gia dụng / nội thất"], seatTypes: [], weightRanges: [], containerTypes: [], constructionVehicleTypes: [], weightVehicleTypes: ["xe tải thùng kín"] };
+  const fixture = formHarness({ catalog });
+  fixture.nodes().find(node => node.props?.role === "tab" && node.props.id.endsWith("tai-xe")).props.onClick(); fixture.render();
+  const locations = fixture.nodes().filter(node => node.type?.name === "LocationField");
+  locations[0].props.onChange(pickup); locations[1].props.onChange(dropoff);
+  fixture.nodes().find(node => node.type?.name === "VehicleCatalogField").props.onChange({ vehicleType: "xe tải", child: "1 - 5 tấn", weightLabel: "1 - 5 tấn" }); fixture.render();
+  fixture.nodes().find(node => node.type?.name === "CargoCatalogField").props.onChange(catalog.cargoTypes[0]);
+  const times = fixture.nodes().filter(node => node.type?.name === "PostingTimeField");
+  times[0].props.onChange(new Date(Date.now() + 3600000).toISOString()); times[1].props.onChange(new Date(Date.now() + 7200000).toISOString());
+  const slider = fixture.nodes().find(node => node.props?.type === "range");
+  assert.equal(slider.props.step, "50000"); slider.props.onChange({ target: { value: "850000" } }); fixture.render();
+  assert.equal(fixture.nodes().find(node => node.props?.type === "number").props.value, "850000");
+  fixture.nodes().find(node => node.type === "form").props.onSubmit({ preventDefault() {} });
+  const restored = drafts.takeHomePostingDraft(fixture.storage, "tai-xe", "?from=home");
+  assert.equal(restored.vehicleType, "xe tải"); assert.equal(restored.cargo, catalog.cargoTypes[0]); assert.equal(restored.price, "850000");
 });
 test("keyboard navigation selects tabs and storage failures leave the form recoverable", () => {
   const fixture = formHarness({ storage: { ...store(), setItem() { throw new Error("blocked"); } } });

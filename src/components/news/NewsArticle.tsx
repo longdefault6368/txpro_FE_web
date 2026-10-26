@@ -44,7 +44,7 @@ export default function NewsArticleView({ article: remote, editorialId, unavaila
       <figure className={styles.articleCover}><NewsCover key={article.imageUrl} source={article.imageUrl} alt={article.title} sizes="(max-width: 1200px) 100vw, 1152px" priority /></figure>
       <div className={styles.articleLayout}>
         <div className={styles.body}>
-          {!article.editorial && language !== "vi" && <p className={styles.notice}>{c("", "This article is displayed in its original language.", "本文以原文语言显示。")}</p>}
+          {(!article.editorial || article.originalLanguage === "vi") && language !== "vi" && <p className={styles.notice}>{c("", "This article is displayed in its original language.", "本文以原文语言显示。")}</p>}
           {article.readingGuide ? <EditorialBody guide={article.readingGuide} /> :
             blocks.map((block, index) => block.startsWith("## ") ? <h2 id={"phan-" + index} key={index}>{block.slice(3)}</h2> : <p key={index}>{block}</p>)}
           <div className={styles.articleActions}><Link href="/tin-tuc"><ArrowLeft size={17} />{c("Tất cả bài viết", "All articles", "全部文章")}</Link><Link href="/dang-tin">{c("Bắt đầu với TXE PRO", "Get started with TXE PRO", "开始使用 TXE PRO")}<ArrowUpRight size={17} /></Link></div>

@@ -241,6 +241,67 @@ function locationFixture() {
   return { render, changed, input: () => nodes(tree).find(node => node.props?.role === "combobox"),
     options: () => nodes(tree).filter(node => node.props?.role === "option") };
 }
+
+const bookingOrderId = "112345678901234567890124";
+const bookingMatch = (postId, price = 250000) => ({ postId, driverId: "driver-one", driverName: "Tài xế thử nghiệm", price,
+  status: "active", availableTo: new Date(Date.now() + 3600000).toISOString(), vehicle: { type: "xe tải thùng kín", plateNumber: postId } });
+async function bookingFixture() {
+  const calls = [], original = [bookingMatch("post-one"), bookingMatch("post-two")];
+  let matches = original, status = "searching_driver", failure = null;
+  const fixture = workspaceFixture("chu-hang", async (path, input) => {
+    calls.push({ path, input });
+    if (path === "/chu-hang/orders") return { orderId: bookingOrderId, status };
+    if (path.endsWith("/matches")) return matches;
+    if (path.endsWith("/select-driver")) {
+      if (failure) throw failure;
+      status = "waiting_driver_acceptance";
+      return { orderId: bookingOrderId, status, financialSummary: { shipperEscrow: { payableAmount: 7500 } } };
+    }
+    return { status };
+  });
+  fixture.form().props.onChange(initial()); fixture.render();
+  await fixture.form().props.onSubmit(event()); fixture.render();
+  await fixture.nodes().find(node => node.type === "button" && node.props.className === "secondaryButton").props.onClick();
+  // The button intentionally starts its async refresh without returning it.
+  await new Promise(resolve => setImmediate(resolve)); fixture.render();
+  fixture.nodes().filter(node => node.type === "button" && node.props.className === "matchButton")[1].props.onClick(); fixture.render();
+  const consent = () => { fixture.nodes().find(node => node.props?.type === "checkbox").props.onChange({ target: { checked: true } }); fixture.render(); };
+  const confirm = async () => { fixture.nodes().find(node => node.type === "button" && node.props.className === "primaryButton").props.onClick(); await new Promise(resolve => setImmediate(resolve)); fixture.render(); };
+  return { ...fixture, calls, original, consent, confirm, setMatches: value => { matches = value; }, setStatus: value => { status = value; }, setFailure: value => { failure = value; } };
+}
+
+test("booking rechecks both exact post and driver, and submits only the selected post", async () => {
+  const fixture = await bookingFixture(); fixture.consent(); await fixture.confirm();
+  const writes = fixture.calls.filter(call => call.path.endsWith("/select-driver"));
+  assert.equal(writes.length, 1);
+  assert.deepEqual(JSON.parse(writes[0].input.body), { postId: "post-two", driverId: "driver-one", offerPrice: 250000 });
+  assert.ok(fixture.nodes().some(node => React.Children.toArray(node.props?.children).some(child => typeof child === "string" && child.includes("Đã ký quỹ 7.500"))));
+});
+
+test("price changes require new consent; removed or paused posts cannot be booked", async () => {
+  const fixture = await bookingFixture(); fixture.consent();
+  fixture.setMatches([bookingMatch("post-two", 300000)]); await fixture.confirm();
+  assert.equal(fixture.calls.filter(call => call.path.endsWith("/select-driver")).length, 0);
+  assert.equal(fixture.nodes().find(node => node.props?.type === "checkbox").props.checked, false);
+  fixture.consent(); await fixture.confirm();
+  assert.equal(JSON.parse(fixture.calls.at(-1).input.body).offerPrice, 300000);
+  for (const replacement of [[], [{ ...bookingMatch("post-two"), status: "paused" }], [{ ...bookingMatch("post-two"), availableTo: new Date(0).toISOString() }], [{ ...bookingMatch("post-two"), driverId: "someone-else" }]]) {
+    const unavailable = await bookingFixture(); unavailable.consent(); unavailable.setMatches(replacement); await unavailable.confirm();
+    assert.equal(unavailable.calls.filter(call => call.path.endsWith("/select-driver")).length, 0);
+  }
+});
+
+test("QR success rechecks current order and offer instead of replaying the old selection", async () => {
+  const fixture = await bookingFixture(); fixture.consent();
+  fixture.setFailure(new PostingError("Nạp thêm", "SHIPPER_ESCROW_INSUFFICIENT_BALANCE", { missingAmount: 31415 }));
+  await fixture.confirm();
+  const funding = fixture.nodes().find(node => node.type?.name === "FundingPanel");
+  assert.equal(funding.props.missingAmount, 31415);
+  funding.props.onPaid(); fixture.render();
+  assert.equal(fixture.nodes().find(node => node.props?.type === "checkbox").props.checked, false);
+  fixture.setStatus("accepted"); fixture.consent(); await fixture.confirm();
+  assert.equal(fixture.calls.filter(call => call.path.endsWith("/select-driver")).length, 1);
+});
 test("address keyboard selection commits exact coordinates and never submits the parent form", () => {
   const fixture = locationFixture(); let prevented = 0;
   fixture.input().props.onKeyDown({ key: "ArrowDown", preventDefault() { prevented++; } }); fixture.render();

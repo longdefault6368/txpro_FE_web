@@ -8,6 +8,7 @@ async function loadTs(name) {
   return import("data:text/javascript;base64," + Buffer.from(js).toString("base64"));
 }
 const contract = await loadTs("posting-contract");
+const booking = await loadTs("shipper-booking");
 const { createPostingTransport, PostingError } = await loadTs("posting-transport");
 const options = { vehicleTypes: ["xe máy", "ô tô", "xe tải thùng kín", "container / xe đầu kéo", "xe cẩu tự hành"],
   cargoTypes: ["đồ gia dụng / nội thất"], weightRanges: ["dưới 1 tấn", "2 - 3.5 tấn"],
@@ -18,20 +19,29 @@ const vehicle = { id: "012345678901234567890123", type: "xe tải thùng kín", 
 const driver = overrides => contract.buildDriverPosting({ vehicle, pickup, dropoff, price: 1000000, radius: 30, min: 2, max: 5,
   from: new Date(Date.now() - 60000).toISOString(), to: new Date(Date.now() + 3600000).toISOString(), note: "", ...overrides }, options);
 
-test("shipper motorcycle contains no cargo or financial fields", () => {
+test("shipper motorcycle matches Flutter passenger service without freight or financial fields", () => {
   const payload = shipper({});
-  assert.equal(payload.cargoType, "");
+  assert.equal(payload.cargoType, "Hành khách");
   assert.equal(payload.weight, 0);
   assert.equal(payload.pickupTimeType, "now");
   for (const key of ["budget", "price", "walletHoldStatus", "voucherGrantId", "platformFeePercent"]) assert.equal(key in payload, false);
 });
 test("passenger car extracts seats and does not request freight fields", () => {
   const p = shipper({ vehicleType: "ô tô", child: "7 ghế", images: ["ignored"] });
-  assert.equal(p.seats, 7); assert.equal(p.cargoType, ""); assert.deepEqual(p.cargoImageUrls, []);
+  assert.equal(p.seats, 7); assert.equal(p.cargoType, "Hành khách"); assert.equal(p.vehicleTypeChild, null); assert.deepEqual(p.cargoImageUrls, []);
+});
+
+test("funding notices reflect the server receipt and never infer voucher use", () => {
+  const base = { orderId: "test", status: "waiting_driver_acceptance" };
+  assert.match(booking.bookingFundingNotice({ ...base, financialSummary: { shipperEscrow: { payableAmount: 0, waivedAmount: 30000, voucherGrantId: "grant" } } }), /voucher/);
+  assert.match(booking.bookingFundingNotice({ ...base, financialSummary: { shipperEscrow: { payableAmount: 30000 } } }), /30.000/);
+  assert.doesNotMatch(booking.bookingFundingNotice(base), /voucher|ký quỹ/);
+  assert.equal(booking.matchFare({ estimatedPrice: 0, price: 1000 }), 0);
+  for (const price of [-1, Infinity, NaN, 2.5, "250000"]) assert.equal(booking.matchFare({ price }), 0);
 });
 test("truck weight and cargo use selected catalog values", () => {
   const p = shipper({ vehicleType: vehicle.type, cargo: options.cargoTypes[0], weightLabel: "2 - 3.5 tấn" });
-  assert.equal(p.weight, 3.5); assert.equal(p.weightLabel, "2 - 3.5 tấn");
+  assert.equal(p.weight, 2); assert.equal(p.weightLabel, "2 - 3.5 tấn"); assert.equal(p.vehicleTypeChild, null);
   assert.throws(() => shipper({ vehicleType: vehicle.type, cargo: "", weightLabel: "2 - 3.5 tấn" }), /hàng hóa/);
 });
 test("containers do not ask for tonnage", () => {

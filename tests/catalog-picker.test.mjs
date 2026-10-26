@@ -93,7 +93,7 @@ test("car cards show seat counts without changing stored catalog values", () => 
   assert.equal(children[0].title, "4 chỗ");
   assert.equal(children[0].selection.child, "4 ghế");
   assert.equal(payload(children[1].selection).seats, 7);
-  assert.equal(payload(children[1].selection).cargoType, "");
+  assert.equal(payload(children[1].selection).cargoType, "Hành khách");
   assert.equal(catalog.validVehicleSelection({ vehicleType: "ô tô", child: "999 ghế", weightLabel: "" }, options), false);
 });
 test("cargo has matching illustrations and translations while retaining exact API identifiers", () => {

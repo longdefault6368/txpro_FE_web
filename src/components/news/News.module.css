@@ -8,6 +8,16 @@
 .allLink{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;font-size:14px;font-weight:600;color:var(--blue);padding-bottom:5px}
 .previewGrid{display:grid;grid-template-columns:1.1fr 1fr;gap:18px 26px}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:26px}
+.spotlight{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px}
+.spotlight>.featured{grid-row:span 2;box-shadow:0 12px 40px #0a315010}
+.spotlight>.featured .cover{aspect-ratio:16/10}
+.spotlight>.horizontal .cover{min-height:205px}
+.spotlight>.horizontal .cardBody{padding:22px}
+.spotlight>.horizontal h3{font-size:20px;-webkit-line-clamp:3}
+.spotlight>.horizontal p{display:-webkit-box;-webkit-line-clamp:2}
+.moreHeading{font-size:clamp(22px,3vw,28px);font-weight:700;line-height:1.35;margin:48px 0 24px;letter-spacing:-.025em}
+@media(max-width:900px){.spotlight{grid-template-columns:minmax(0,1fr)}.spotlight>.featured{grid-row:auto}.spotlight>.horizontal .cover{min-height:180px}}
+@media(max-width:520px){.spotlight{gap:18px}.spotlight>.horizontal{grid-template-columns:115px minmax(0,1fr)}.spotlight>.horizontal .cardBody{padding:15px}.spotlight>.horizontal h3{font-size:17px}.spotlight>.horizontal p{display:none}.spotlight>.horizontal .cover{min-height:165px}.moreHeading{margin-top:35px}}
 .card{display:flex;flex-direction:column;min-width:0;border:1px solid #e0e8f1;border-radius:19px;background:white;overflow:hidden;transition:transform .2s,border-color .2s,box-shadow .2s}
 .cover{position:relative;aspect-ratio:16/10;background:#eaf1f7;overflow:hidden}
 .cover img{object-fit:cover;width:100%;height:100%;transition:transform .35s ease}
@@ -44,7 +54,7 @@
 .empty h1,.empty h2{font-size:24px;line-height:1.4;font-weight:700;color:var(--navy);margin-bottom:10px}
 .empty a{display:inline-flex;align-items:center;gap:9px;color:var(--blue);font-weight:600;margin-top:20px}
 .pagination{display:flex;align-items:center;justify-content:center;gap:25px;margin-top:35px;font-size:14px}
-.pagination button{display:flex;align-items:center;gap:6px;border:1px solid #d8e3ed;padding:10px 15px;border-radius:10px;cursor:pointer}
+.pagination button,.pagination a{display:flex;align-items:center;gap:6px;border:1px solid #d8e3ed;padding:10px 15px;border-radius:10px;cursor:pointer}
 .pagination button:disabled{opacity:.4;cursor:default}
 .sourceNote{color:var(--muted);font-size:13px;border-top:1px solid #e1e8f0;padding-top:24px;margin-top:35px}
 .section{padding-top:36px;background:linear-gradient(180deg,#edf5ff,#fff 90%);border-top:1px solid #dce9f7;border-radius:24px}

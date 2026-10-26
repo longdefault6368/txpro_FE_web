@@ -22,7 +22,7 @@ export default function HomePostingForm() {
   const [pickup, setPickup] = useState<LocationValue | null>(null), [dropoff, setDropoff] = useState<LocationValue | null>(null);
   const [vehicleType, setVehicleType] = useState(""), [scheduled, setScheduled] = useState(false), [shipperTime, setShipperTime] = useState("");
   const [child, setChild] = useState(""), [weightLabel, setWeightLabel] = useState(""), [cargo, setCargo] = useState("");
-  const [driverFrom, setDriverFrom] = useState(""), [driverTo, setDriverTo] = useState(""), [price, setPrice] = useState("");
+  const [driverFrom, setDriverFrom] = useState(""), [driverTo, setDriverTo] = useState(""), [price, setPrice] = useState("250000");
   const [options, setOptions] = useState<PostingOptions | null>(null), [catalogState, setCatalogState] = useState<"loading" | "ready" | "error">("loading");
   const [retry, setRetry] = useState(0), [error, setError] = useState(""), [saving, setSaving] = useState(false);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]), submitting = useRef(false);
@@ -53,8 +53,11 @@ export default function HomePostingForm() {
     if (!validLocation(pickup) || !validLocation(dropoff)) {
       setError(c("Chọn đủ hai địa điểm từ gợi ý hoặc vị trí hiện tại để có tọa độ chính xác.", "Select both locations from suggestions or current location to include coordinates.", "请从建议或当前位置选择两端地点，以获取坐标。")); return;
     }
-    if (!driver && options && !validVehicleSelection({ vehicleType, child, weightLabel }, options)) {
+    if (options && !validVehicleSelection({ vehicleType, child, weightLabel }, options)) {
       setError(c("Vui lòng chọn loại phương tiện.", "Please choose a vehicle type.", "请选择车型。")); return;
+    }
+    if (options && caps.cargo && !options.cargoTypes.includes(cargo)) {
+      setError(c("Vui lòng chọn loại hàng hóa.", "Please choose a cargo type.", "请选择货物类型。")); return;
     }
     const from = driver ? driverFrom : scheduled ? shipperTime : "";
     if ((driver || scheduled) && (!from || Date.parse(from) <= Date.now() || !Number.isFinite(Date.parse(from)))) {
@@ -66,8 +69,7 @@ export default function HomePostingForm() {
     try {
       submitting.current = true; setSaving(true);
       const path = saveHomePostingDraft(sessionStorage, {
-        role, pickup, dropoff, vehicleType: driver ? "" : vehicleType, scheduled,
-        ...(!driver ? { child, weightLabel, cargo } : {}),
+        role, pickup, dropoff, vehicleType, scheduled, child, weightLabel, cargo: caps.cargo ? cargo : "",
         from, to: driver ? driverTo : "", price: driver ? price : "",
       });
       router.push(path);
@@ -94,15 +96,20 @@ export default function HomePostingForm() {
         <form onSubmit={submit}>
           <fieldset disabled={saving}>
             <div className={s.grid}><LocationField label={c("Vị trí nhận", "Pickup", "起点")} value={pickup} onChange={setPickup} /><LocationField label={c("Vị trí trả", "Destination", "终点")} value={dropoff} onChange={setDropoff} /></div>
-            {!driver && <div className={s.grid}>
+            <div className={s.grid}>
               <VehicleCatalogField options={options} disabled={catalogState !== "ready"} value={{ vehicleType, child, weightLabel }}
                 onChange={value => { if (value.vehicleType !== vehicleType) setCargo(""); setVehicleType(value.vehicleType); setChild(value.child); setWeightLabel(value.weightLabel); }} />
-              <PostingTimeField label={c("Thời gian", "When", "时间")} value={scheduled ? shipperTime : ""} allowNow requireFuture
-                onChange={value => { setShipperTime(value); setScheduled(Boolean(value)); }} />
+              {!driver && <PostingTimeField label={c("Thời gian", "When", "时间")} value={scheduled ? shipperTime : ""} allowNow requireFuture
+                onChange={value => { setShipperTime(value); setScheduled(Boolean(value)); }} />}
               {options && caps.cargo && <CargoCatalogField options={options} value={cargo} onChange={setCargo} />}
-            </div>}
-            {!driver && catalogState === "error" && <p className={s.catalogNotice} role="status">{c("Chưa tải được loại xe. Bạn có thể chọn tại form đầy đủ.", "Vehicle types are unavailable. Choose in the full form.", "暂时无法加载车型，可在完整表单中选择。")}<button type="button" onClick={() => setRetry(value => value + 1)}>{c("Thử lại", "Retry", "重试")}</button></p>}
-            {driver && <><div className={s.grid}><PostingTimeField label={c("Có xe từ", "Available from", "开始时间")} value={driverFrom} requireFuture onChange={setDriverFrom} /><PostingTimeField label={c("Đến", "Until", "结束时间")} value={driverTo} min={driverFrom} requireFuture onChange={setDriverTo} /></div><label>{c("Giá chuyến đi (đ)", "Trip price (VND)", "行程报价（越南盾）")}<input type="number" min="1" max="999999999999" step="1" required value={price} onChange={event => setPrice(event.target.value)} placeholder={c("Nhập giá dự kiến của bạn", "Enter your proposed price", "输入您的报价")} /></label></>}
+            </div>
+            {catalogState === "error" && <p className={s.catalogNotice} role="status">{c("Chưa tải được loại xe. Bạn có thể chọn tại form đầy đủ.", "Vehicle types are unavailable. Choose in the full form.", "暂时无法加载车型，可在完整表单中选择。")}<button type="button" onClick={() => setRetry(value => value + 1)}>{c("Thử lại", "Retry", "重试")}</button></p>}
+            {driver && <><div className={s.grid}><PostingTimeField label={c("Có xe từ", "Available from", "开始时间")} value={driverFrom} requireFuture onChange={setDriverFrom} /><PostingTimeField label={c("Đến", "Until", "结束时间")} value={driverTo} min={driverFrom} requireFuture onChange={setDriverTo} /></div>
+              <div className={s.priceCard}><div className={s.priceHeading}><label htmlFor="quick-trip-price">{c("Giá chuyến đi", "Trip price", "行程报价")}</label><output htmlFor="quick-trip-price" aria-live="polite">{(Number(price) || 0).toLocaleString(language === "en" ? "en-US" : language === "zh" ? "zh-CN" : "vi-VN")} ₫</output></div>
+                <input id="quick-trip-price" aria-label={c("Kéo chọn giá chuyến đi", "Adjust trip price", "调整行程报价")} type="range" min="50000" max="20000000" step="50000" value={Math.min(20000000, Math.max(50000, Number(price) || 50000))} onChange={event => setPrice(event.target.value)} />
+                <div className={s.priceLimits}><span>50.000 ₫</span><span>20.000.000 ₫</span></div>
+                <label className={s.exactPrice}>{c("Hoặc nhập giá chính xác (đ)", "Or enter an exact price (VND)", "或输入准确报价（越南盾）")}<input type="number" min="1" max="999999999999" step="1" required value={price} onChange={event => setPrice(event.target.value)} /></label>
+              </div></>}
           </fieldset>
           {error && <div className={s.error} role="alert">{error}</div>}
           <div className={s.actions}><button type="submit" className={s.submit} disabled={saving}>{saving ? <Loader2 className={s.spin} size={18} /> : <ArrowRight size={18} />}{driver ? c("Tiếp tục đăng xe trống", "Continue to vehicle listing", "继续发布空车") : c("Tiếp tục tìm xe", "Continue to find a vehicle", "继续找车")}</button><Link href={driver ? "/tai-xe/dang-tin" : "/chu-hang/form-tao-don"}>{c("Mở form đầy đủ", "Open full form", "打开完整表单")}</Link></div>

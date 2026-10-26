@@ -86,10 +86,6 @@
 .screenAction>svg{flex-shrink:0;transition:transform .2s ease}
 @media(hover:hover) and (pointer:fine){.screenAction:hover>svg{transform:translate(2px,-2px)}}
 .screenFoot { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 14px; font-size: 11px; color: #526c62; }
-.caption { position: absolute; bottom: 0; left: 0; right: 0; display:flex;align-items:center;flex-direction:column;gap:8px;text-align: center; font-size: 11px; line-height: 1.6; color: #c0d5ed; padding: 0 10px; }
-.motionToggle{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;padding:5px 10px;border:1px solid #8cb7df3d;border-radius:20px;background:#ffffff07;font-size:10px;color:#cce0f3;cursor:pointer}
-.motionToggle:hover{background:#ffffff12;border-color:#8cb7df70}
-.motionToggle:focus-visible{outline:2px solid #a5e8dc;outline-offset:4px}
 .showcase{animation:showcaseArrival .85s cubic-bezier(.2,.7,.2,1) both}
 @keyframes showcaseArrival{from{opacity:.3;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
 @media (max-width: 1100px) and (min-width: 761px) {
@@ -109,11 +105,9 @@
   .screen { padding-inline: 12px; }
   .photo { --photo-tilt:-9deg;width: 72%; height: 245px; top: 75px; left: -5px; }
   .photoLabel { display: none; }
-  .caption { bottom: 0; font-size: 10px; padding-inline: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .showcase,.showcase .photo,.showcase .orbitGlow,.showcase .orbitTrack { animation: none; }
   .screenAction,.screenAction>svg { transition: none; }
-  .motionToggle{display:none}
 }
-@media(forced-colors:active){.orbit{display:none}.motionToggle{border-color:ButtonText;color:ButtonText;background:ButtonFace}}
+@media(forced-colors:active){.orbit{display:none}}

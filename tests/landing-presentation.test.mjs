@@ -59,15 +59,16 @@ test("landing hero retains translated actions and illustration accessibility wit
   }
 });
 
-test("role panels use distinct images and retain role-specific posting destinations", () => {
-  const shipper = renderLanding("vi", "shipper");
-  const driver = renderLanding("vi", "driver");
-  assert.ok(shipper.includes('src="/images/home/shipper-cargo.png"'));
-  assert.ok(!driver.includes('src="/images/home/shipper-cargo.png"'));
-  assert.match(shipper, /aria-pressed="true"[^>]*><svg[^]*?Dành cho chủ hàng/);
-  assert.match(driver, /aria-pressed="true"[^>]*><svg[^]*?Dành cho tài xế/);
-  assert.match(shipper, /href="\/chu-hang\/form-tao-don">Bắt đầu với TXE PRO/);
-  assert.match(driver, /href="\/tai-xe\/dang-tin">Bắt đầu với TXE PRO/);
+test("removed role section stays absent while posting actions and the guide anchor remain", () => {
+  for (const language of ["vi", "en", "zh"]) {
+    const html = renderLanding(language);
+    assert.doesNotMatch(html, /Hai vai trò|Một kết nối tốt hơn|Two roles|One better connection|两种角色|更好的连接/);
+    assert.ok(!html.includes('class="roleTabs"'));
+    assert.ok(html.includes('href="/chu-hang/form-tao-don"'));
+    assert.ok(html.includes('href="/tai-xe/dang-tin"'));
+    assert.ok(html.includes('id="for-you"'));
+    assert.ok(html.includes('id="reviews"'));
+  }
 });
 
 test("every local image rendered by the landing exists", () => {

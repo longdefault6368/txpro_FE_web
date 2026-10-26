@@ -1,4 +1,6 @@
 import { getEditorialDetails } from "./news-editorial-details";
+import { vietnameseNews } from "./news-editorial-vi";
+import { extraEditorials } from "./news-extra-editorials";
 
 export type NewsReadingGuide = {
   intro: string; takeaways: string[]; conclusion: string;
@@ -13,6 +15,7 @@ export type NewsArticle = {
   id: string; title: string; summary: string; content: string;
   category: NewsCategory; imageUrl: string; publishedAt: string | null;
   editorial?: boolean;
+  originalLanguage?: string;
   readingGuide?: NewsReadingGuide;
 };
 type Text = { vi: string; en: string; zh: string };
@@ -25,7 +28,7 @@ type Editorial = {
 // Original evergreen guides: no invented dates, promotions, statistics or testimonials.
 const editorials: Editorial[] = [
   {
-    id: "chon-xe-phu-hop", category: "guide", imageUrl: "/images/home/shipper-cargo.png",
+    id: "chon-xe-phu-hop", category: "guide", imageUrl: "/images/news/chon-xe-phu-hop.webp",
     title: t("Chọn đúng xe, bắt đầu một hành trình thuận tiện", "Choose the right vehicle for your next journey", "选对车辆，轻松开始下一段旅程"),
     summary: t("Chuẩn bị thông tin về hành trình, hàng hóa và thời gian trước khi tìm xe trên TXE PRO.", "Prepare your route, cargo details and timing before finding a vehicle on TXE PRO.", "找车前，先准备好路线、货物信息和出发时间。"),
     sections: [
@@ -44,7 +47,7 @@ const editorials: Editorial[] = [
     ],
   },
   {
-    id: "dang-xe-trong-hieu-qua", category: "guide", imageUrl: "/splash1.png",
+    id: "dang-xe-trong-hieu-qua", category: "guide", imageUrl: "/images/news/dang-xe-trong.webp",
     title: t("Một tin xe trống rõ ràng cần những thông tin gì?", "What makes a clear vehicle-availability listing?", "一条清晰的空车信息需要什么？"),
     summary: t("Tuyến đường, thời gian và thông tin xe đầy đủ giúp chủ hàng dễ cân nhắc lựa chọn.", "A clear route, availability and vehicle details help shippers make an informed choice.", "完整的路线、时间和车辆资料，有助于货主做出选择。"),
     sections: [
@@ -63,7 +66,7 @@ const editorials: Editorial[] = [
     ],
   },
   {
-    id: "chuan-bi-do-noi-that", category: "guide", imageUrl: "/images/news/furniture.png",
+    id: "chuan-bi-do-noi-that", category: "guide", imageUrl: "/images/news/chuyen-do-noi-that.webp",
     title: t("Chuẩn bị đồ nội thất trước ngày vận chuyển", "Prepare furniture before moving day", "搬运前如何准备家具"),
     summary: t("Một danh sách đơn giản để kiểm kê, đóng gói và trao đổi việc giao nhận rõ ràng hơn.", "A practical checklist for inventory, packing and clear handover arrangements.", "用一份清单，理清物品、包装和交接安排。"),
     sections: [
@@ -82,7 +85,7 @@ const editorials: Editorial[] = [
     ],
   },
   {
-    id: "san-sang-truoc-chuyen-di", category: "community", imageUrl: "/images/news/vehicle-check.png",
+    id: "san-sang-truoc-chuyen-di", category: "community", imageUrl: "/images/news/chuan-bi-hanh-trinh.webp",
     title: t("Dành ít phút chuẩn bị trước mỗi chuyến đi", "Take time to prepare before every trip", "每次出发前，留一点准备时间"),
     summary: t("Kiểm tra lịch trình, thông tin liên hệ và tình trạng phương tiện trước khi khởi hành.", "Review your plan, contact details and vehicle readiness before setting off.", "出发前，检查行程、联系信息与车辆状态。"),
     sections: [
@@ -104,9 +107,10 @@ const editorials: Editorial[] = [
 
 export function getEditorialArticles(language = "vi"): NewsArticle[] {
   const lang = language === "en" || language === "zh" ? language : "vi";
-  return editorials.map(item => {
+  return editorials.map<NewsArticle>(item => {
+    const rewritten = lang === 'vi' ? vietnameseNews[item.id] : undefined;
     const extra = getEditorialDetails(item.id, lang);
-    const sections = item.sections.map((section, index) => {
+    const baseSections = item.sections.map((section, index) => {
       const addition = extra?.additions[index];
       return {
         heading: section.heading[lang],
@@ -115,21 +119,22 @@ export function getEditorialArticles(language = "vi"): NewsArticle[] {
         example: addition?.example, note: addition?.note,
       };
     });
-    const readingGuide = extra ? { intro: extra.intro, takeaways: extra.takeaways, conclusion: extra.conclusion, sections } : undefined;
+    const readingGuide = rewritten?.guide || (extra ? { intro: extra.intro, takeaways: extra.takeaways, conclusion: extra.conclusion, sections: baseSections } : undefined);
+    const sections = readingGuide?.sections || baseSections;
     const content = [
-      extra?.intro, ...(extra?.takeaways || []),
+      readingGuide?.intro, ...(readingGuide?.takeaways || []),
       ...sections.flatMap(section => [
         "## " + section.heading, ...section.paragraphs, ...(section.checklist || []),
         section.example, section.note,
       ]),
-      extra?.conclusion,
+      readingGuide?.conclusion,
     ].filter(Boolean).join("\n\n");
     return {
       id: item.id, category: item.category, imageUrl: item.imageUrl, editorial: true,
-      title: item.title[lang], summary: item.summary[lang], publishedAt: null,
+      title: rewritten?.title || item.title[lang], summary: rewritten?.summary || item.summary[lang], publishedAt: null,
       content, readingGuide,
     };
-  });
+  }).concat(extraEditorials);
 }
 
 /** Convert CMS markup into inert text, never inject stored HTML into the page. */
