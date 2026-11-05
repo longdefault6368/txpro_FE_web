@@ -59,7 +59,7 @@ export function validLocation(value: LocationValue | null): value is LocationVal
     && Math.abs(value.lat) <= 90 && Math.abs(value.lng) <= 180);
 }
 export function safePostingReturn(value: string | null) {
-  return value && ["/chu-hang/form-tao-don", "/tai-xe/dang-tin", "/tai-xe/phuong-tien", "/user/ekyc", "/dang-tin", "/don-cua-ban", "/tracking"].includes(value.split("?")[0])
+  return value && ["/chu-hang/form-tao-don", "/tai-xe/dang-tin", "/tai-xe/phuong-tien", "/user/ekyc", "/dang-tin", "/don-cua-ban", "/tracking", "/doi-tac"].includes(value.split("?")[0])
     && value.startsWith("/") && !value.startsWith("//") ? value : null;
 }
 export function buildShipperPosting(input: { pickup: LocationValue | null; dropoff: LocationValue | null; vehicleType: string; child: string; weightLabel: string; cargo: string; time: string; notes: string; images: string[] }, options: PostingOptions) {

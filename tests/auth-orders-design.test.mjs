@@ -54,10 +54,28 @@ test("OTP states have numeric keyboards, one-time-code autofill and disabled pen
  assert.ok(login.includes('autoComplete="one-time-code"'));
  assert.ok(login.includes('inputMode="numeric"'));
  assert.ok(login.includes("Đang xác minh"));
- const register = render("src/app/register/page.tsx", { 6: "otp", 8: 35 });
+ const register = render("src/app/register/page.tsx", { 7: "otp", 9: 35 });
  assert.ok(register.includes('autoComplete="one-time-code"'));
  assert.ok(register.includes("35"));
  assert.ok(register.includes("Hoàn tất đăng ký"));
+});
+
+test('affiliate sign-in and signup have dedicated routes, copy and navigation without vehicle role selection', () => {
+ const login = render('src/app/doi-tac/dang-nhap/page.tsx');
+ const signup = render('src/app/doi-tac/dang-ky/page.tsx');
+ for (const html of [login, signup]) {
+  assert.ok(html.includes('TXE PRO AFFILIATE'));
+  assert.ok(html.includes('href="/doi-tac/dang-nhap"'));
+  assert.ok(html.includes('href="/doi-tac/dang-ky"'));
+  assert.ok(!html.includes('href="/register"'));
+  assert.ok(!html.includes('role="group"'));
+  assert.ok(!html.includes('Một tài khoản.'));
+ }
+ assert.ok(login.includes('Đăng nhập đối tác'));
+ assert.ok(login.includes('autoComplete="current-password"'));
+ assert.ok(signup.includes('Đăng ký đối tác TXE PRO'));
+ assert.ok(signup.includes('autoComplete="new-password"'));
+ assert.ok(!signup.includes('id="referralCode"'));
 });
 test("orders shows account sign-in, loading and real cards without invented prices or invalid dates", () => {
  const path = "src/components/posting/OrdersWorkspace.tsx";

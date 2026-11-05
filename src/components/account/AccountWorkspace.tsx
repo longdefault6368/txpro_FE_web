@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, ArrowRight, BadgeCheck, Camera, CircleHelp, Copy, FileCheck2, Globe, Loader2, LockKeyhole, LogOut, Mail, Phone, RefreshCw, ShieldCheck, Ticket, Truck, UserRound, Wallet } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, Camera, CircleHelp, FileCheck2, Globe, Loader2, LockKeyhole, LogOut, Mail, Phone, RefreshCw, ShieldCheck, Ticket, Truck, UserRound, Wallet } from "lucide-react";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
 import RoleSwitchButton from "./RoleSwitchButton";
@@ -108,10 +108,6 @@ export default function AccountWorkspace() {
   } catch (e) { if (alive.current) setVoucherError(e instanceof Error ? e.message : "Chưa tải được voucher."); }
   finally { lock.current = false; if (alive.current) setVoucherBusy(false); }
  }
- async function copyReferral() {
-  try { await navigator.clipboard.writeText(profile?.referralCode || ""); setMessage("Đã sao chép mã giới thiệu."); }
-  catch { setMessage("Bạn có thể chọn và sao chép mã giới thiệu trực tiếp."); }
- }
  async function logout() {
   if (lock.current) return; lock.current = true; setBusy(true);
   const session = localStorage.getItem("txpro_user_session");
@@ -148,8 +144,8 @@ export default function AccountWorkspace() {
     <InfoRow icon={<Mail size={19} />} title="Email" value={profile.email} verified={profile.isEmailVerified === true}><button className={s.textButton} disabled={busy} onClick={() => setAction("email")}>{!profile.email ? "Bổ sung" : profile.isEmailVerified ? "Thay đổi" : "Xác minh"}</button></InfoRow>
     <InfoRow icon={<Globe size={19} />} title="Ngôn ngữ" value={profile.language === "en" ? "English" : profile.language === "zh" ? "中文" : "Tiếng Việt"}><select aria-label="Ngôn ngữ tài khoản" disabled={busy} value={profile.language || language} onChange={event => void saveLanguage(event.target.value as "vi" | "en" | "zh")}><option value="vi">Tiếng Việt</option><option value="en">English</option><option value="zh">中文</option></select></InfoRow>
    </section>
-   {!admin && <section className={s.card}><div className={s.heading}><div><h2>Xác minh danh tính</h2><p>Hồ sơ xác minh dùng chung với ứng dụng.</p></div><ShieldCheck size={23} /></div><div className={s.verification}><div><span className={s.rowIcon}><FileCheck2 size={22} /></span><div><strong>{accountKycLabel(profile.kycStatus)}</strong><p>Giấy tờ và kết quả xét duyệt được cập nhật từ hệ thống.</p></div></div><Link className={s.secondary} href="/user/ekyc">{profile.kycStatus === "verified" ? "Xem hồ sơ" : "Hoàn thiện hồ sơ"}<ArrowRight size={16} /></Link></div></section>}
-   <section className={s.card}><div className={s.details}><div><span>Ngày tham gia</span><strong>{accountDate(profile.createdAt)}</strong></div>{profile.referralCode && <div><span>Mã giới thiệu</span><strong>{profile.referralCode}<button type="button" aria-label="Sao chép mã giới thiệu" onClick={() => void copyReferral()}><Copy size={15} /></button></strong></div>}</div></section>
+   {!admin && <section className={s.card}><div className={s.heading}><div><h2>Xác minh danh tính</h2><p>{driver ? 'Tài xế xác minh danh tính trên ứng dụng TXE PRO.' : 'Hồ sơ xác minh dùng chung với ứng dụng.'}</p></div><ShieldCheck size={23} /></div><div className={s.verification}><div><span className={s.rowIcon}><FileCheck2 size={22} /></span><div><strong>{accountKycLabel(profile.kycStatus)}</strong><p>Giấy tờ và kết quả xét duyệt được cập nhật từ hệ thống.</p></div></div><Link className={s.secondary} href="/user/ekyc">{profile.kycStatus === "verified" ? "Xem trạng thái" : driver ? "Hướng dẫn xác minh trên app" : "Hoàn thiện hồ sơ"}<ArrowRight size={16} /></Link></div></section>}
+   <section className={s.card}><div className={s.details}><div><span>Ngày tham gia</span><strong>{accountDate(profile.createdAt)}</strong></div><div><span>Chương trình đối tác</span><Link href="/doi-tac" className={s.secondary}>Trở thành đối tác / Quản lý đối tác<ArrowRight size={16} /></Link></div></div></section>
   </>}
   {tab === "benefits" && !admin && <>
    <section className={s.card}><div className={s.heading}><div><h2>Ví TXE PRO</h2><p>Số dư và các khoản bảo đảm của tài khoản.</p></div><button className={s.textButton} disabled={voucherBusy} onClick={() => setFinanceRetry(value => value + 1)}><RefreshCw size={16} />Cập nhật</button></div>

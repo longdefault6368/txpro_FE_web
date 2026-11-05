@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Mail, Phone, ShieldCheck, User, ArrowRight, KeyRound, AlertCircle, Package, Truck, LoaderCircle } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
+import { useAffiliateAuth } from '@/components/auth/AuthAudienceContext';
 import AuthField from "@/components/auth/AuthField";
 import s from "@/components/auth/Auth.module.css";
 import { API_BASE } from "@/utils/api";
 import { createRegistrationClient, commitRegistrationSession } from '@/utils/web-registration';
 import { safePostingReturn } from '@/utils/posting-contract';
+import { validReferralCode, readReferralCode, clearReferralCode } from '@/utils/affiliate';
 const registrationRequest = createRegistrationClient(API_BASE);
 
 interface ValidationErrors {
@@ -21,18 +23,26 @@ interface ValidationErrors {
 }
 
 export default function RegisterPage() {
+  const affiliate = useAffiliateAuth();
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("chu-hang");
+  const [referralCode, setReferralCode] = useState('');
   const [returnPath, setReturnPath] = useState<string | null>(null);
   useEffect(() => {
-    const next = safePostingReturn(new URLSearchParams(window.location.search).get('next'));
-    setReturnPath(next);
-    if (next?.startsWith('/tai-xe/') || next?.startsWith('/user/ekyc')) setRole('tai-xe');
-  }, []);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      const next = safePostingReturn(new URLSearchParams(window.location.search).get('next'));
+      setReturnPath(next);
+      if (!affiliate && (next?.startsWith('/tai-xe/') || next?.startsWith('/user/ekyc'))) setRole('tai-xe');
+      try { setReferralCode(validReferralCode(new URLSearchParams(window.location.search).get('ref')) || readReferralCode(localStorage)); } catch { /* Optional referral storage. */ }
+    });
+    return () => { active = false; };
+  }, [affiliate]);
   
   // OTP flow state
   const [step, setStep] = useState<"form" | "otp">("form");
@@ -70,7 +80,7 @@ export default function RegisterPage() {
     if (requestLock.current || !validateForm()) return;
     requestLock.current = true; setLoading(true); setGeneralError(null);
     try {
-      await registrationRequest("/auth/register-otp", { name: fullName.trim(), phone: phone.trim().replace(/\s+/g, ""), email: email.trim() || undefined, password, role });
+      await registrationRequest("/auth/register-otp", { name: fullName.trim(), phone: phone.trim().replace(/\s+/g, ""), email: email.trim() || undefined, password, role: affiliate ? 'chu-hang' : role, referralCode: affiliate ? undefined : referralCode.trim() || undefined });
       setStep("otp"); setOtpTimer(60);
     } catch (error) { setGeneralError(error instanceof Error ? error.message : "Không gửi được OTP đăng ký."); }
     finally { requestLock.current = false; setLoading(false); }
@@ -86,9 +96,10 @@ export default function RegisterPage() {
       if (!deviceId) { deviceId = crypto.randomUUID(); localStorage.setItem("txpro_device_id", deviceId); }
       const data = await registrationRequest<Parameters<typeof commitRegistrationSession>[1]>("/auth/verify-otp", { phone: phone.trim().replace(/\s+/g, ""), otp: otp.trim(), deviceId });
       const destination = commitRegistrationSession(localStorage, data, expectedSession);
+      clearReferralCode(localStorage);
       setSuccess(true); window.dispatchEvent(new Event("txpro_session_updated"));
       const next = safePostingReturn(new URLSearchParams(window.location.search).get("next"));
-      router.replace(next || destination);
+      router.replace(affiliate ? '/doi-tac' : next || destination);
     } catch (error) { setGeneralError(error instanceof Error ? error.message : "Chưa xác thực được tài khoản."); }
     finally { requestLock.current = false; setLoading(false); }
   };
@@ -101,8 +112,8 @@ export default function RegisterPage() {
     } catch (error) { setGeneralError(error instanceof Error ? error.message : "Không gửi lại được mã OTP."); }
     finally { requestLock.current = false; setLoading(false); }
   };
-  return <AuthShell mode="register" title={success ? "Tài khoản đã sẵn sàng" : step === "otp" ? "Xác minh số điện thoại" : "Bắt đầu cùng TXE PRO"}
-    description={success ? "Bạn có thể tiếp tục thiết lập và sử dụng tài khoản." : step === "otp" ? "Chỉ còn một bước để hoàn tất đăng ký." : "Tạo tài khoản để tìm xe hoặc đăng lịch xe trống."} next={returnPath}>
+  return <AuthShell mode="register" title={success ? "Tài khoản đã sẵn sàng" : step === "otp" ? "Xác minh số điện thoại" : affiliate ? 'Đăng ký đối tác TXE PRO' : "Bắt đầu cùng TXE PRO"}
+    description={success ? "Bạn có thể tiếp tục thiết lập và sử dụng tài khoản." : step === "otp" ? "Chỉ còn một bước để hoàn tất đăng ký." : affiliate ? 'Tạo tài khoản để tham gia chương trình giới thiệu. Nếu đã có tài khoản TXE PRO, hãy chọn Đăng nhập đối tác.' : "Tạo tài khoản để tìm xe hoặc đăng lịch xe trống."} next={returnPath}>
     {!success && <div className={s.steps} aria-label="Tiến trình đăng ký"><span data-active={step === "form"}>01 · Thông tin tài khoản</span><span data-active={step === "otp"}>02 · Xác minh OTP</span></div>}
     {generalError && <div className={s.error} role="alert"><AlertCircle size={18} /><p>{generalError}</p></div>}
     {success ? <div className={s.success} role="status"><ShieldCheck /><p>Đang chuyển đến bước tiếp theo…</p></div> : step === "form" ?
@@ -110,11 +121,12 @@ export default function RegisterPage() {
         <AuthField id="fullName" name="name" label="Họ và tên" icon={<User />} value={fullName} onChange={event => { setFullName(event.target.value); if (errors.fullName) setErrors({ ...errors, fullName: undefined }); }} autoComplete="name" placeholder="Nhập họ và tên" error={errors.fullName} required />
         <AuthField id="phone" name="tel" label="Số điện thoại" icon={<Phone />} type="tel" inputMode="tel" value={phone} onChange={event => { setPhone(event.target.value); if (errors.phone) setErrors({ ...errors, phone: undefined }); }} autoComplete="tel" placeholder="Nhập số điện thoại của bạn" error={errors.phone} required />
         <AuthField id="email" name="email" label="Email (không bắt buộc)" icon={<Mail />} type="email" value={email} onChange={event => { setEmail(event.target.value); if (errors.email) setErrors({ ...errors, email: undefined }); }} autoComplete="email" placeholder="Nhập địa chỉ email" error={errors.email} />
+        {!affiliate && <AuthField id='referralCode' label='Mã giới thiệu (không bắt buộc)' icon={<User />} value={referralCode} onChange={event => setReferralCode(event.target.value.toUpperCase())} maxLength={50} placeholder='Nhập mã đối tác giới thiệu' />}
         <AuthField id="password" name="new-password" label="Mật khẩu" icon={<Lock />} type="password" value={password} onChange={event => { setPassword(event.target.value); if (errors.password) setErrors({ ...errors, password: undefined }); }} autoComplete="new-password" placeholder="Tạo mật khẩu" hint="Sử dụng ít nhất 6 ký tự." error={errors.password} required />
-        <div><span className={s.roleLabel} id="role-label">Bạn muốn bắt đầu với vai trò nào?</span><div className={s.roles} role="group" aria-labelledby="role-label">
+        {!affiliate && <div><span className={s.roleLabel} id="role-label">Bạn muốn bắt đầu với vai trò nào?</span><div className={s.roles} role="group" aria-labelledby="role-label">
           <button type="button" aria-pressed={role === "chu-hang"} onClick={() => setRole("chu-hang")}><Package size={19} />Chủ hàng</button>
           <button type="button" aria-pressed={role === "tai-xe"} onClick={() => setRole("tai-xe")}><Truck size={19} />Tài xế</button>
-        </div></div>
+        </div></div>}
         <button type="submit" className={s.primary} disabled={loading}>{loading ? <><LoaderCircle size={18} className={s.spinner} />Đang gửi mã…</> : <>Tiếp tục xác minh<ArrowRight size={18} /></>}</button>
       </fieldset></form> :
       <><div className={s.notice}><Phone size={18} /><p>Nhập mã OTP đã gửi đến <strong>{phone}</strong> để xác minh tài khoản.</p></div>
@@ -125,6 +137,6 @@ export default function RegisterPage() {
         <div className={s.actions}><button type="button" className={s.secondary} onClick={() => setStep("form")}><ArrowLeft size={16} />Quay lại</button>
           <button type="submit" className={s.primary} disabled={loading}>{loading ? <><LoaderCircle size={18} className={s.spinner} />Đang xác minh…</> : <>Hoàn tất đăng ký<ArrowRight size={18} /></>}</button></div>
       </fieldset></form></>}
-    {!success && <p className={s.bottom}>Đã có tài khoản? <Link href={returnPath ? "/login?next=" + encodeURIComponent(returnPath) : "/login"}>Đăng nhập</Link></p>}
+    {!success && <p className={s.bottom}>Đã có tài khoản? <Link href={affiliate ? '/doi-tac/dang-nhap' : returnPath ? "/login?next=" + encodeURIComponent(returnPath) : "/login"}>Đăng nhập</Link></p>}
   </AuthShell>;
 }

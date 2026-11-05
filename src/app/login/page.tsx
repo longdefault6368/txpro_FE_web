@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, ShieldCheck, ArrowRight, AlertCircle, Smartphone, KeyRound, Check, LoaderCircle } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
+import { useAffiliateAuth } from '@/components/auth/AuthAudienceContext';
 import AuthField from "@/components/auth/AuthField";
 import s from "@/components/auth/Auth.module.css";
 import { API_BASE } from "@/utils/api";
@@ -30,9 +31,10 @@ const maskPhone = (phone: string | null) => {
 };
 
 export default function LoginPage() {
+  const affiliate = useAffiliateAuth();
   const router = useRouter();
   const [returnPath, setReturnPath] = useState<string | null>(null);
-  useEffect(() => { setReturnPath(safePostingReturn(new URLSearchParams(window.location.search).get('next'))); }, []);
+  useEffect(() => { let active = true; void Promise.resolve().then(() => { if (active) setReturnPath(safePostingReturn(new URLSearchParams(window.location.search).get('next'))); }); return () => { active = false; }; }, []);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -114,7 +116,7 @@ export default function LoginPage() {
         }));
         setSuccess(true);
         const next = safePostingReturn(new URLSearchParams(window.location.search).get("next"));
-        const targetRoute = userRole === "admin" ? "/admin" : next || "/user";
+        const targetRoute = userRole === "admin" ? "/admin" : affiliate ? '/doi-tac' : next || "/user";
         window.dispatchEvent(new Event("txpro_session_updated"));
         setTimeout(() => router.push(targetRoute), 1200);
       } else {
@@ -126,7 +128,7 @@ export default function LoginPage() {
           setError(data.message || "Tài khoản hoặc mật khẩu không chính xác");
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Login connection error:", err);
       setError("Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại đường truyền hoặc khởi động Backend!");
     } finally {
@@ -171,15 +173,15 @@ export default function LoginPage() {
       } else {
         setError(data.message || "Mã xác nhận OTP không chính xác hoặc đã hết hạn");
       }
-    } catch (err) {
+    } catch {
       setError("Không thể kết nối để xác thực thiết bị. Vui lòng kiểm tra lại đường truyền.");
     } finally {
       setVerifying(false);
     }
   };
 
-  return <AuthShell mode="login" title={success ? "Đăng nhập thành công" : verificationRequired ? "Xác minh thiết bị" : "Chào mừng trở lại"}
-    description={success ? "Tài khoản của bạn đã sẵn sàng." : verificationRequired ? "Nhập mã OTP để tiếp tục trên thiết bị này." : "Đăng nhập để tiếp tục hành trình cùng TXE PRO."} next={returnPath}>
+  return <AuthShell mode="login" title={success ? "Đăng nhập thành công" : verificationRequired ? "Xác minh thiết bị" : affiliate ? 'Đăng nhập đối tác' : "Chào mừng trở lại"}
+    description={success ? "Tài khoản của bạn đã sẵn sàng." : verificationRequired ? "Nhập mã OTP để tiếp tục trên thiết bị này." : affiliate ? 'Truy cập mã giới thiệu, kết quả và tiền thưởng của bạn. Nếu đã có tài khoản TXE PRO, bạn có thể sử dụng thông tin đăng nhập đó.' : "Đăng nhập để tiếp tục hành trình cùng TXE PRO."} next={returnPath}>
     {error && <div className={s.error} role="alert"><AlertCircle size={18} /><p>{error}</p></div>}
     {success ? <div className={s.success} role="status"><ShieldCheck /><p>Đang đưa bạn đến khu vực tài khoản…</p></div> :
     verificationRequired ? <>
@@ -196,6 +198,6 @@ export default function LoginPage() {
         <Link className={s.forgot} href="/forgot-password">Quên mật khẩu?</Link></div>
       <button type="submit" className={s.primary} disabled={loading}>{loading ? <><LoaderCircle size={18} className={s.spinner} />Đang đăng nhập…</> : <>Đăng nhập<ArrowRight size={18} /></>}</button>
     </fieldset></form>}
-    {!success && <p className={s.bottom}>Chưa có tài khoản? <Link href={returnPath ? "/register?next=" + encodeURIComponent(returnPath) : "/register"}>Tạo tài khoản mới</Link></p>}
+    {!success && <p className={s.bottom}>Chưa có tài khoản? <Link href={affiliate ? '/doi-tac/dang-ky' : returnPath ? "/register?next=" + encodeURIComponent(returnPath) : "/register"}>{affiliate ? 'Đăng ký đối tác' : 'Tạo tài khoản mới'}</Link></p>}
   </AuthShell>;
 }

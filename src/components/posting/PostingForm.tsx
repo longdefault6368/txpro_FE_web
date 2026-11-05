@@ -77,7 +77,7 @@ export default function PostingForm({ driver, options, vehicles, value: v, busy,
             onChange({ vehicleId, min: capacity, max: capacity });
           }} /> : <VehicleCatalogField options={options} value={{ vehicleType: v.type, child: v.child, weightLabel: v.weight }}
             onChange={selection => onChange({ type: selection.vehicleType, child: selection.child, weight: selection.weightLabel })} />}
-          {driver && <div className={w.inlineNotice}><Truck size={20} /><span>{vehicles.length === 0 ? 'Chưa có phương tiện hoạt động. ' : ''}<Link href='/tai-xe/phuong-tien'>Thêm / quản lý phương tiện</Link> trước khi đăng xe trống.</span></div>}
+          {driver && <div className={w.inlineNotice}><Truck size={20} /><span>Muốn thêm hoặc cập nhật xe? <Link href='/tai-xe/phuong-tien'>Xem phương tiện và hướng dẫn trên app</Link>.</span></div>}
           {driver && caps.capacity && vehicle && <div className={w.capacityCard}>
             <div className={w.capacityTitle}><span>Tải trọng nhận chở</span><strong>{v.min === v.max ? v.max : v.min + "–" + v.max} tấn</strong></div>
             <div className={w.twoColumns}>

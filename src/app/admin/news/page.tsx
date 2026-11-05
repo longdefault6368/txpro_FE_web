@@ -32,6 +32,7 @@ interface AdminNewsItem {
   imageUrl: string;
   published: boolean;
   publishedAt: string | null;
+  expiresAt?: string | null;
   createdAt: string | null;
 }
 
@@ -44,6 +45,7 @@ interface NewsForm {
   imageUrl: string;
   published: boolean;
   publishedAt: string;
+  expiresAt: string;
 }
 
 const CATEGORY_LABELS: Record<NewsCategory, { label: string; badge: string }> = {
@@ -69,6 +71,7 @@ const EMPTY_FORM: NewsForm = {
   imageUrl: "",
   published: true,
   publishedAt: "",
+  expiresAt: "",
 };
 
 function toDateTimeLocal(iso?: string | null) {
@@ -156,7 +159,7 @@ export default function AdminNewsPage() {
   }, [fetchNews]);
 
   const publishedCount = useMemo(
-    () => items.filter((item) => item.published && (!item.publishedAt || new Date(item.publishedAt).getTime() <= publicationAsOf)).length,
+    () => items.filter((item) => item.published && (!item.publishedAt || new Date(item.publishedAt).getTime() <= publicationAsOf) && !(item.category === "promotion" && item.expiresAt && new Date(item.expiresAt).getTime() <= publicationAsOf)).length,
     [items, publicationAsOf],
   );
 
@@ -177,6 +180,7 @@ export default function AdminNewsPage() {
       imageUrl: item.imageUrl || "",
       published: item.published,
       publishedAt: toDateTimeLocal(item.publishedAt),
+      expiresAt: toDateTimeLocal(item.expiresAt),
     });
     setModalOpen(true);
   };
@@ -227,6 +231,11 @@ export default function AdminNewsPage() {
       setError("Vui lòng nhập tiêu đề.");
       return;
     }
+    if (form.category === "promotion" && form.expiresAt &&
+        new Date(form.expiresAt).getTime() <= (form.publishedAt ? new Date(form.publishedAt).getTime() : editing?.publishedAt ? new Date(editing.publishedAt).getTime() : Date.now())) {
+      setError("Thời hạn ưu đãi phải sau thời điểm đăng.");
+      return;
+    }
     mutationRef.current = true;
     setSaving(true);
     setError(null);
@@ -239,6 +248,7 @@ export default function AdminNewsPage() {
         audience: form.audience,
         imageUrl: normalizePersistedImagePath(form.imageUrl),
         published: form.published,
+        expiresAt: form.category === "promotion" && form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
         ...(form.publishedAt ? { publishedAt: new Date(form.publishedAt).toISOString() } : {}),
       };
       const res = await fetchWithAuth(
@@ -465,9 +475,10 @@ export default function AdminNewsPage() {
                               : "bg-slate-100 text-slate-500 border-slate-200"
                           }`}
                         >
-                          {item.published ? item.publishedAt && new Date(item.publishedAt).getTime() > publicationAsOf ? "Đã lên lịch" : "Đang hiện" : "Đang ẩn"}
+                          {item.published ? item.category === "promotion" && item.expiresAt && new Date(item.expiresAt).getTime() <= publicationAsOf ? "Hết hạn" : item.publishedAt && new Date(item.publishedAt).getTime() > publicationAsOf ? "Đã lên lịch" : "Đang hiện" : "Đang ẩn"}
                         </button>
                         <div className="text-[11px] text-slate-400 mt-1">{formatDate(item.publishedAt)}</div>
+                        {item.category === "promotion" && item.expiresAt && <div className="text-xs text-slate-500 mt-1">Hết hạn: {formatDate(item.expiresAt)}</div>}
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex justify-end gap-2">
@@ -632,6 +643,14 @@ export default function AdminNewsPage() {
                     className="mt-1.5 w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"
                   />
                 </label>
+                {form.category === "promotion" && <label className="block">
+                  <span className="text-xs font-bold text-slate-600">Thời hạn ưu đãi (không bắt buộc)</span>
+                  <input type="datetime-local" value={form.expiresAt}
+                    min={form.publishedAt || undefined}
+                    onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
+                    className="mt-1.5 w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl" />
+                  <span className="mt-1 block text-xs text-slate-500">Tự ẩn khi hết hạn. Để trống nếu không giới hạn. Giờ theo thiết bị đang sử dụng.</span>
+                </label>}
                 <label className="flex items-center gap-3 mt-7">
                   <input
                     type="checkbox"

@@ -1,3 +1,4 @@
+'use client';
 import type { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -5,9 +6,12 @@ import { ArrowLeft, Route, Truck, MapPinned, ShieldCheck } from "lucide-react";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
 import s from "./Auth.module.css";
+import { useAffiliateAuth } from './AuthAudienceContext';
+import AffiliateAuthShell from './AffiliateAuthShell';
 export default function AuthShell({ mode, title, description, children, next }: {
  mode: "login" | "register"; title: string; description: string; children: ReactNode; next?: string | null;
 }) {
+ if (useAffiliateAuth()) return <AffiliateAuthShell mode={mode} title={title} description={description}>{children}</AffiliateAuthShell>;
  const suffix = next ? "?next=" + encodeURIComponent(next) : "";
  return <><Header /><main className={s.page}>
  <div className={s.topline}><Link href="/"><ArrowLeft size={16} />Trở về trang chủ</Link><span><ShieldCheck size={16} />Tài khoản TXE PRO</span></div>

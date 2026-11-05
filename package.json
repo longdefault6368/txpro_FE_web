@@ -10,6 +10,8 @@
     "start": "next start",
     "test:posting": "node --test tests/web-posting.test.mjs",
     "test:onboarding": "node --test tests/onboarding.test.mjs",
+    "test:driver-access": "node --test tests/driver-app-verification.test.mjs",
+    "test:affiliate": "node --test tests/affiliate.test.mjs",
     "test:onboarding:backend": "node --test --test-concurrency=1 tests/onboarding-backend.test.mjs",
     "test:roles": "node --test tests/account-role-switch.test.mjs",
     "test:roles:backend": "node --test --test-concurrency=1 tests/account-role-switch-backend.test.mjs",

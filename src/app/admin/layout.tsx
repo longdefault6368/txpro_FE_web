@@ -137,6 +137,7 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
     path: "/admin/analytics",
     category: "finance",
   },
+  { id: 'affiliates', name: 'Đối Tác & Giới Thiệu', description: 'Chính sách, tiền thưởng và thanh toán đối tác', path: '/admin/affiliates', category: 'finance' },
   {
     id: "support",
     name: "Hỗ Trợ & Live Chat",
@@ -183,11 +184,11 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
   super_admin: ["*"],
-  operations: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts", "/admin/news"],
+  operations: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts", "/admin/news", "/admin/affiliates"],
   dispatcher: ["/admin", "/admin/notifications", "/admin/orders", "/admin/incidents", "/admin/support"],
   kyc_officer: ["/admin/notifications", "/admin/users"],
   cskh: ["/admin/notifications", "/admin/incidents", "/admin/support", "/admin/contacts"],
-  accountant: ["/admin/notifications", "/admin/orders", "/admin/analytics"],
+  accountant: ["/admin/notifications", "/admin/orders", "/admin/analytics", "/admin/affiliates"],
 };
 
 interface UserSession {
@@ -227,6 +228,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: "/admin/incidents", icon: ShieldAlert, label: "Xử Lý Tranh Chấp", roles: ["super_admin", "operations", "dispatcher", "cskh"] },
   { href: "/admin/analytics", icon: BarChart3, label: "Phân Tích", roles: ["super_admin", "operations", "accountant"] },
+  { href: "/admin/affiliates", icon: Users, label: "Đối Tác & Giới Thiệu", roles: ["super_admin", "operations", "accountant"] },
   { href: "/admin/support", icon: Headset, label: "Hỗ trợ & Live Chat", roles: ["super_admin", "operations", "dispatcher", "cskh"] },
   { href: "/admin/contacts", icon: Mail, label: "Liên Hệ Website", roles: ["super_admin", "operations", "cskh"] },
   { href: "/admin/news", icon: Newspaper, label: "Tin Tức & Ưu Đãi", roles: ["super_admin", "operations"] },

@@ -11,17 +11,19 @@ import PostingForm, { PostingFormSkeleton, type PostingFormValues } from "./Post
 import { validVehicleSelection, vehicleImage } from "@/utils/catalog-presentation";
 import FundingPanel from "./FundingPanel";
 import { postingRequest, PostingError } from "@/utils/posting-api";
-import { buildDriverPosting, buildShipperPosting, postingCapabilities, readPostingPage, type PostingPage, type LocationValue, type PostingOptions, type PostingVehicle } from "@/utils/posting-contract";
+import { buildDriverPosting, buildShipperPosting, postingCapabilities, type LocationValue, type PostingOptions, type PostingVehicle } from "@/utils/posting-contract";
 import w from "./PostingExperience.module.css";
 import { takeHomePostingDraft } from "@/utils/home-posting-draft";
 import { bookingFundingNotice, canSelectVehicle, interruptionNotice, latestBookingMatch, matchFare, type BookingSelection, type VehicleMatch as Match } from "@/utils/shipper-booking";
 import { orderStatusLabel } from "@/utils/order-display";
+import DriverAppVerification from '@/components/onboarding/DriverAppVerification';
+import { driverIdentityVerified, driverVerificationLabel, readDriverVehicles, type DriverKycAccess } from '@/utils/driver-web-access';
 
 type Quote = { canPost: boolean; missingAmount: number; requiredAmount: number; platformFeeAmount: number; vatAmount: number; voucherEligible: boolean; paymentPolicy?: string };
 const localDate = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe" }) {
   const driver = role === "tai-xe";
-  const [auth, setAuth] = useState<"loading" | "login" | "wrong-role" | "kyc" | "ready" | "error">("loading");
+  const [auth, setAuth] = useState<"loading" | "login" | "wrong-role" | "kyc" | "vehicle" | "ready" | "error">("loading");
   const [options, setOptions] = useState<PostingOptions | null>(null), [vehicles, setVehicles] = useState<PostingVehicle[]>([]);
   const [pickup, setPickup] = useState<LocationValue | null>(null), [dropoff, setDropoff] = useState<LocationValue | null>(null);
   const [type, setType] = useState(""), [child, setChild] = useState(""), [cargo, setCargo] = useState(""), [weight, setWeight] = useState("");
@@ -39,28 +41,39 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
   const matchRevision = useRef(0);
   const matchLock = useRef(false);
   const vehicle = vehicles.find(v => (v.id || v._id) === vehicleId);
+  const [accessRevision, setAccessRevision] = useState(0), [access, setAccess] = useState<DriverKycAccess>({});
   useEffect(() => {
     let active = true;
+    const session = localStorage.getItem('txpro_user_session');
+    async function request<T>(path: string, init?: RequestInit, authenticated = true): Promise<T> {
+      if (!active || localStorage.getItem('txpro_user_session') !== session) throw new Error('Phiên tài khoản đã thay đổi. Vui lòng tải lại trang.');
+      const result = await postingRequest<T>(path, init, authenticated);
+      if (!active || localStorage.getItem('txpro_user_session') !== session) throw new Error('Phiên tài khoản đã thay đổi. Vui lòng tải lại trang.');
+      return result;
+    }
     async function load() {
       try {
         if (!localStorage.getItem("txpro_token")) { setAuth("login"); return; }
-        const me = await postingRequest<{ user: { role: string; kycStatus?: string } }>("/auth/me");
+        const me = await request<{ user: { role: string; kycStatus?: string } }>("/auth/me");
         if (!active) return;
         setAccountRole(me.user.role);
         if (me.user.role !== role) { setAuth("wrong-role"); return; }
-        if (driver && me.user.kycStatus && me.user.kycStatus !== 'verified') { setAuth('kyc'); return; }
-        const catalog = await postingRequest<PostingOptions>("/chu-hang/find-vehicle/options", {}, false);
+        if (driver) {
+          const status = await request<DriverKycAccess>('/common/kyc-status');
+          if (!active) return;
+          setAccess(status);
+          if (!driverIdentityVerified(status)) { setVehicles([]); setAuth('kyc'); return; }
+          const all = await readDriverVehicles<PostingVehicle>(request);
+          if (!active) return;
+          const available = all.filter(v => v.status === 'active');
+          setVehicles(available);
+          if (!available.length) { setAuth('vehicle'); return; }
+          setVehicleId(previous => available.some(v => (v.id || v._id) === previous) ? previous : '');
+        }
+        const catalog = await request<PostingOptions>("/chu-hang/find-vehicle/options", {}, false);
         if (!active) return;
         setOptions(catalog);
-        if (driver) {
-          const all: PostingVehicle[] = [];
-          for (let page = 1; page <= 100; page++) {
-            const data = await postingRequest<PostingPage<PostingVehicle>>("/tai-xe/vehicles?paginated=true&limit=100&page=" + page);
-            const result = readPostingPage(data, 100);
-            all.push(...result.items); if (!result.hasMore) break;
-          }
-          if (active) setVehicles(all.filter(v => v.status === "active"));
-        } else {
+        if (!driver) {
           const existing = new URLSearchParams(window.location.search).get("order");
           if (existing && /^[a-f0-9]{24}$/i.test(existing)) {
             const detail = await postingRequest<{ status: string }>("/chu-hang/orders/" + existing);
@@ -93,7 +106,13 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
     }
     void load();
     return () => { active = false; };
-  }, [driver, role]);
+  }, [driver, role, accessRevision]);
+  useEffect(() => {
+    if (!driver || !['kyc', 'vehicle'].includes(auth)) return;
+    const refresh = () => { if (!document.hidden) { setError(''); setAuth('loading'); setAccessRevision(v => v + 1); } };
+    window.addEventListener('focus', refresh); document.addEventListener('visibilitychange', refresh);
+    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
+  }, [driver, auth]);
   async function loadMatches(id = orderId) {
     if (!id || matchLock.current || lock.current) return;
     matchLock.current = true;
@@ -142,7 +161,7 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (lock.current || uploading || uncertain || !options) return;
+    if (lock.current || uploading || uncertain || !options || auth !== 'ready') return;
     setError(""); setMessage(""); lock.current = true; setBusy(true);
     try {
     if (!driver) {
@@ -166,6 +185,7 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
         setSuccess(true); setMessage("Đã đăng xe trống. Quyền lợi được xử lý theo kết quả máy chủ.");
       }
     } catch (e) {
+      if (driver && e instanceof PostingError && ['KYC_REQUIRED', 'KYC_VERIFICATION_REQUIRED'].includes(e.code)) { setAccess({}); setAuth('kyc'); setConfirmed(false); setQuote(null); }
       if (e instanceof PostingError && e.code === "DRIVER_POST_INSUFFICIENT_BALANCE") { setMissing(Number(e.details.missingAmount) || 0); setConfirmed(false); }
       setUncertain(e instanceof PostingError && e.uncertain);
       setError(e instanceof Error ? e.message : "Không đăng được tin.");
@@ -252,7 +272,9 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
       <Link href="/chu-hang/form-tao-don" aria-current={!driver ? "page" : undefined}><Search size={17} />Tìm xe ngay</Link>
       <Link href="/tai-xe/dang-tin" aria-current={driver ? "page" : undefined}><Truck size={17} />Đăng xe trống</Link>
     </nav>
-    {auth === "loading" ? <PostingFormSkeleton /> : auth !== "ready" ? <section className={w.stateCard}>
+    {auth === "loading" ? <PostingFormSkeleton /> : driver && (auth === 'kyc' || auth === 'vehicle') ? <DriverAppVerification
+      reason={auth === 'kyc' ? 'identity' : 'vehicle'} status={auth === 'kyc' ? driverVerificationLabel(access) : 'Chưa có phương tiện hoạt động'}
+      onRefresh={() => { setError(''); setAuth('loading'); setAccessRevision(v => v + 1); }} /> : auth !== "ready" ? <section className={w.stateCard}>
       <Image src={vehicleImage(driver ? "xe tải" : "ô tô")} alt="" width={260} height={190} sizes="230px" />
       <div><span className={w.stateBadge}><ShieldCheck size={16} />Tài khoản TXE PRO</span>
         <h2>{auth === "login" ? "Đăng nhập để bắt đầu" : auth === "wrong-role" ? "Bạn đang ở vai trò khác" : auth === 'kyc' ? 'Xác minh danh tính tài xế' : "Chưa tải được thông tin"}</h2>
@@ -261,7 +283,7 @@ export default function PostingWorkspace({ role }: { role: "chu-hang" | "tai-xe"
         <div className={w.buttonRow}>{auth === "error" ? <button type="button" className={w.primaryButton} onClick={() => window.location.reload()}><RefreshCw size={17} />Thử lại</button>
           : <Link className={w.primaryButton} href={"/login?next=" + encodeURIComponent(path)}>Đăng nhập<ArrowRight size={17} /></Link>}
           {auth === "wrong-role" && <RoleSwitchButton currentRole={accountRole} targetRole={role} />}
-          {auth === 'kyc' && <Link className={w.primaryButton} href='/user/ekyc?next=%2Ftai-xe%2Fphuong-tien'>Xác minh eKYC để tiếp tục</Link>}
+          {auth === 'kyc' && <Link className={w.primaryButton} href='/user/ekyc'>Xem trạng thái xác minh</Link>}
           <Link className={w.secondaryButton} href={auth === "wrong-role" ? "/user" : "/"}>{auth === "wrong-role" ? "Trang cá nhân" : "Về trang chủ"}</Link>
         </div>
       </div>
