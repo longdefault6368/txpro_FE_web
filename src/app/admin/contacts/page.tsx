@@ -22,7 +22,8 @@ import {
   CreditCard,
   MessageSquare
 } from "lucide-react";
-import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { CUSTOMER_PURPOSES, customerMail } from "@/lib/admin-mail";
+import { fetchWithAuth, API_BASE, API_BASE_URL } from "@/utils/api";
 
 interface ContactMessage {
   _id: string;
@@ -32,6 +33,8 @@ interface ContactMessage {
   category: "shipper" | "driver" | "enterprise" | "payment" | "other";
   subject: string;
   message: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
   status: "new" | "in_progress" | "resolved" | "spam";
   adminNotes?: string;
   ip?: string;
@@ -79,6 +82,8 @@ export default function AdminContactsPage() {
   const [modalNotes, setModalNotes] = useState<string>("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [customerCampaigns, setCustomerCampaigns] = useState<{ _id: string; name: string; subject: string; body: string }[]>([]);
+  const [composer, setComposer] = useState<{ contact: ContactMessage; purposeId: string; campaignId: string; toEmail: string; subject: string; body: string; sending: boolean; error: string; notice: string } | null>(null);
 
   const fetchContacts = useCallback(async () => {
     setLoading(true);
@@ -115,6 +120,73 @@ export default function AdminContactsPage() {
     setModalNotes(contact.adminNotes || "");
     setActionSuccess(null);
   };
+
+  async function openCustomerMail(contact: ContactMessage) {
+    const draft = customerMail("reply", contact.fullName, contact.subject);
+    setComposer({
+      contact,
+      purposeId: "reply",
+      campaignId: "manual",
+      toEmail: contact.email,
+      subject: draft.subject,
+      body: draft.body,
+      sending: false,
+      error: "",
+      notice: "",
+    });
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/email-marketing/campaigns?audience=customer`);
+      const json = await res.json().catch(() => null);
+      if (res.ok) setCustomerCampaigns(json?.data || []);
+    } catch {
+      setCustomerCampaigns([]);
+    }
+  }
+
+  function chooseCustomerPurpose(purposeId: string) {
+    if (purposeId === "saved") return;
+    setComposer((current) => {
+      if (!current) return current;
+      const draft = customerMail(purposeId, current.contact.fullName, current.contact.subject);
+      return { ...current, purposeId, campaignId: "manual", subject: draft.subject, body: draft.body };
+    });
+  }
+
+  function chooseCustomerCampaign(id: string) {
+    const campaign = customerCampaigns.find((item) => item._id === id);
+    setComposer((current) => {
+      if (!current) return current;
+      if (!campaign) return { ...current, campaignId: "manual" };
+      return {
+        ...current,
+        purposeId: "saved",
+        campaignId: id,
+        subject: campaign.subject,
+        body: campaign.body.split("{{name}}").join(current.contact.fullName).split("{{ten}}").join(current.contact.fullName),
+      };
+    });
+  }
+
+  async function sendCustomerMail() {
+    if (!composer) return;
+    setComposer({ ...composer, sending: true, error: "", notice: "" });
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/email-marketing/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: composer.subject,
+          body: composer.body,
+          recipients: [{ name: composer.contact.fullName, email: composer.toEmail }],
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.message || "Chưa gửi được email.");
+      setComposer({ ...composer, sending: false, notice: "Đã gửi email cho khách hàng." });
+    } catch (reason) {
+      setComposer({ ...composer, sending: false, error: reason instanceof Error ? reason.message : "Chưa gửi được email." });
+    }
+  }
 
   const handleUpdateContact = async () => {
     if (!selectedContact) return;
@@ -479,15 +551,15 @@ export default function AdminContactsPage() {
                 <span className="text-slate-400 font-medium">Địa chỉ Email:</span>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="font-bold text-slate-900 text-xs truncate">{selectedContact.email}</span>
-                  <a
-                    href={`mailto:${selectedContact.email}?subject=TXEPRO phản hồi: ${encodeURIComponent(
-                      selectedContact.subject
-                    )}`}
+                  <button
+                    type="button"
+                    onClick={() => void openCustomerMail(selectedContact)}
                     className="p-1 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                     title="Gửi email phản hồi"
+                    aria-label={`Gửi email cho ${selectedContact.fullName}`}
                   >
                     <Mail className="w-3.5 h-3.5" />
-                  </a>
+                  </button>
                 </div>
                 <p className="text-slate-400 mt-0.5">Bấm để gửi email</p>
               </div>
@@ -501,6 +573,17 @@ export default function AdminContactsPage() {
               <div className="p-4 rounded-2xl bg-white border border-slate-200 text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-normal">
                 {selectedContact.message}
               </div>
+              {selectedContact.attachmentUrl && (
+                <a
+                  href={`${API_BASE_URL}${selectedContact.attachmentUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-primary-700 hover:text-primary-800"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  {selectedContact.attachmentName || "Tải CV"}
+                </a>
+              )}
             </div>
 
             {/* Handling Form */}
@@ -583,6 +666,43 @@ export default function AdminContactsPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {composer && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4" onClick={() => setComposer(null)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="customer-mail-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <h2 id="customer-mail-title" className="text-xl font-bold text-slate-900">Gửi email cho {composer.contact.fullName}</h2>
+              <button type="button" onClick={() => setComposer(null)} className="rounded-xl px-3 py-2 text-sm text-slate-500 hover:bg-slate-100">Đóng</button>
+            </div>
+            <p className="mt-2 text-sm text-slate-500">Email này gửi cho khách hàng, theo nội dung liên hệ &quot;{composer.contact.subject}&quot;.</p>
+            <div className="mt-5 grid gap-4">
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">Mục đích gửi
+                <select value={composer.purposeId} onChange={(event) => chooseCustomerPurpose(event.target.value)} className="rounded-xl border border-slate-200 px-4 py-3 font-normal">
+                  {composer.campaignId !== "manual" && <option value="saved">Theo chiến dịch đã lưu</option>}
+                  {CUSTOMER_PURPOSES.map((purpose) => <option key={purpose.id} value={purpose.id}>{purpose.label}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">Chiến dịch đã lưu cho khách hàng
+                <select value={composer.campaignId} onChange={(event) => chooseCustomerCampaign(event.target.value)} className="rounded-xl border border-slate-200 px-4 py-3 font-normal">
+                  <option value="manual">Dùng tiêu đề theo mục đích</option>
+                  {customerCampaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">Email người nhận
+                <input required type="email" value={composer.toEmail} onChange={(event) => setComposer({ ...composer, toEmail: event.target.value })} className="rounded-xl border border-slate-200 px-4 py-3 font-normal" />
+              </label>
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">Tiêu đề
+                <input required value={composer.subject} onChange={(event) => setComposer({ ...composer, subject: event.target.value })} className="rounded-xl border border-slate-200 px-4 py-3 font-normal" />
+              </label>
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">Nội dung
+                <textarea required rows={7} value={composer.body} onChange={(event) => setComposer({ ...composer, body: event.target.value })} className="rounded-xl border border-slate-200 px-4 py-3 font-normal" />
+              </label>
+              {composer.error && <p className="text-sm text-red-600">{composer.error}</p>}
+              {composer.notice && <p className="text-sm font-semibold text-emerald-700">{composer.notice}</p>}
+              <button type="button" disabled={composer.sending} onClick={() => void sendCustomerMail()} className="rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-60">{composer.sending ? "Đang gửi..." : "Gửi email"}</button>
+            </div>
+          </section>
         </div>
       )}
     </div>

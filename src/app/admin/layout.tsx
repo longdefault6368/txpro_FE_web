@@ -28,6 +28,8 @@ import {
   ChevronDown,
   Mail,
   Newspaper,
+  Briefcase,
+  Megaphone,
   type LucideIcon
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
@@ -54,7 +56,7 @@ export const ADMIN_ROLE_CONFIG: Record<AdminRole, {
     shortLabel: "Vận Hành",
     badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
     color: "#2563eb",
-    allowedPaths: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts", "/admin/news"],
+    allowedPaths: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts", "/admin/tuyen-dung", "/admin/email-marketing", "/admin/news"],
   },
   dispatcher: {
     label: "Điều Phối Viên",
@@ -75,7 +77,7 @@ export const ADMIN_ROLE_CONFIG: Record<AdminRole, {
     shortLabel: "CSKH",
     badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-200",
     color: "#16a34a",
-    allowedPaths: ["/admin/support", "/admin/incidents", "/admin/notifications", "/admin/contacts"],
+    allowedPaths: ["/admin/support", "/admin/incidents", "/admin/notifications", "/admin/contacts", "/admin/tuyen-dung", "/admin/email-marketing"],
   },
   accountant: {
     label: "Kế Toán & Đối Soát",
@@ -153,6 +155,20 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
     category: "support",
   },
   {
+    id: "careers",
+    name: "Tuyển Dụng",
+    description: "Xem hồ sơ ứng viên gửi từ trang tuyển dụng",
+    path: "/admin/tuyen-dung",
+    category: "support",
+  },
+  {
+    id: "email-marketing",
+    name: "Email Marketing",
+    description: "Soạn chiến dịch và gửi cho một người hoặc một danh sách",
+    path: "/admin/email-marketing",
+    category: "support",
+  },
+  {
     id: "news",
     name: "Tin Tức & Ưu Đãi",
     description: "Đăng tin tức, hướng dẫn và ưu đãi hiển thị trên app tài xế và chủ hàng",
@@ -184,10 +200,10 @@ export const ADMIN_PERMISSION_MODULES: AdminPermissionModule[] = [
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
   super_admin: ["*"],
-  operations: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts", "/admin/news", "/admin/affiliates"],
+  operations: ["/admin", "/admin/notifications", "/admin/users", "/admin/orders", "/admin/incidents", "/admin/analytics", "/admin/support", "/admin/contacts", "/admin/tuyen-dung", "/admin/email-marketing", "/admin/news", "/admin/affiliates"],
   dispatcher: ["/admin", "/admin/notifications", "/admin/orders", "/admin/incidents", "/admin/support"],
   kyc_officer: ["/admin/notifications", "/admin/users"],
-  cskh: ["/admin/notifications", "/admin/incidents", "/admin/support", "/admin/contacts"],
+  cskh: ["/admin/notifications", "/admin/incidents", "/admin/support", "/admin/contacts", "/admin/tuyen-dung", "/admin/email-marketing"],
   accountant: ["/admin/notifications", "/admin/orders", "/admin/analytics", "/admin/affiliates"],
 };
 
@@ -231,6 +247,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/affiliates", icon: Users, label: "Đối Tác & Giới Thiệu", roles: ["super_admin", "operations", "accountant"] },
   { href: "/admin/support", icon: Headset, label: "Hỗ trợ & Live Chat", roles: ["super_admin", "operations", "dispatcher", "cskh"] },
   { href: "/admin/contacts", icon: Mail, label: "Liên Hệ Website", roles: ["super_admin", "operations", "cskh"] },
+  { href: "/admin/tuyen-dung", icon: Briefcase, label: "Tuyển dụng", roles: ["super_admin", "operations", "cskh"] },
+  { href: "/admin/email-marketing", icon: Megaphone, label: "Email marketing", roles: ["super_admin", "operations", "cskh"] },
   { href: "/admin/news", icon: Newspaper, label: "Tin Tức & Ưu Đãi", roles: ["super_admin", "operations"] },
   { href: "/admin/logs", icon: TerminalSquare, label: "Log hệ thống", roles: ["super_admin"] },
   { href: "/admin/settings", icon: Settings, label: "Cài Đặt", roles: ["super_admin"] },

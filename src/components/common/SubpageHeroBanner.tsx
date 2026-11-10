@@ -25,6 +25,7 @@ const SUBPAGE_NAV_ITEMS = [
   { href: "/thong-tin/huong-dan-chu-hang", label: { vi: "HD Chủ hàng", en: "Shipper Guide", zh: "货主指南" } },
   { href: "/thong-tin/huong-dan-tai-xe", label: { vi: "HD Tài xế", en: "Driver Guide", zh: "司机指南" } },
   { href: "/tro-giup", label: { vi: "Trợ giúp & FAQ", en: "Help & FAQ", zh: "帮助与 FAQ" } },
+  { href: "/tuyen-dung", label: { vi: "Tuyển dụng", en: "Careers", zh: "招聘" } },
   { href: "/thong-tin/lien-he", label: { vi: "Liên hệ", en: "Contact Us", zh: "联系我们" } },
   { href: "/thong-tin/dieu-khoan-su-dung", label: { vi: "Điều khoản", en: "Terms of Service", zh: "使用条款" } },
   { href: "/thong-tin/chinh-sach-bao-mat", label: { vi: "Bảo mật", en: "Privacy Policy", zh: "隐私政策" } },
