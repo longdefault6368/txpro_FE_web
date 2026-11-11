@@ -10,7 +10,7 @@ export default function HomeQuickActions() {
   const { language } = useLanguage();
   const c = (vi: string, en: string, zh: string) => language === "en" ? en : language === "zh" ? zh : vi;
   const mainActions = [
-    { href: "/chu-hang/form-tao-don", icon: Package, audience: c("Dành cho chủ hàng", "For shippers", "货主服务"), title: c("Đăng tìm xe", "Find a vehicle", "发布找车需求"),
+    { href: "/chu-hang/form-tao-don", icon: Package, audience: c("Dành cho khách hàng", "For customers", "客户服务"), title: c("Đăng tìm xe", "Find a vehicle", "发布找车需求"),
       text: c("Chọn lộ trình, thời gian và phương tiện phù hợp cho chuyến đi của bạn.", "Choose a route, time and suitable vehicle for your journey.", "为您的行程选择路线、时间及合适车型。"),
       action: c("Bắt đầu tìm xe", "Start searching", "开始找车"), image: "/images/catalog/vehicle_picker_small_truck.webp", theme: s.shipper },
     { href: "/tai-xe/dang-tin", icon: Truck, audience: c("Dành cho tài xế", "For drivers", "司机服务"), title: c("Đăng xe trống", "Post availability", "发布空车"),

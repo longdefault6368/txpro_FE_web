@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Package, Truck, Route, Loader2 } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Package, Truck, Loader2, X, ZoomIn } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import LocationField from "@/components/posting/LocationField";
 import PostingTimeField from "@/components/posting/PostingTimeField";
@@ -13,6 +14,38 @@ import { postingRequest } from "@/utils/posting-api";
 import { postingCapabilities, validLocation, type LocationValue, type PostingOptions } from "@/utils/posting-contract";
 import { saveHomePostingDraft, type PostingRole } from "@/utils/home-posting-draft";
 import s from "./HomePostingForm.module.css";
+
+const POSTERS = [
+  "/images/intro/01-bat-dau.webp",
+  "/images/intro/02-phuong-tien.webp",
+  "/images/intro/03-hang-hoa.webp",
+  "/images/intro/04-vi-tri.webp",
+  "/images/intro/05-lich.webp",
+  "/images/intro/06-tim-xe.webp",
+];
+
+function PosterLightbox({ src, alt, onClose, onPrev, onNext, labels }: { src: string; alt: string; onClose: () => void; onPrev: () => void; onNext: () => void; labels: { close: string; previous: string; next: string } }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    const overflow = document.body.style.overflow;
+    dialog?.showModal();
+    document.body.style.overflow = "hidden";
+    return () => { dialog?.close(); document.body.style.overflow = overflow; };
+  }, []);
+  function onKey(event: KeyboardEvent<HTMLDialogElement>) {
+    if (event.key === "ArrowRight") { event.preventDefault(); onNext(); }
+    if (event.key === "ArrowLeft") { event.preventDefault(); onPrev(); }
+  }
+  return <dialog ref={ref} className={s.lightbox} aria-label={alt} onKeyDown={onKey}
+    onCancel={event => { event.preventDefault(); onClose(); }}
+    onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <button type="button" className={s.lightboxClose} onClick={onClose} aria-label={labels.close}><X size={22} /></button>
+    <button type="button" className={s.lightboxPrev} onClick={onPrev} aria-label={labels.previous}><ChevronLeft size={22} /></button>
+    <img src={src} alt={alt} />
+    <button type="button" className={s.lightboxNext} onClick={onNext} aria-label={labels.next}><ChevronRight size={22} /></button>
+  </dialog>;
+}
 
 export default function HomePostingForm() {
   const { language } = useLanguage();
@@ -25,6 +58,7 @@ export default function HomePostingForm() {
   const [driverFrom, setDriverFrom] = useState(""), [driverTo, setDriverTo] = useState(""), [price, setPrice] = useState("250000");
   const [options, setOptions] = useState<PostingOptions | null>(null), [catalogState, setCatalogState] = useState<"loading" | "ready" | "error">("loading");
   const [retry, setRetry] = useState(0), [error, setError] = useState(""), [saving, setSaving] = useState(false);
+  const [slide, setSlide] = useState(0), [hold, setHold] = useState(false), [enlarged, setEnlarged] = useState(false), [kept, setKept] = useState(0);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]), submitting = useRef(false);
   const driver = role === "tai-xe";
   const caps = postingCapabilities(vehicleType, options || undefined);
@@ -39,6 +73,16 @@ export default function HomePostingForm() {
       }).catch(() => { if (!controller.signal.aborted) setCatalogState("error"); });
     return () => controller.abort();
   }, [retry]);
+  useEffect(() => {
+    const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (hold || enlarged || media?.matches) return;
+    const timer = window.setInterval(() => setSlide(index => (index + 1) % POSTERS.length), 5600);
+    return () => window.clearInterval(timer);
+  }, [hold, slide, enlarged]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setKept(slide), 800);
+    return () => window.clearTimeout(timer);
+  }, [slide]);
   function selectRole(next: PostingRole) { setRole(next); setError(""); }
   function tabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     const next = event.key === "Home" ? 0 : event.key === "End" ? 1 :
@@ -78,17 +122,36 @@ export default function HomePostingForm() {
       setError(c("Chưa lưu được thông tin tạm. Cho phép lưu trữ trên trình duyệt hoặc mở form đầy đủ bên dưới.", "Could not save the draft. Allow browser storage or open the full form below.", "无法保存草稿，请允许浏览器存储，或打开下方完整表单。"));
     }
   }
-  return <section id="quick-posting" data-reveal className={s.section} aria-labelledby="quick-posting-title">
-    <div className={s.intro}>
-      <span className={s.kicker}><Route size={17} />{c("Bắt đầu ngay tại đây", "Start right here", "从这里开始")}</span>
-      <h2 id="quick-posting-title">{c("Một điểm bắt đầu.\nHai cách kết nối.", "One starting point.\nTwo ways to connect.", "一个起点，\n两种连接方式。")}</h2>
-      <p>{c("Chuyển tab để chuẩn bị thông tin theo nhu cầu. Chưa cần đăng nhập để tham khảo và nhập lộ trình.", "Switch tabs to prepare your request. Explore and enter a route before signing in.", "切换标签准备所需信息，无需登录即可查看并填写路线。")}</p>
-      <ul><li><Check size={16} />{c("Tìm địa chỉ và lấy vị trí hiện tại", "Search addresses or use your location", "搜索地址或使用当前位置")}</li><li><Check size={16} />{c("Giữ thông tin khi chuyển sang bước tiếp theo", "Carry your details into the next step", "将已填信息带到下一步")}</li><li><Check size={16} />{c("Chỉ đăng khi bạn kiểm tra và xác nhận", "Post only after reviewing and confirming", "核对并确认后才发布")}</li></ul>
-      <Link href="/tin-tuc">{c("Xem cẩm nang sử dụng", "Explore the guides", "查看使用指南")}<ArrowRight size={16} /></Link>
+  const captions = [
+    c("Bắt đầu hành trình và chọn vai trò trên ứng dụng TXE PRO", "Start a journey and choose a role in the TXE PRO app", "在 TXE PRO 应用中开始行程并选择角色"),
+    c("Chọn loại phương tiện, từ xe máy đến container", "Choose a vehicle, from a motorcycle to a container truck", "选择车型，从摩托车到集装箱车"),
+    c("Chọn loại hàng cần chở", "Choose the cargo you need to move", "选择需要运输的货物"),
+    c("Xác nhận vị trí và phạm vi kết nối", "Confirm a location and the connection range", "确认位置和连接范围"),
+    c("Lên lịch nhận hàng theo ngày và khung giờ", "Schedule a pickup by day and time window", "按日期和时间段安排取货"),
+    c("Tìm xe, xem lộ trình và theo dõi chuyến hàng", "Find a vehicle, review the route and follow the shipment", "找车、查看路线并跟踪货运"),
+  ];
+  function showSlide(next: number) { setSlide((next + POSTERS.length) % POSTERS.length); }
+  return <section id="quick-posting" className={s.section} aria-labelledby="quick-posting-title">
+    <div className={s.stage} data-reveal="left" onMouseEnter={() => setHold(true)} onMouseLeave={() => setHold(false)}
+      onFocus={() => setHold(true)} onBlur={event => { const next = event.relatedTarget; if (!(next instanceof Node) || !event.currentTarget.contains(next)) setHold(false); }}>
+      <h2 id="quick-posting-title" className={s.srOnly}>{c("Bắt đầu ngay tại đây", "Start right here", "从这里开始")}</h2>
+      {POSTERS.map((src, index) => {
+        const nearby = index === slide || index === kept || index === (slide + 1) % POSTERS.length;
+        if (!nearby) return null;
+        return <figure key={src} className={index === slide ? s.slideOn : s.slide} aria-hidden={index !== slide}>
+          <Image src={src} alt={index === slide ? captions[index] : ""} fill sizes="(max-width: 850px) 92vw, 420px" />
+        </figure>;
+      })}
+      <button type="button" className={s.expand} onClick={() => setEnlarged(true)} aria-label={c("Phóng to ảnh", "Enlarge image", "放大图片")}><span><ZoomIn size={18} /></span></button>
+      <button type="button" className={s.stagePrev} onClick={() => showSlide(slide - 1)} aria-label={c("Ảnh trước", "Previous image", "上一张")}><ChevronLeft size={20} /></button>
+      <button type="button" className={s.stageNext} onClick={() => showSlide(slide + 1)} aria-label={c("Ảnh sau", "Next image", "下一张")}><ChevronRight size={20} /></button>
+      <div className={s.dots}>{POSTERS.map((src, index) => <button key={src} type="button" aria-current={index === slide ? "true" : undefined} aria-label={c("Ảnh ", "Image ", "图片 ") + (index + 1)} onClick={() => showSlide(index)}>{index === slide && <i />}</button>)}</div>
     </div>
-    <div className={s.workspace}>
+    {enlarged && <PosterLightbox src={POSTERS[slide]} alt={captions[slide]} onClose={() => setEnlarged(false)} onPrev={() => showSlide(slide - 1)} onNext={() => showSlide(slide + 1)}
+      labels={{ close: c("Đóng", "Close", "关闭"), previous: c("Ảnh trước", "Previous image", "上一张"), next: c("Ảnh sau", "Next image", "下一张") }} />}
+    <div className={s.workspace} data-reveal="right">
       <div className={s.tabs} role="tablist" aria-label={c("Chọn nhu cầu", "Choose your role", "选择需求")}>
-        {(["chu-hang", "tai-xe"] as const).map((value, index) => <button key={value} ref={node => { tabs.current[index] = node; }} type="button" role="tab" id={"quick-tab-" + value} aria-controls="quick-posting-panel" aria-selected={role === value} tabIndex={role === value ? 0 : -1} disabled={saving} onClick={() => selectRole(value)} onKeyDown={event => tabKey(event, index)}>{index === 0 ? <Package size={20} /> : <Truck size={20} />}<span>{index === 0 ? c("Chủ hàng", "Shipper", "货主") : c("Tài xế", "Driver", "司机")}</span></button>)}
+        {(["chu-hang", "tai-xe"] as const).map((value, index) => <button key={value} ref={node => { tabs.current[index] = node; }} type="button" role="tab" id={"quick-tab-" + value} aria-controls="quick-posting-panel" aria-selected={role === value} tabIndex={role === value ? 0 : -1} disabled={saving} onClick={() => selectRole(value)} onKeyDown={event => tabKey(event, index)}>{index === 0 ? <Package size={20} /> : <Truck size={20} />}<span>{index === 0 ? c("Khách hàng", "Customer", "客户") : c("Tài xế", "Driver", "司机")}</span></button>)}
       </div>
       <div id="quick-posting-panel" role="tabpanel" aria-labelledby={"quick-tab-" + role} className={s.panel}>
         <h3>{driver ? c("Bạn có xe trống?", "Have a vehicle available?", "有空闲车辆？") : c("Bạn cần tìm xe?", "Looking for a vehicle?", "需要找车？")}</h3>

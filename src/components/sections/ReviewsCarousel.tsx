@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, MessageSquareQuote, Package, Truck, Quote, Star } from "lucide-react";
+import Image from "next/image";
+import { ChevronLeft, ChevronRight, MessageSquareQuote, Quote, Star } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { getHomeReviewExamples } from "@/lib/home-review-examples";
 import { communitySlideMetrics, communitySlidePage, communitySlideTarget, type SlideMetrics } from "@/utils/community-slider";
@@ -35,7 +36,7 @@ export default function ReviewsCarousel() {
     track.current?.scrollTo({ left: communitySlideTarget(next, metrics.current),
       behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ? "auto" : "smooth" });
   }
-  return <section id="reviews" data-reveal className={s.section} aria-labelledby="reviews-heading">
+  return <section id="reviews" className={s.section} aria-labelledby="reviews-heading">
     <div className={s.heading}>
       <div><span className={s.eyebrow}><MessageSquareQuote size={18} aria-hidden="true" />{c("Review & đánh giá", "Reviews & perspectives", "评价与体验")}</span>
         <h2 id="reviews-heading">{c("Góc nhìn từ mỗi hành trình.", "A perspective for every journey.", "每段行程，不同视角。")}</h2>
@@ -47,17 +48,18 @@ export default function ReviewsCarousel() {
         <button type="button" onClick={() => go(page + 1)} disabled={page >= pages - 1} aria-label={c("Xem đánh giá tiếp", "Next reviews", "下一组")}><ChevronRight size={20} /></button>
       </div>
     </div>
-    <div ref={track} className={s.track} tabIndex={0} role="region" aria-roledescription="carousel"
+    <div ref={track} data-reveal="stagger" className={s.track} tabIndex={0} role="region" aria-roledescription="carousel"
       aria-label={c("Các nhận xét tham khảo", "Illustrative review examples", "参考评价")}
       onKeyDown={event => {
         const target = event.key === "ArrowRight" ? page + 1 : event.key === "ArrowLeft" ? page - 1 : event.key === "Home" ? 0 : event.key === "End" ? pages - 1 : null;
         if (target !== null) { event.preventDefault(); go(target); }
       }}>
-      {cards.map((card, index) => { const Icon = card.role === "driver" ? Truck : Package;
+      {cards.map((card, index) => {
+        const roleName = card.role === "driver" ? c("Tài xế", "Driver", "司机") : c("Khách hàng", "Customer", "客户");
         return <article key={card.id} className={s.card} aria-label={c("Nhận xét mẫu ", "Example ", "示例 ") + (index + 1)}>
           <div className={s.cardTop}><div className={s.stars} aria-hidden="true">{Array.from({ length: 5 }, (_, i) => <Star key={i} size={15} fill="currentColor" />)}</div><Quote size={26} className={s.quoteIcon} aria-hidden="true" /></div>
           <blockquote>{card.quote}</blockquote>
-          <div className={s.author}><span className={s.avatar}><Icon size={22} aria-hidden="true" /></span><div><strong>{card.role === "driver" ? c("Tài xế", "Driver", "司机") : c("Chủ hàng", "Shipper", "货主")}</strong><span>{card.context}</span></div></div>
+          <div className={s.author}><span className={s.avatar}><Image src={card.avatar} alt="" width={96} height={96} /></span><div><strong>{roleName}</strong><span>{card.context}</span></div></div>
         </article>;
       })}
     </div>

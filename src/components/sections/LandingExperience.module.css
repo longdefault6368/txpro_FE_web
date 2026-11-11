@@ -36,7 +36,7 @@
 .heroFoot i{background:#9bb9d43d}
 .heroStrip{border-color:#b6d4f126;color:#c5d9ed;justify-content:flex-end}
 .heroStrip a{color:#e7f3ff}
-.heroCopy{animation:heroArrival .7s cubic-bezier(.2,.7,.2,1) both}
+.heroCopy{animation:heroArrival .4s cubic-bezier(.16,1,.3,1) both}
 .primary,.secondary{transition:transform .2s,background .2s,box-shadow .2s,border-color .2s}
 .roleContent .primary,.download .primary{background:linear-gradient(120deg,#136dec,#0d57c7);box-shadow:0 8px 20px #136dec21}
 .primary svg,.secondary svg{transition:transform .2s}
@@ -64,7 +64,7 @@
 .productTop span{color:#c7dbed}
 .productMap{border:1px solid #aacbe533}
 .productInfo{box-shadow:0 5px 16px #071a331a}
-.featureList .selectedFeature{background:linear-gradient(100deg,#eaf3ff,#f6fbff);border-color:#c8dff9;box-shadow:inset 3px 0 #136dec}
+.featureList .selectedFeature{background:linear-gradient(100deg,#eaf3ff,#f6fbff);border-color:#c8dff9}
 .featureList button{transition:background .2s,border-color .2s,box-shadow .2s}
 .stepNumber{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:42px;background:#eaf3ff;border:1px solid #d2e4fa;border-radius:13px;box-shadow:0 4px 10px #136dec0b}
 .steps article:nth-child(2) .stepNumber{background:#e8f5ef;border-color:#cfe8dc;color:#167757}
@@ -88,14 +88,17 @@
 .download p{color:#d3e2f6}
 .downloadMark{color:#9dc8ec}
 .downloadMark span{color:#d3e7fa}
-@keyframes heroArrival{from{opacity:.3;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes heroArrival{from{opacity:.4;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media(hover:hover) and (pointer:fine){.hero .secondary:hover{background:#ffffff16;border-color:#c3dfff80}.primary:hover{box-shadow:0 12px 28px #0a4ead30}.primary:hover svg,.secondary:hover svg{transform:translate(2px,-2px)}.quickGrid>a:hover{transform:translateY(-5px);box-shadow:0 18px 34px #123c6621}.vehicleRow a:hover::after{opacity:1}.trust>a:hover{background:#e2f1ff}.featureList button:hover{border-color:#c8dff9}}
 @media(hover:none){.quickGrid>a:hover,.guideGrid>a:hover,.primary:hover{transform:none}}
 @media(prefers-reduced-motion:reduce){.heroCopy{animation:none}.landing *::before,.landing *::after{animation:none!important;transition:none!important}}
-@media(forced-colors:active){.hero h1 em{background:none;color:CanvasText;-webkit-text-fill-color:currentColor}}
+@media(forced-colors:active){.hero h1 em,.heroCopy>.heroTitle em{background:none;color:CanvasText;-webkit-text-fill-color:currentColor}}
 
 /* Short interaction accents only; ambient motion stays confined to the hero. */
 .experienceCopy { min-width: 0; }
+.featureList { position: relative; }
+.featureList > button { min-height: 112px; }
+.featureList::before { content: ""; position: absolute; left: 0; top: 0; z-index: 1; width: 3px; height: calc((100% - 20px) / 3); border-radius: 3px; background: #136dec; pointer-events: none; transform: translate3d(0, calc(var(--feature-index, 0) * (100% + 10px)), 0); transition: transform .24s cubic-bezier(.16,1,.3,1); }
 .experienceImage {
   position: relative;
   width: 100%;
@@ -139,7 +142,7 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, .8fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 42px;
   max-width: 1152px;
@@ -220,3 +223,15 @@
   .heroStrip a:hover>svg{transform:translateY(3px)}
   .heroStrip a>svg{transition:transform .22s ease}
 }
+.heroViewport{overflow:hidden}
+.heroTrack{display:flex;width:100%;transition:transform .45s cubic-bezier(.16,1,.3,1)}
+.heroTrack>.heroGrid{flex:0 0 100%;min-width:0;overflow:hidden}
+.heroCopy>.heroTitle{margin:0;max-width:none;font-size:clamp(43px,4.7vw,64px);font-weight:700;line-height:1.13;letter-spacing:-.04em;color:#f5f9ff}
+.heroCopy>.heroTitle em{font-style:normal;color:#91dbed;background:linear-gradient(100deg,#96ccff,#82e3cb);background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+@media(max-width:1000px){.heroCopy>.heroTitle{font-size:48px}}
+.heroDots{display:flex;justify-content:center;gap:8px;margin-top:22px}
+.heroDots button{width:8px;height:8px;padding:0;border:0;border-radius:99px;background:#ffffff55;cursor:pointer;transition:width .25s ease,background .25s ease}
+.heroDots button[aria-current=true]{width:28px;background:#fff}
+.heroDots button:focus-visible{outline:2px solid #fff;outline-offset:3px}
+@media(max-width:760px){.heroCopy>.heroTitle{font-size:clamp(42px,9vw,64px)}}
+@media(max-width:360px){.heroCopy>.heroTitle{font-size:38px}}

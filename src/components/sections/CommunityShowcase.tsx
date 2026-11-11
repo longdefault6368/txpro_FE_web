@@ -21,7 +21,7 @@ export default function CommunityShowcase() {
   const roles = ["chu-hang", "tai-xe"] as const;
   const driver = role === "tai-xe";
   const cards = getCommunityExamples(role, language);
-  const roleName = driver ? c("Tài xế", "Driver", "司机") : c("Chủ hàng", "Shipper", "货主");
+  const roleName = driver ? c("Tài xế", "Driver", "司机") : c("Khách hàng", "Customer", "客户");
   const nextPath = driver ? "/chu-hang/form-tao-don" : "/tai-xe/dang-tin";
   const loginPath = "/login?next=" + encodeURIComponent(nextPath);
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function CommunityShowcase() {
     element.scrollTo({ left: communitySlideTarget(to, metrics.current), behavior: reduced ? "instant" : "smooth" });
   }
   function changeRole(next: CommunityDemoRole) { if (next !== role) { setSelected(null); setPage(0); setRole(next); } }
-  return <section id="community" data-reveal className={s.section} aria-labelledby="community-heading">
+  return <section id="community" className={s.section} aria-labelledby="community-heading">
     <div className={s.heading}>
       <div><span className={s.eyebrow}><Users size={17} />{c("Kết nối cùng TXE PRO", "Connect with TXE PRO", "与 TXE PRO 连接")}</span>
         <h2 id="community-heading">{c("Có nhu cầu. Có người đồng hành.", "Your next connection starts here.", "需求与同行，在这里相遇。")}</h2>
@@ -54,7 +54,7 @@ export default function CommunityShowcase() {
     </div>
     <div className={s.board}>
     <div className={s.toolbar}>
-      <div className={s.tabs} role="tablist" aria-label={c("Chủ hàng và tài xế", "Shippers and drivers", "货主与司机")}>
+      <div className={s.tabs} role="tablist" aria-label={c("Khách hàng và tài xế", "Customers and drivers", "客户与司机")}>
         {roles.map((value, index) => <button key={value} ref={node => { tabs.current[index] = node; }} id={"community-tab-" + value} type="button" role="tab"
           aria-selected={role === value} aria-controls="community-panel" tabIndex={role === value ? 0 : -1} onClick={() => changeRole(value)}
           onKeyDown={event => {
@@ -62,7 +62,7 @@ export default function CommunityShowcase() {
             event.preventDefault(); const next = event.key === "Home" ? 0 : event.key === "End" ? 1 : 1 - index;
             changeRole(roles[next]); tabs.current[next]?.focus();
           }}>
-          {value === "chu-hang" ? <Package size={19} /> : <Truck size={19} />}{value === "chu-hang" ? c("Chủ hàng", "Shippers", "货主") : c("Tài xế", "Drivers", "司机")}
+          {value === "chu-hang" ? <Package size={19} /> : <Truck size={19} />}{value === "chu-hang" ? c("Khách hàng", "Customers", "客户") : c("Tài xế", "Drivers", "司机")}
         </button>)}
       </div>
       <div className={s.controls}>
@@ -71,14 +71,14 @@ export default function CommunityShowcase() {
       </div>
     </div>
     <div id="community-panel" role="tabpanel" aria-labelledby={"community-tab-" + role} className={s.panel}>
-      <div id="community-slides" ref={track} className={s.track} role="region" aria-roledescription="carousel" aria-label={c("Kết nối chủ hàng và tài xế", "Shipper and driver connections", "货主与司机连接")}
+      <div id="community-slides" ref={track} data-reveal="stagger" className={s.track} role="region" aria-roledescription="carousel" aria-label={c("Kết nối khách hàng và tài xế", "Customer and driver connections", "客户与司机连接")}
         onScroll={() => { if (track.current) setPage(communitySlidePage(track.current.scrollLeft, metrics.current)); }}>
         {cards.map((item, index) => <article key={item.id} className={s.card} role="group" aria-roledescription="slide" aria-label={(index + 1) + " / " + cards.length}>
           <div className={s.visual}><span className={s.roleLabel}>{driver ? <Truck size={12} /> : <Package size={12} />}{roleName}</span>
-            <Image src={item.image} alt="" width={300} height={170} sizes="(max-width: 650px) 82vw, (max-width: 1000px) 45vw, 365px" />
+            <Image src={item.image} alt="" fill sizes="(max-width: 650px) 82vw, (max-width: 1000px) 45vw, 365px" style={{ objectFit: "cover" }} />
             <span className={s.specialty}>{item.specialty}</span></div>
           <div className={s.content}>
-            <div className={s.identity}><span className={s.avatar} aria-hidden="true">{driver ? item.displayName.split(" ").slice(-2).map(word => word[0]).join("") : item.displayName.split(" ").slice(0, 2).map(word => word[0]).join("")}</span><div><h3 className={s.title}>{item.displayName}</h3><span>{roleName}</span></div></div>
+            <div className={s.identity}><span className={s.avatar} aria-hidden="true"><Image src={item.avatar} alt="" width={96} height={96} /></span><div><h3 className={s.title}>{item.displayName}</h3><span>{roleName}</span></div></div>
             <div className={s.route}><span><MapPin size={15} />{item.region}</span><ArrowRight size={15} /><span>{item.destination}</span></div>
             <p className={s.intro}>{item.introduction}</p>
             <button type="button" className={s.cardAction} onClick={() => setSelected(item)} aria-label={c("Kết nối với ", "Connect with ", "联系 ") + item.displayName}>

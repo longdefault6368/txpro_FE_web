@@ -8,7 +8,7 @@ import { useCompanyInfo } from "@/context/CompanyInfoContext";
 
 const footerCopy = {
   vi: {
-    desc: "Nền tảng kết nối chủ hàng và tài xế theo thời gian thực, hỗ trợ đăng đơn, nhận chuyến, theo dõi GPS, ví điện tử và thanh toán ký quỹ an toàn.",
+    desc: "Nền tảng kết nối khách hàng và tài xế theo thời gian thực, hỗ trợ đăng đơn, nhận chuyến, theo dõi GPS, ví điện tử và thanh toán ký quỹ an toàn.",
     company: "TXEPRO",
     guide: "Hướng dẫn",
     policy: "Chính sách",
@@ -23,7 +23,7 @@ const footerCopy = {
       help: "Trợ giúp & FAQ",
       careers: "Tuyển dụng",
       contact: "Liên hệ TXEPRO",
-      shipperGuide: "Hướng dẫn chủ hàng",
+      shipperGuide: "Hướng dẫn khách hàng",
       driverGuide: "Hướng dẫn tài xế",
       trackingGuide: "Tra cứu vận đơn",
       faq: "Câu hỏi thường gặp",
@@ -34,7 +34,7 @@ const footerCopy = {
     },
   },
   en: {
-    desc: "A real-time logistics platform connecting shippers and drivers with order posting, trip matching, GPS tracking, wallet flows, and secure escrow payments.",
+    desc: "A real-time logistics platform connecting customers and drivers with order posting, trip matching, GPS tracking, wallet flows, and secure escrow payments.",
     company: "TXEPRO",
     guide: "Guides",
     policy: "Policies",
@@ -49,7 +49,7 @@ const footerCopy = {
       help: "Help & Support",
       careers: "Careers",
       contact: "Contact TXEPRO",
-      shipperGuide: "Shipper guide",
+      shipperGuide: "Customer guide",
       driverGuide: "Driver guide",
       trackingGuide: "Track an order",
       faq: "Frequently Asked Questions",
@@ -60,7 +60,7 @@ const footerCopy = {
     },
   },
   zh: {
-    desc: "TXEPRO 是连接货主与司机的实时物流平台，支持发布运单、接单匹配、GPS 追踪、钱包流程以及安全担保支付。",
+    desc: "TXEPRO 是连接客户与司机的实时物流平台，支持发布运单、接单匹配、GPS 追踪、钱包流程以及安全担保支付。",
     company: "TXEPRO",
     guide: "使用指南",
     policy: "政策条款",
@@ -75,7 +75,7 @@ const footerCopy = {
       help: "帮助与支持",
       careers: "招聘",
       contact: "联系 TXEPRO",
-      shipperGuide: "货主指南",
+      shipperGuide: "客户指南",
       driverGuide: "司机指南",
       trackingGuide: "运单查询",
       faq: "常见问题",
@@ -130,7 +130,7 @@ export default function Footer() {
           <div>
             <Link href="/" className="inline-flex items-center group" title="TXEPRO">
               <Image
-                src="/logo.png"
+                src="/logo-mark.webp"
                 alt="TXEPRO Logo"
                 width={52}
                 height={52}

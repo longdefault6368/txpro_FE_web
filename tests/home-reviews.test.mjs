@@ -15,6 +15,7 @@ function loader(language = "vi", hooks, globals = {}) {
     const require = id => {
       if (id === "react" && hooks) return { ...React, ...hooks };
       if (id === "@/context/LanguageContext") return { useLanguage: () => ({ language }) };
+      if (id === "next/image") return ({ fill, priority, ...props }) => React.createElement("img", props);
       if (id.endsWith(".module.css")) return new Proxy({}, { get: (_, key) => key === "__esModule" ? false : String(key) });
       if (id.startsWith("@/") || id.startsWith(".")) {
         const path = id.startsWith("@/") ? resolve(root, "src", id.slice(2)) : resolve(dirname(filename), id);

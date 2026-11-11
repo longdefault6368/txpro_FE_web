@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { ArrowLeft, ArrowUpRight, BatteryFull, CalendarDays, CheckCheck, ChevronRight, Home, MapPin, MessageCircle, Mic, Navigation, Phone, Plus, Send, Signal, Truck, UserRound, Wifi } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
@@ -9,11 +10,14 @@ import s from "./AppFeaturePreview.module.css";
 export default function AppFeaturePreview({ feature, title, description }: { feature: number; title: string; description: string }) {
   const { language } = useLanguage();
   const c = (vi: string, en: string, zh: string) => language === "en" ? en : language === "zh" ? zh : vi;
+  const previous = useRef(feature);
+  const direction = feature === previous.current ? undefined : feature > previous.current ? "next" : "prev";
+  useEffect(() => { previous.current = feature; }, [feature]);
   return <div className={s.panel}>
-    <div className={s.topline}><Image src="/logo.png" width={29} height={29} alt="" /><strong>TXE PRO</strong><span>{feature === 0 ? <Truck size={18} /> : feature === 1 ? <Navigation size={18} /> : <MessageCircle size={18} />}</span></div>
+    <div className={s.topline}><Image src="/logo-mark.webp" width={29} height={29} alt="" /><strong>TXE PRO</strong><span>{feature === 0 ? <Truck size={18} /> : feature === 1 ? <Navigation size={18} /> : <MessageCircle size={18} />}</span></div>
     <div className={s.stage}>
       <div className={s.phone} role="group" aria-label={c("Giao diện ứng dụng: ", "App interface: ", "应用界面：") + title}>
-        <div className={s.screen} key={feature}>
+        <div className={s.screen} key={feature} data-direction={direction}>
           <div className={s.status} aria-hidden="true"><span>9:41</span><span className={s.camera} /><span><Signal size={12} /><Wifi size={12} /><BatteryFull size={15} /></span></div>
           <div className={s.appHeader}><ArrowLeft size={17} /><strong>{feature === 0 ? c("Tìm xe ngay", "Find a vehicle", "立即找车") : feature === 1 ? c("Hành trình của bạn", "Your journey", "您的行程") : c("Tin nhắn", "Messages", "消息")}</strong><span>{feature === 0 ? <Truck size={17} /> : feature === 1 ? <Navigation size={17} /> : <Phone size={17} />}</span></div>
           {feature === 0 ? <div className={s.search}>

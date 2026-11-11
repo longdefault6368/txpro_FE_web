@@ -86,7 +86,7 @@ test('community shows six demo cards immediately and has no public/private API d
   assert.match(html, /href="\/register"/);
 });
 
-test('sample profiles are complete, distinct, localized and use existing illustrations', () => {
+test('sample profiles are complete, distinct, localized and use posted photos', () => {
   const { getCommunityExamples } = modules()('src/lib/community-examples.ts');
   const allIDs = new Set();
   for (const role of ['chu-hang', 'tai-xe']) for (const language of ['vi', 'en', 'zh']) {
@@ -96,6 +96,7 @@ test('sample profiles are complete, distinct, localized and use existing illustr
       assert.equal(item.demo, true); assert.equal(item.role, role); assert.ok(item.id.startsWith('demo-'));
       for (const key of ['displayName', 'region', 'destination', 'introduction', 'specialty']) assert.ok(item[key].length > 2, key);
       assert.ok(existsSync(resolve(root, 'public', item.image.slice(1))));
+      assert.ok(existsSync(resolve(root, 'public', item.avatar.slice(1))));
       assert.equal(item.phone, undefined); assert.equal(item.rating, undefined);
       if (language === 'vi') { assert.ok(!allIDs.has(item.id)); allIDs.add(item.id); }
     }

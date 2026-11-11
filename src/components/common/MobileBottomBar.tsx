@@ -158,7 +158,7 @@ export default function MobileBottomBar() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">Tải Ứng Dụng TXEPRO</h3>
-                  <p className="text-xs text-slate-500">Kết nối chủ hàng & tài xế tức thì</p>
+                  <p className="text-xs text-slate-500">Kết nối khách hàng & tài xế tức thì</p>
                 </div>
               </div>
               <button
@@ -174,7 +174,7 @@ export default function MobileBottomBar() {
             <div className="bg-primary-50/70 border border-primary-100 p-3.5 rounded-2xl text-xs space-y-1.5 text-slate-700 font-medium">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary-600 flex-shrink-0" />
-                <span>Kết nối chủ hàng và tài xế trên TXEPRO</span>
+                <span>Kết nối khách hàng và tài xế trên TXEPRO</span>
               </div>
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary-600 flex-shrink-0" />

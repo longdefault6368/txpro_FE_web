@@ -17,6 +17,18 @@ export function startLandingMotion(root: HTMLElement, { media, Observer }: Motio
     for (const animation of active) animation.cancel();
     active.clear();
   };
+  const play = (element: HTMLElement, delay: number, direction: "up" | "left" | "right") => {
+    if (stopped || typeof element.animate !== "function") return;
+    const from = direction === "left" ? "translate3d(-12px,0,0)" : direction === "right" ? "translate3d(12px,0,0)" : "translate3d(0,10px,0)";
+    try {
+      const animation = element.animate([
+        { transform: from },
+        { transform: "none" },
+      ], { duration: 280, delay, easing: "cubic-bezier(.16,1,.3,1)", fill: "none" });
+      active.add(animation);
+      animation.onfinish = animation.oncancel = () => active.delete(animation);
+    } catch { /* Presentation failure must never prevent access to content. */ }
+  };
   const observer = new Observer(entries => {
     if (stopped || media.matches) return;
     entries.forEach((entry, index) => {
@@ -24,15 +36,12 @@ export function startLandingMotion(root: HTMLElement, { media, Observer }: Motio
       seen.add(entry.target);
       observer.unobserve(entry.target);
       const element = entry.target as HTMLElement;
-      if (typeof element.animate !== "function") return;
-      try {
-        const animation = element.animate([
-          { opacity: 0.2, transform: "translateY(16px)" },
-          { opacity: 1, transform: "translateY(0)" },
-        ], { duration: 520, delay: (index % 3) * 45, easing: "cubic-bezier(.2,.7,.2,1)", fill: "none" });
-        active.add(animation);
-        animation.onfinish = animation.oncancel = () => active.delete(animation);
-      } catch { /* Presentation failure must never prevent access to content. */ }
+      const reveal = typeof element.getAttribute === "function" ? element.getAttribute("data-reveal") || "" : "";
+      if (reveal === "stagger" && element.children) {
+        Array.from(element.children).forEach((child, childIndex) => play(child as HTMLElement, childIndex * 30, "up"));
+        return;
+      }
+      play(element, (index % 3) * 45, reveal === "left" || reveal === "right" ? reveal : "up");
     });
   }, { threshold: 0.08, rootMargin: "0px 0px -24px 0px" });
   const preferenceChanged = () => {
