@@ -38,14 +38,14 @@ function loader({ language = "vi", fetch = async () => { throw new Error("Unexpe
   return path => load(resolve(root, path));
 }
 
-test("twelve complete guides have unique URLs and bundled covers", () => {
+test("fourteen complete guides have unique URLs and bundled covers", () => {
   const { getEditorialArticles } = loader()("src/lib/news-content.ts");
   for (const language of ["vi", "en", "zh"]) {
     const articles = getEditorialArticles(language);
-    assert.equal(articles.length, 12);
-    assert.equal(new Set(articles.map(item => item.id)).size, 12);
-    assert.equal(new Set(articles.map(item => item.imageUrl)).size, 12, "every article needs a different cover");
-    assert.equal(new Set(articles.map(item => createHash("sha256").update(readFileSync(resolve(root, "public", item.imageUrl.slice(1)))).digest("hex"))).size, 12, "different filenames must not hide duplicate images");
+    assert.equal(articles.length, 14);
+    assert.equal(new Set(articles.map(item => item.id)).size, 14);
+    assert.equal(new Set(articles.map(item => item.imageUrl)).size, 14, "every article needs a different cover");
+    assert.equal(new Set(articles.map(item => createHash("sha256").update(readFileSync(resolve(root, "public", item.imageUrl.slice(1)))).digest("hex"))).size, 14, "different filenames must not hide duplicate images");
     for (const item of articles) {
       assert.ok(item.title.length >= (language === "zh" ? 8 : 10));
       assert.ok(item.summary.length > 15);
@@ -263,24 +263,24 @@ test("combined news pages have no gaps or duplicates at the CMS/editorial bounda
         pagination: { page, total: remoteTotal, totalPages: Math.max(1, Math.ceil(remoteTotal / 9)) } }, editorial, page);
       assert.ok(result.items.length <= 9);
       assert.equal(result.pagination.totalPages, count);
-      assert.equal(result.pagination.total, remoteTotal + 12);
+      assert.equal(result.pagination.total, remoteTotal + editorial.length);
       all.push(...result.items.map(item => item.id));
     }
     assert.deepEqual(all, [...remote, ...editorial].map(item => item.id));
     assert.equal(new Set(all).size, all.length);
   }
-  assert.equal(paginateNews(null, editorial, 2).items.length, 3);
+  assert.equal(paginateNews(null, editorial, 2).items.length, 5);
   assert.equal(readNewsQuery({ page: "-1", category: ["guide"] }).page, 1);
   assert.equal(readNewsQuery({ category: ["guide"] }).category, "all");
   assert.equal(newsPageHref(2, "guide", "xe trống"), "/tin-tuc?page=2&category=guide&search=xe+tr%E1%BB%91ng");
 });
 
-test("listing renders nine uniform cards, then the last three on a separate crawlable page", () => {
+test("listing renders nine uniform cards, then the last five on a separate crawlable page", () => {
   const load = loader();
   const Feed = load("src/components/news/NewsFeed.tsx").default;
   const editorial = load("src/lib/news-content.ts").getEditorialArticles();
   const links = [];
-  for (const [page, expected] of [[1, 9], [2, 3]]) {
+  for (const [page, expected] of [[1, 9], [2, 5]]) {
     const html = renderToStaticMarkup(React.createElement(Feed, { initialData: null, initialPage: page }));
     const ids = [...html.matchAll(/href="\/tin-tuc\/([^"]+)"/g)].map(item => item[1]);
     assert.equal(ids.length, expected);

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
+import { AccountClosureActions, type AccountClosure } from "./account-closure-actions";
 import { useToast } from "@/context/ToastContext";
 import { getServerMediaUrl, normalizePersistedImagePath } from "@/utils/media";
 import { getVehicleCapabilities } from "@/utils/vehicleCapabilities";
@@ -196,6 +197,7 @@ interface User {
   role: "admin" | "tai-xe" | "chu-hang";
   isActive: boolean;
   deletedAt?: string | null;
+  accountClosure?: AccountClosure;
   kycStatus: "draft" | "pending" | "pending_review" | "verified" | "rejected";
   language: string;
   createdAt: string;
@@ -877,7 +879,8 @@ function AdminUsersContent() {
   }, [search, roleFilter, statusFilter, kycFilter, accountScope]);
 
   const isProtectedUser = (user: User) =>
-    user.role === "admin" || user._id === sessionUserId || Boolean(user.deletedAt);
+    user.role === "admin" || user._id === sessionUserId || Boolean(user.deletedAt)
+    || ["deletion_requested", "deleted"].includes(user.accountClosure?.state || "");
 
   const selectableUsers = useMemo(
     () => users.filter((user) => !isProtectedUser(user)),
@@ -2263,11 +2266,17 @@ function AdminUsersContent() {
                   value={statusFilter}
                   onChange={(e) => {
                     setStatusFilter(e.target.value);
+                    if (["deactivated", "deletion_requested", "deleted"].includes(e.target.value)) {
+                      setAccountScope("all");
+                    }
                     setCurrentPage(1);
                   }}
                   className="appearance-none w-full md:w-44 pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white"
                 >
                   <option value="">Tất cả Trạng thái</option>
+                  <option value="deactivated">Tự vô hiệu hóa</option>
+                  <option value="deletion_requested">Chờ xóa vĩnh viễn</option>
+                  <option value="deleted">Đã xóa vĩnh viễn</option>
                   <option value="active">Đang hoạt động</option>
                   <option value="inactive">Đã bị khóa</option>
                 </select>
@@ -2428,6 +2437,16 @@ function AdminUsersContent() {
                               </div>
                               <span className="font-bold text-slate-800">{user.name || "Người dùng TXEPRO"}</span>
                             </div>
+                            <AccountClosureActions closure={user.accountClosure} complete={async (retentionSummary) => {
+                              const res = await fetchWithAuth(`${API_BASE}/admin/users/${user._id}/account-deletion/complete`, {
+                                method: "POST", headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ cleanupConfirmed: true, completionNoticeSent: true, retentionSummary }),
+                              });
+                              const data = await res.json();
+                              if (!res.ok) throw new Error(data.message || "Chưa hoàn tất được yêu cầu.");
+                              showToast(true, "Đã hoàn tất xóa tài khoản.");
+                              await fetchUsers();
+                            }} />
                           </td>
                           
                           {/* Phone / Email */}
@@ -2566,6 +2585,7 @@ function AdminUsersContent() {
                             ) : (
                             <button
                               onClick={() => handleToggleStatus(user)}
+                              disabled={Boolean(user.accountClosure?.state && user.accountClosure.state !== "deactivated")}
                               className={`transition-colors duration-200 outline-none focus:outline-none cursor-pointer ${
                                 user.isActive ? "text-primary-500" : "text-slate-300"
                               }`}
@@ -2627,7 +2647,7 @@ function AdminUsersContent() {
                               </button>
 
                               {/* Delete */}
-                              {user.deletedAt && (
+                              {user.deletedAt && user.accountClosure?.state !== "deleted" && (
                                 <button
                                   type="button"
                                   onClick={() => setRestoreTarget(user)}
@@ -2639,7 +2659,7 @@ function AdminUsersContent() {
                                   Khôi phục
                                 </button>
                               )}
-                              {!user.deletedAt && (
+                              {!user.deletedAt && user.accountClosure?.state !== "deletion_requested" && (
                               <button
                                 onClick={() => handleDeleteUser(user._id)}
                                 className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"

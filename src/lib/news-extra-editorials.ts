@@ -217,6 +217,62 @@ const drafts: Draft[] = [
  ],
  conclusion: "Buổi giao nhận rõ cần phối hợp giữa người giao, tài xế và người nhận. Danh sách, kiểm đếm và ghi nhận tình trạng giúp giảm nhầm lẫn. Khi thực hiện chuyến trên TXE PRO, làm theo yêu cầu hiện trên màn hình và kiểm tra trạng thái đúng đơn sau mỗi thao tác."
  }
+},
+{
+ id: "chuong-trinh-doi-tac-txe-pro",
+ title: "Chương trình Đối tác TXE PRO: giới thiệu thành viên, nhận thưởng theo chính sách",
+ summary: "Tài xế và chủ hàng đăng ký đối tác trên ứng dụng, giới thiệu tài khoản mới bằng mã hợp lệ và nhận thưởng khi người được giới thiệu đủ điều kiện.",
+ category: "news",
+ imageUrl: "/images/news/doi-tac-txe-pro.jpg",
+ guide: {
+ intro: "Chương trình Đối tác TXE PRO dành cho thành viên muốn giới thiệu tài xế hoặc chủ hàng mới đến nền tảng. Người tham gia đăng ký trên ứng dụng, chia sẻ mã giới thiệu và nhận thưởng khi người được giới thiệu hoàn tất đúng điều kiện của vai trò đó. Bài viết trình bày cách ghi nhận, mức thưởng từng vai trò, thưởng thêm theo số thành viên hợp lệ và cách tiền thưởng được cộng vào tài khoản. Đây là phần thông tin. Khi đăng ký, bạn vẫn cần đọc và đồng ý đúng phiên bản chính sách đang hiển thị trong ứng dụng.",
+ takeaways: ["Tài xế và chủ hàng đều có thể đăng ký làm đối tác trên ứng dụng.", "Người mới phải tạo tài khoản bằng mã hợp lệ và chỉ gắn với một đối tác.", "Thưởng giới thiệu và thưởng mốc chỉ nhận khi đủ điều kiện, mỗi mốc một lần."],
+ sections: [
+ { heading: "Đăng ký đối tác và ghi nhận lời giới thiệu",
+ paragraphs: ["Tài xế và chủ hàng đều có thể đăng ký làm đối tác TXE PRO trên ứng dụng. Sau khi đọc chính sách và xác nhận đồng ý, tài khoản có mã giới thiệu để chia sẻ. Mã được dùng khi người mới tạo tài khoản, không dùng để gắn vào một tài khoản đã có từ trước. Đối tác nên gửi đúng mã, vì hệ thống ghi nhận theo mã hợp lệ tại thời điểm đăng ký.",
+ "Người được giới thiệu phải đăng ký tài khoản mới bằng mã hợp lệ. Mỗi người chỉ được ghi nhận cho một đối tác. Một tài khoản vì vậy không thể vừa tính cho người này, vừa tính cho người khác, và cũng không phát sinh thêm lượt thưởng chỉ vì đổi vai trò sau khi đã đăng ký. Đối tác theo dõi danh sách giới thiệu trong khu vực đối tác để biết lượt nào đã được ghi nhận."],
+ image: media("dang-ky-doi-tac.jpg", "Người đăng ký đối tác trên điện thoại tại bàn làm việc", "Đăng ký đối tác và chia sẻ mã giới thiệu được thực hiện trên ứng dụng TXE PRO."),
+ checklist: ["Đăng ký đối tác trên ứng dụng sau khi đọc chính sách.", "Người mới tạo tài khoản bằng đúng mã hợp lệ.", "Mỗi tài khoản chỉ được gắn với một đối tác."] },
+ { heading: "Khi nào một lượt giới thiệu đủ điều kiện nhận thưởng",
+ paragraphs: ["Thưởng không phát sinh ngay khi người mới vừa tạo tài khoản. Tài xế được giới thiệu cần hoàn tất xác thực hợp lệ theo quy trình TXE PRO. Chủ hàng được giới thiệu cần hoàn thành đơn hàng đầu tiên. Chỉ khi điều kiện của đúng vai trò đăng ký đã hoàn tất, lượt giới thiệu đó mới được tính là thành viên hợp lệ.",
+ "Mức thưởng giới thiệu là 30.000 đồng cho mỗi tài xế hợp lệ và 20.000 đồng cho mỗi chủ hàng hợp lệ. Số tiền gắn với vai trò lúc đăng ký, không cộng hai mức cho cùng một người. Trong danh sách giới thiệu, đối tác thấy lượt đang chờ đủ điều kiện hoặc đã đủ điều kiện. Khi chưa đủ điều kiện, khoản hiển thị vẫn là mức dự kiến, chưa phải số đã được ghi nhận."],
+ example: "Bạn giới thiệu một tài xế mới bằng mã của mình. Lượt này được thưởng 30.000 đồng sau khi tài xế hoàn tất xác thực hợp lệ. Nếu người được giới thiệu là chủ hàng, điều kiện là hoàn thành đơn hàng đầu tiên và mức thưởng là 20.000 đồng.",
+ note: "Xác thực tài xế và đơn hàng đầu tiên của chủ hàng theo quy trình đang hiển thị trên TXE PRO. Bài viết không thay thế chính sách mà bạn đã đồng ý trong ứng dụng." },
+ { heading: "Mức thưởng thêm và cách tiền được cộng vào tài khoản",
+ paragraphs: ["Ngoài thưởng từng người, đối tác nhận thêm theo số lượng thành viên hợp lệ. Mốc 200 người thưởng thêm 1.500.000 đồng, 500 người thưởng thêm 4.000.000 đồng, 1.000 người thưởng thêm 9.000.000 đồng, 2.000 người thưởng thêm 20.000.000 đồng và 5.000 người thưởng thêm 60.000.000 đồng. Mỗi mốc chỉ nhận thưởng một lần. Người được tính vào mốc là thành viên đã đủ điều kiện, không phải mọi lượt vừa tạo tài khoản.",
+ "Để nhận tiền, đối tác thêm tài khoản ngân hàng trên ứng dụng. Tiền thưởng được tự động cộng vào tài khoản khi đủ điều kiện. Trong trang đối tác, bạn theo dõi tổng thưởng, số có thể sử dụng và các khoản đang xử lý. Khi đối soát, dùng đúng mã giới thiệu và danh sách thành viên đang hiển thị. Một mốc đã nhận không được khai báo thêm một lần nữa."],
+ image: media("thuong-gioi-thieu.jpg", "Điện thoại và thẻ ngân hàng trên bàn làm việc của đối tác", "Đối tác thêm tài khoản ngân hàng để tiền thưởng được cộng khi đủ điều kiện.") }
+ ],
+ conclusion: "Chương trình Đối tác TXE PRO ghi nhận lời giới thiệu bằng mã hợp lệ, thưởng 30.000 đồng cho mỗi tài xế hợp lệ và 20.000 đồng cho mỗi chủ hàng hợp lệ, rồi cộng thêm theo từng mốc thành viên. Mỗi người chỉ gắn với một đối tác và mỗi mốc chỉ nhận một lần. Hãy đăng ký trên ứng dụng, thêm tài khoản ngân hàng và đọc chính sách trước khi chia sẻ mã. TXE PRO – Hàng tìm xe, xe tìm hàng."
+ }
+},
+{
+ id: "uu-dai-doi-tac-txe-pro",
+ title: "Ưu đãi Đối tác TXE PRO: thưởng khi giới thiệu tài xế và chủ hàng hợp lệ",
+ summary: "Giới thiệu tài xế hợp lệ nhận 30.000 đồng, chủ hàng hợp lệ nhận 20.000 đồng, kèm thưởng thêm theo từng mốc thành viên.",
+ category: "promotion",
+ imageUrl: "/images/news/uu-dai-doi-tac.jpg",
+ guide: {
+ intro: "Ưu đãi Đối tác TXE PRO dành cho tài xế và chủ hàng đã đăng ký làm đối tác trên ứng dụng. Khi người được giới thiệu tạo tài khoản mới bằng mã hợp lệ và hoàn tất điều kiện của vai trò đó, đối tác nhận thưởng theo mức đang công bố. Bài này nêu rõ khoản thưởng từng người, các mốc thưởng thêm và việc tiền được cộng vào tài khoản. Số liệu dưới đây theo chính sách đối tác hiện tại. Trước khi chia sẻ mã, hãy đọc lại phiên bản chính sách trong ứng dụng.",
+ takeaways: ["Tài xế hợp lệ: 30.000 đồng mỗi người. Chủ hàng hợp lệ: 20.000 đồng mỗi người.", "Thưởng thêm một lần tại các mốc 200, 500, 1.000, 2.000 và 5.000 thành viên hợp lệ.", "Thêm tài khoản ngân hàng trên ứng dụng để tiền thưởng được cộng khi đủ điều kiện."],
+ sections: [
+ { heading: "Thưởng giới thiệu cho từng thành viên hợp lệ",
+ paragraphs: ["Ưu đãi cơ bản tính theo từng người được giới thiệu, không tính theo số lần chia sẻ mã. Tài xế hợp lệ mang lại 30.000 đồng. Chủ hàng hợp lệ mang lại 20.000 đồng. Một người chỉ nhận một mức, đúng với vai trò lúc đăng ký tài khoản mới. Đối tác không cộng cả hai khoản cho cùng một tài khoản.",
+ "Tài khoản mới phải đăng ký bằng mã hợp lệ và chỉ được ghi nhận cho một đối tác. Thưởng chưa có ngay khi người đó vừa tạo tài khoản. Tài xế cần hoàn tất xác thực hợp lệ theo quy trình TXE PRO. Chủ hàng cần hoàn thành đơn hàng đầu tiên. Khi điều kiện chưa xong, khoản hiển thị vẫn là mức dự kiến."],
+ image: media("dang-ky-doi-tac.jpg", "Người xem ưu đãi giới thiệu trên điện thoại", "Mã giới thiệu được chia sẻ sau khi đăng ký đối tác trên ứng dụng TXE PRO."),
+ checklist: ["Đăng ký đối tác và dùng đúng mã hợp lệ.", "Mỗi người mới chỉ gắn với một đối tác.", "Chờ đúng điều kiện của tài xế hoặc chủ hàng trước khi tính thưởng."] },
+ { heading: "Thưởng thêm theo số thành viên hợp lệ",
+ paragraphs: ["Ngoài thưởng từng người, chương trình có thưởng thêm khi số thành viên hợp lệ chạm mốc. Mốc 200 người là 1.500.000 đồng, 500 người là 4.000.000 đồng, 1.000 người là 9.000.000 đồng, 2.000 người là 20.000.000 đồng và 5.000 người là 60.000.000 đồng. Đây là khoản thưởng thêm của từng mốc, không thay thế 30.000 đồng hoặc 20.000 đồng đã nhận cho từng người.",
+ "Mỗi mốc chỉ nhận thưởng một lần. Người được đếm là thành viên đã đủ điều kiện, không gồm những tài khoản mới còn đang chờ xác thực hoặc chưa hoàn thành đơn đầu tiên. Khi một mốc đã được ghi nhận, đối tác không khai báo lại mốc đó. Danh sách trong khu vực đối tác là căn cứ để đối chiếu số người hợp lệ."],
+ example: "Một đối tác đã có 199 chủ hàng và tài xế hợp lệ. Khi người thứ 200 đủ điều kiện, đối tác nhận thưởng của người đó, 30.000 hoặc 20.000 đồng tùy vai trò, và thêm 1.500.000 đồng của mốc 200. Mốc 500 vẫn chờ đến khi đủ số thành viên hợp lệ tiếp theo.",
+ note: "Các mốc chỉ tính thành viên hợp lệ. Lượt mới đăng ký nhưng chưa đủ điều kiện chưa được cộng vào mốc thưởng." },
+ { heading: "Cách tiền thưởng được cộng vào tài khoản",
+ paragraphs: ["Đối tác thêm tài khoản ngân hàng trên ứng dụng trước khi nhận tiền. Khi một lượt giới thiệu hoặc một mốc đủ điều kiện, tiền thưởng được tự động cộng vào tài khoản. Không cần gửi một yêu cầu riêng cho từng người vừa hợp lệ. Trang đối tác hiển thị tổng thưởng, số có thể theo dõi và các khoản đang xử lý để đối soát.",
+ "Ưu đãi này gắn với chương trình đối tác, tách khỏi ví chuyến xe và voucher của từng đơn. Muốn tham gia, tài xế hoặc chủ hàng mở mục đối tác, đọc chính sách và xác nhận đồng ý. Sau đó chia sẻ mã cho người tạo tài khoản mới. TXE PRO giữ nguyên nguyên tắc: hàng tìm xe, xe tìm hàng, và chỉ ghi thưởng khi điều kiện đã hoàn tất."],
+ image: media("thuong-gioi-thieu.jpg", "Thẻ ngân hàng và điện thoại để nhận thưởng đối tác", "Tài khoản ngân hàng trên ứng dụng là nơi tiền thưởng được cộng khi đủ điều kiện.") }
+ ],
+ conclusion: "Ưu đãi Đối tác TXE PRO trả 30.000 đồng cho mỗi tài xế hợp lệ và 20.000 đồng cho mỗi chủ hàng hợp lệ, rồi thưởng thêm một lần ở các mốc 200, 500, 1.000, 2.000 và 5.000 thành viên. Hãy đăng ký trên ứng dụng, thêm tài khoản ngân hàng và chỉ chia sẻ mã cho người tạo tài khoản mới. Tiền được cộng khi đủ điều kiện, không cộng trước. TXE PRO – Hàng tìm xe, xe tìm hàng."
+ }
 }
 ];
 export const extraEditorials: NewsArticle[] = drafts.map(draft => ({
