@@ -532,7 +532,7 @@ export default function AdminNewsPage() {
       {preview && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={() => setPreview(null)}><section role="dialog" aria-modal="true" aria-label="Xem trước bài viết" className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-xl" onClick={event => event.stopPropagation()}><header className="flex items-center justify-between border-b border-slate-100 p-4"><span className="text-sm font-semibold text-slate-700">Xem trước • {AUDIENCE_LABELS[preview.audience].label}</span><button type="button" aria-label="Đóng xem trước" onClick={() => setPreview(null)} className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></header><div className="overflow-y-auto"><div className="h-52"><NewsThumbnail key={preview.imageUrl} src={getServerMediaUrl(preview.imageUrl)} title={preview.title} /></div><div className="space-y-2 p-5"><span className="text-xs font-semibold text-primary-700">{CATEGORY_LABELS[preview.category].label} • {formatDate(preview.publishedAt)}</span><h2 className="text-xl font-bold text-slate-900">{preview.title}</h2><p className="text-sm leading-relaxed text-slate-600">{preview.summary}</p></div><iframe title="Nội dung bài viết" sandbox="" referrerPolicy="no-referrer" className="h-[40vh] w-full border-0" srcDoc={`<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="referrer" content="no-referrer"><style>body{font:15px/1.7 system-ui,sans-serif;color:#334155;margin:0;padding:0 20px 20px;overflow-wrap:anywhere}img{max-width:100%;height:auto}h2,h3{color:#0f172a}a{color:#0f766e}table{max-width:100%;border-collapse:collapse}td,th{border:1px solid #e2e8f0;padding:6px}</style></head><body>${preview.content}</body></html>`} /><p className="px-5 pb-5 text-xs text-slate-500">Bản xem trước nội dung. App lọc theo đối tượng, trạng thái xuất bản và giờ đăng; khung hiển thị có thể khác theo thiết bị.</p></div></section></div>}
       {modalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl max-h-[94vh] overflow-y-auto">
+          <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl max-h-[94vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-lg font-black text-slate-900">
                 {editing ? "Sửa bài viết" : "Thêm bài viết"}
@@ -590,7 +590,7 @@ export default function AdminNewsPage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-bold text-slate-700">Nội dung chi tiết bài viết *</span>
-                  <span className="text-[11px] text-slate-400">Hỗ trợ định dạng trực quan & xem trước mobile</span>
+                  <span className="text-[11px] text-slate-400">Soạn trực tiếp trên trang. Không cần gõ mã HTML.</span>
                 </div>
                 <NewsContentEditor
                   value={form.content}

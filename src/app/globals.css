@@ -242,3 +242,26 @@ html, body {
   font-size: 0.875rem;
   line-height: 1.6;
 }
+.news-visual-editor {
+  min-height: 68vh;
+  padding: 22px 24px 32px;
+  outline: none;
+  font-size: 16px;
+  line-height: 1.75;
+  color: #1e293b;
+}
+.news-visual-editor[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+}
+.news-visual-editor img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 14px 0;
+  border-radius: 14px;
+}
+.news-visual-editor:focus {
+  outline: none;
+}
