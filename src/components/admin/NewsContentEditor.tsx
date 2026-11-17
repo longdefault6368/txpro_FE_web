@@ -314,7 +314,7 @@ export function NewsContentEditor({
     holder.innerHTML = html;
     const fragment = document.createDocumentFragment();
     while (holder.firstChild) fragment.appendChild(holder.firstChild);
-    if (node && node.parentNode === editor) node.after(fragment);
+    if (node?.parentNode === editor) editor.insertBefore(fragment, node.nextSibling);
     else editor.appendChild(fragment);
     emitVisual();
   };
