@@ -31,11 +31,11 @@ export function AdminPager({ pagination, onPage, busy }: { pagination: Affiliate
 export function AdminPartnersTable({ partners, onSelect, onStatus, busy }: { partners: Partner[]; onSelect: (id: string) => void; onStatus?: (partner: Partner) => void; busy?: boolean }) {
   if (!partners.length) return <AdminEmpty title='Chưa tìm thấy đối tác'>Thử thay đổi từ khóa hoặc bộ lọc để xem các đối tác khác.</AdminEmpty>;
   return <div className={s.tableWrap}><table><thead><tr><th>Đối tác</th><th>Mã giới thiệu</th><th>Thành viên</th><th>Trạng thái</th><th className={s.numeric}>Tổng thưởng</th><th className={s.numeric}>Khả dụng</th><th /></tr></thead><tbody>
-    {partners.map(p => <tr key={p._id} className={s.clickableRow} onClick={() => onSelect(p._id)}><td><div className={s.person}>
+    {partners.map(p => <tr key={p._id} className={s.clickableRow} onClick={() => onSelect(p._id)}><td data-label="Đối tác"><div className={s.person}>
       <span className={s.avatar}>{(p.userId?.name || 'ĐT').trim().split(/\s+/).slice(-2).map(v => v[0]).join('').toUpperCase()}</span>
       <div><button className={s.nameButton} onClick={e => { e.stopPropagation(); onSelect(p._id); }}>{p.userId?.name || 'Chưa cập nhật tên'}</button><small>{p.userId?.phone || 'Chưa cập nhật số điện thoại'}</small></div></div></td>
-      <td><span className={s.code}>{p.code}</span></td><td><strong>{p.stats?.registered.toLocaleString('vi-VN') ?? '—'}</strong><small>{p.stats ? `${p.stats.qualified.toLocaleString('vi-VN')} đủ điều kiện` : 'Chưa có thống kê'}</small></td>
-      <td><AdminStatus value={p.status} /></td><td className={s.numeric}><strong>{money(p.totalEarned)}</strong></td><td className={s.numeric}>{money(p.balance)}</td><td><div className={s.rowActions}>
+      <td data-label="Mã giới thiệu"><span className={s.code}>{p.code}</span></td><td data-label="Thành viên"><strong>{p.stats?.registered.toLocaleString('vi-VN') ?? '—'}</strong><small>{p.stats ? `${p.stats.qualified.toLocaleString('vi-VN')} đủ điều kiện` : 'Chưa có thống kê'}</small></td>
+      <td data-label="Trạng thái"><AdminStatus value={p.status} /></td><td className={s.numeric} data-label="Tổng thưởng"><strong>{money(p.totalEarned)}</strong></td><td className={s.numeric} data-label="Khả dụng">{money(p.balance)}</td><td data-label="Thao tác"><div className={s.rowActions}>
         <button className={s.iconButton} aria-label={`Xem chi tiết ${p.userId?.name || p.code}`} onClick={e => { e.stopPropagation(); onSelect(p._id); }}><Eye size={18} /></button>
         {onStatus && <button className={s.textButton} disabled={busy} onClick={e => { e.stopPropagation(); onStatus(p); }}>{p.status === 'active' ? 'Tạm ngưng' : 'Mở lại'}</button>}
       </div></td></tr>)}
@@ -44,9 +44,9 @@ export function AdminPartnersTable({ partners, onSelect, onStatus, busy }: { par
 export function AdminPayoutsTable({ payouts, onReview }: { payouts: Payout[]; onReview?: (payout: Payout) => void }) {
   if (!payouts.length) return <AdminEmpty title='Chưa có yêu cầu thanh toán'>Các yêu cầu thanh toán của đối tác sẽ hiển thị tại đây.</AdminEmpty>;
   return <div className={s.tableWrap}><table><thead><tr><th>Đối tác / Thời gian</th><th>Số tiền</th><th>Tài khoản nhận</th><th>Trạng thái</th><th>Đối soát</th></tr></thead><tbody>{payouts.map(p => <tr key={p._id}>
-    <td><span className={s.code}>{p.partnerId?.code || 'Yêu cầu của đối tác'}</span><small>{affiliateDate(p.createdAt, true)}</small></td><td><strong>{money(p.amount)}</strong></td>
-    <td><strong>{p.accountName}</strong><small>{p.bankName} · {p.accountNumber}</small></td><td><AdminStatus value={p.status} /></td>
-    <td>{p.status === 'pending' && onReview ? <AdminButton secondary onClick={() => onReview(p)}><ArrowDownLeft size={16} />Xử lý</AdminButton> : <span className={s.muted}>{p.transferReference || p.note || '—'}</span>}</td>
+    <td data-label="Đối tác"><span className={s.code}>{p.partnerId?.code || 'Yêu cầu của đối tác'}</span><small>{affiliateDate(p.createdAt, true)}</small></td><td data-label="Số tiền"><strong>{money(p.amount)}</strong></td>
+    <td data-label="Tài khoản nhận"><strong>{p.accountName}</strong><small>{p.bankName} · {p.accountNumber}</small></td><td data-label="Trạng thái"><AdminStatus value={p.status} /></td>
+    <td data-label="Đối soát">{p.status === 'pending' && onReview ? <AdminButton secondary onClick={() => onReview(p)}><ArrowDownLeft size={16} />Xử lý</AdminButton> : <span className={s.muted}>{p.transferReference || p.note || '—'}</span>}</td>
   </tr>)}</tbody></table></div>;
 }
 export function AdminDialog({ title, children, onClose, busy }: { title: string; children: ReactNode; onClose: () => void; busy?: boolean }) {
