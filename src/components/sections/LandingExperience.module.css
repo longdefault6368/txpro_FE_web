@@ -36,7 +36,7 @@
 .heroFoot i{background:#9bb9d43d}
 .heroStrip{border-color:#b6d4f126;color:#c5d9ed;justify-content:flex-end}
 .heroStrip a{color:#e7f3ff}
-.heroCopy{animation:heroArrival .4s cubic-bezier(.16,1,.3,1) both}
+.heroCopy{animation:heroArrival .72s cubic-bezier(.22,.61,.36,1) both}
 .primary,.secondary{transition:transform .2s,background .2s,box-shadow .2s,border-color .2s}
 .roleContent .primary,.download .primary{background:linear-gradient(120deg,#136dec,#0d57c7);box-shadow:0 8px 20px #136dec21}
 .primary svg,.secondary svg{transition:transform .2s}
@@ -88,7 +88,7 @@
 .download p{color:#d3e2f6}
 .downloadMark{color:#9dc8ec}
 .downloadMark span{color:#d3e7fa}
-@keyframes heroArrival{from{opacity:.4;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes heroArrival{from{opacity:.72;transform:translateY(16px)}to{opacity:1;transform:none}}
 @media(hover:hover) and (pointer:fine){.hero .secondary:hover{background:#ffffff16;border-color:#c3dfff80}.primary:hover{box-shadow:0 12px 28px #0a4ead30}.primary:hover svg,.secondary:hover svg{transform:translate(2px,-2px)}.quickGrid>a:hover{transform:translateY(-5px);box-shadow:0 18px 34px #123c6621}.vehicleRow a:hover::after{opacity:1}.trust>a:hover{background:#e2f1ff}.featureList button:hover{border-color:#c8dff9}}
 @media(hover:none){.quickGrid>a:hover,.guideGrid>a:hover,.primary:hover{transform:none}}
 @media(prefers-reduced-motion:reduce){.heroCopy{animation:none}.landing *::before,.landing *::after{animation:none!important;transition:none!important}}
@@ -225,7 +225,7 @@
 }
 .heroViewport{overflow:hidden}
 .heroTrack{display:flex;width:100%;transition:transform .45s cubic-bezier(.16,1,.3,1)}
-.heroTrack>.heroGrid{flex:0 0 100%;min-width:0;overflow:hidden}
+.heroTrack>.heroGrid{flex:0 0 100%;min-width:0;overflow:hidden;align-items:start}
 .heroCopy>.heroTitle{margin:0;max-width:none;font-size:clamp(43px,4.7vw,64px);font-weight:700;line-height:1.13;letter-spacing:-.04em;color:#f5f9ff}
 .heroCopy>.heroTitle em{font-style:normal;color:#91dbed;background:linear-gradient(100deg,#96ccff,#82e3cb);background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 @media(max-width:1000px){.heroCopy>.heroTitle{font-size:48px}}

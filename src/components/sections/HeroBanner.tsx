@@ -18,7 +18,7 @@ export default function HeroBanner() {
     {
       key: "connect",
       eyebrow: c("Kết nối mọi hành trình", "Every journey, connected", "连接每一段旅程"),
-      title: [c("Đúng xe.", "Right vehicle.", "合适的车。"), c("Đúng hành trình.", "Right journey.", "合适的旅程。"), c("Cùng TXE PRO.", "With TXE PRO.", "尽在 TXE PRO。")],
+      title: [c("Tìm xe chở hàng", "Find freight transport", "查找货运车辆"), c("và kết nối", "and connect", "并连接"), c("tài xế.", "with drivers.", "司机。")],
       text: c("Từ chuyến đi cá nhân đến vận chuyển hàng hóa. Kết nối khách hàng và tài xế, chủ động lựa chọn và an tâm trên từng chặng đường.", "From personal journeys to moving goods. Connect customers and drivers, choose what works for you and stay informed along the way.", "从个人出行到货物运输。连接客户与司机，自主选择，随时了解行程。"),
       primary: { href: "/chu-hang/form-tao-don", label: c("Tôi cần tìm xe", "Find a vehicle", "我要找车") },
       secondary: { href: "/tai-xe/dang-tin", label: c("Đăng xe trống", "Post availability", "发布空车") },

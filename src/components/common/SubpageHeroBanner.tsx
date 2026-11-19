@@ -22,7 +22,7 @@ interface SubpageHeroBannerProps {
 const SUBPAGE_NAV_ITEMS = [
   { href: "/thong-tin/gioi-thieu", label: { vi: "Giới thiệu", en: "About", zh: "项目介绍" } },
   { href: "/thong-tin/quy-che-hoat-dong", label: { vi: "Quy chế", en: "Operating Rules", zh: "运营规则" } },
-  { href: "/thong-tin/huong-dan-chu-hang", label: { vi: "HD Chủ hàng", en: "Shipper Guide", zh: "货主指南" } },
+  { href: "/thong-tin/huong-dan-chu-hang", label: { vi: "Đăng nhu cầu", en: "Post a request", zh: "发布需求" } },
   { href: "/thong-tin/huong-dan-tai-xe", label: { vi: "HD Tài xế", en: "Driver Guide", zh: "司机指南" } },
   { href: "/tro-giup", label: { vi: "Trợ giúp & FAQ", en: "Help & FAQ", zh: "帮助与 FAQ" } },
   { href: "/tuyen-dung", label: { vi: "Tuyển dụng", en: "Careers", zh: "招聘" } },
@@ -58,7 +58,7 @@ export default function SubpageHeroBanner({
       <div className="absolute inset-0 z-0">
         <Image
           src="/splash1.png"
-          alt="TXEPRO Transport Truck Banner"
+          alt=""
           fill
           priority
           sizes="100vw"

@@ -155,7 +155,7 @@ test('referral storage keeps the first valid code for 30 days and ignores malfor
 test('Play links carry the referral while rejecting foreign, insecure or credential-bearing URLs', () => {
   const { googlePlayReferralUrl } = modules()('src/utils/affiliate.ts');
   const url = new URL(googlePlayReferralUrl('https://play.google.com/store/apps/details?id=vn.txepro.mobile&hl=vi', 'txe-123'));
-  assert.equal(url.searchParams.get('id'), 'vn.txepro.mobile'); assert.equal(new URLSearchParams(url.searchParams.get('referrer')).get('referral_code'), 'TXE-123');
+  assert.equal(url.searchParams.get('id'), 'vn.txepro.mobile'); assert.equal(url.searchParams.get('ref'), 'TXE-123'); assert.equal(new URLSearchParams(url.searchParams.get('referrer')).get('referral_code'), 'TXE-123');
   for (const raw of ['http://play.google.com/store/apps/details?id=vn.txepro.mobile', 'https://evil.test/store/apps/details?id=vn.txepro.mobile', 'https://someone@play.google.com/store/apps/details?id=vn.txepro.mobile', 'https://play.google.com/store/apps/details?id=invalid']) assert.equal(googlePlayReferralUrl(raw, 'TXE123'), null);
   assert.equal(googlePlayReferralUrl(url.href, '???'), null);
 });
@@ -170,7 +170,7 @@ test('a validated invitation saves attribution and copies the code before openin
   await f.settle(); assert.ok(f.localStorage.getItem('txepro_affiliate_referral').includes('TXE123'));
   const link = f.nodes().find(n => n.type === 'a' && label(n).includes('Tải từ App Store'));
   await link.props.onClick({ preventDefault() {} }); await f.settle();
-  assert.match(sequence[0], /^TXEPRO_REFERRAL:TXE123:\d+$/); assert.equal(f.assigned[0], 'https://apps.apple.com/vn/app/txepro/id6819531395'); f.dispose();
+  assert.match(sequence[0], /^TXEPRO_REFERRAL:TXE123:\d+$/); assert.equal(f.assigned[0], 'https://apps.apple.com/vn/app/txepro/id6819531395?ref=TXE123'); f.dispose();
 });
 test('denied clipboard access still lets an invited user download; invalid invitation never offers download actions', async () => {
   const f = harness(invite, async () => ({ code: 'TXE123' }), { props: { code: 'TXE123' }, clipboard: async () => { throw new Error('denied'); } });

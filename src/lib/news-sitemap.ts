@@ -15,7 +15,12 @@ export async function buildNewsSitemap(origin: string | null, read = getPublicNe
     } catch { break; } // Available editorial guides remain discoverable if CMS is down.
   }
   return [
-    ...["/", "/tin-tuc", "/tro-giup", "/dang-tin", "/thong-tin/lien-he"].map(path => ({ url: origin + path })),
+    ...["/", "/tin-tuc", "/tro-giup", "/dang-tin", "/login", "/register", "/tracking",
+      "/chu-hang/form-tao-don", "/tai-xe/dang-tin", "/tuyen-dung",
+      "/thong-tin/lien-he", "/thong-tin/gioi-thieu", "/thong-tin/huong-dan-chu-hang",
+      "/thong-tin/huong-dan-tai-xe", "/thong-tin/thanh-toan-ky-quy",
+      "/thong-tin/khieu-nai-boi-thuong", "/thong-tin/dieu-khoan-su-dung",
+      "/thong-tin/chinh-sach-bao-mat"].map(path => ({ url: origin + path })),
     ...Array.from(articles.values(), article => ({ url: origin + newsPath(article.id) })),
   ];
 }

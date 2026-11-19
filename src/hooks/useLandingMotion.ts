@@ -19,12 +19,18 @@ export function startLandingMotion(root: HTMLElement, { media, Observer }: Motio
   };
   const play = (element: HTMLElement, delay: number, direction: "up" | "left" | "right") => {
     if (stopped || typeof element.animate !== "function") return;
-    const from = direction === "left" ? "translate3d(-12px,0,0)" : direction === "right" ? "translate3d(12px,0,0)" : "translate3d(0,10px,0)";
+    const vertical = direction === "up";
+    const from = direction === "left" ? "translate3d(-12px,0,0)" : direction === "right" ? "translate3d(12px,0,0)" : "translate3d(0,18px,0)";
     try {
       const animation = element.animate([
         { transform: from },
         { transform: "none" },
-      ], { duration: 280, delay, easing: "cubic-bezier(.16,1,.3,1)", fill: "none" });
+      ], {
+        duration: vertical ? 560 : 280,
+        delay,
+        easing: vertical ? "cubic-bezier(.22,.61,.36,1)" : "cubic-bezier(.16,1,.3,1)",
+        fill: vertical ? "backwards" : "none",
+      });
       active.add(animation);
       animation.onfinish = animation.oncancel = () => active.delete(animation);
     } catch { /* Presentation failure must never prevent access to content. */ }
@@ -38,7 +44,7 @@ export function startLandingMotion(root: HTMLElement, { media, Observer }: Motio
       const element = entry.target as HTMLElement;
       const reveal = typeof element.getAttribute === "function" ? element.getAttribute("data-reveal") || "" : "";
       if (reveal === "stagger" && element.children) {
-        Array.from(element.children).forEach((child, childIndex) => play(child as HTMLElement, childIndex * 30, "up"));
+        Array.from(element.children).forEach((child, childIndex) => play(child as HTMLElement, childIndex * 80, "up"));
         return;
       }
       play(element, (index % 3) * 45, reveal === "left" || reveal === "right" ? reveal : "up");

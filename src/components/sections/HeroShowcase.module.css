@@ -44,11 +44,7 @@
   transform: rotate(var(--photo-tilt));
   box-shadow: 0 28px 55px #020d2466;
   background: #102b4b;
-  animation:photoDrift 8s ease-in-out infinite;
-  animation-play-state:paused;
 }
-.showcase[data-motion-running=true] .photo{animation-play-state:running}
-@keyframes photoDrift{0%,100%{transform:translateY(0) rotate(var(--photo-tilt))}50%{transform:translateY(-5px) rotate(var(--photo-tilt))}}
 .photo img { object-fit: cover; object-position: 45% 40%; }
 .photo::after { content: ""; position: absolute; inset: 40% 0 0; background: linear-gradient(transparent, #061b36e8); }
 .photoLabel { position: absolute; z-index: 1; bottom: 20px; left: 16px; right: 16px; display: flex; gap: 8px; align-items: center; font-size: 12px; color: #e2eeff; }
@@ -86,8 +82,8 @@
 .screenAction>svg{flex-shrink:0;transition:transform .2s ease}
 @media(hover:hover) and (pointer:fine){.screenAction:hover>svg{transform:translate(2px,-2px)}}
 .screenFoot { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 14px; font-size: 11px; color: #526c62; }
-.showcase{animation:showcaseArrival .4s cubic-bezier(.16,1,.3,1) .06s both}
-@keyframes showcaseArrival{from{transform:translateY(10px)}to{transform:none}}
+.showcase{animation:showcaseArrival .78s cubic-bezier(.22,.61,.36,1) .08s both}
+@keyframes showcaseArrival{from{transform:translateY(18px)}to{transform:none}}
 @media (max-width: 1100px) and (min-width: 761px) {
   .showcase { height: 560px; }
   .phone { right: 0; width: 255px; }

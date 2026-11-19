@@ -8,7 +8,7 @@ export type Partner = { _id: string; code: string; status: string; balance: numb
 export type Referral = { id: string; role: string; registeredAt: string; qualifiedAt?: string; rewardAmount: number };
 export type Reward = { _id: string; kind: string; amount: number; threshold?: number; createdAt: string };
 export type Payout = { _id: string; amount: number; bankName: string; accountNumber: string; accountName: string; status: string; createdAt: string; transferReference: string; note: string; partnerId?: { _id?: string; code?: string } };
-export type AffiliateSummary = { partner: Partner | null; policy: AffiliatePolicy; currentPolicy?: AffiliatePolicy; referralLink?: string; portalUrl?: string; stats?: { registered: number; qualified: number } };
+export type AffiliateSummary = { partner: Partner | null; policy: AffiliatePolicy; currentPolicy?: AffiliatePolicy; referralLink?: string; googlePlayUrl?: string; appStoreUrl?: string; portalUrl?: string; stats?: { registered: number; qualified: number } };
 export type AffiliatePage<T> = { items: T[]; pagination: { page: number; total: number; hasMore: boolean } };
 export const affiliateMoney = (amount: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount);
 const STORAGE_KEY = 'txepro_affiliate_referral';
@@ -24,9 +24,17 @@ export function readReferralCode(storage: Storage, now = Date.now()) {
 }
 export function clearReferralCode(storage: Storage) { try { storage.removeItem(STORAGE_KEY); } catch { /* Account registration already succeeded. */ } }
 export function googlePlayReferralUrl(raw: string, code: string) {
-  if (!validReferralCode(code)) return null;
+  const referral = validReferralCode(code);
+  if (!referral) return null;
   try { const safe = appStoreUrl(raw, 'android'); if (!safe) return null; const url = new URL(safe);
-    url.searchParams.set('referrer', new URLSearchParams({ referral_code: validReferralCode(code) }).toString()); return url.href; } catch { return null; }
+    url.searchParams.set('ref', referral);
+    url.searchParams.set('referrer', new URLSearchParams({ referral_code: referral }).toString()); return url.href; } catch { return null; }
+}
+export function appStoreReferralUrl(raw: string, code: string) {
+  const referral = validReferralCode(code);
+  if (!referral) return null;
+  try { const safe = appStoreUrl(raw, 'ios'); if (!safe) return null; const url = new URL(safe);
+    url.searchParams.set('ref', referral); return url.href; } catch { return null; }
 }
 export function referralClipboardPayload(code: string, now = Date.now()) {
   const valid = validReferralCode(code);

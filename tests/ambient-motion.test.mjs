@@ -82,7 +82,10 @@ test("hero starts ambient motion by default without an effects button", () => {
 });
 test("new loops only animate transforms or opacity and add no per-frame JavaScript", () => {
   const css = readFileSync(resolve(root, "src/components/sections/HeroShowcase.module.css"), "utf8");
-  for (const keyframe of ["orbitTravel", "orbitBreathe", "photoDrift"]) {
+  assert.ok(!css.includes("photoDrift"), "hero photo stays still");
+  const landingCss = readFileSync(resolve(root, "src/components/sections/LandingExperience.module.css"), "utf8");
+  assert.match(landingCss, /\.heroTrack>\.heroGrid\{[^}]*align-items:start/);
+  for (const keyframe of ["orbitTravel", "orbitBreathe"]) {
     const start = css.indexOf("@keyframes " + keyframe);
     assert.ok(start >= 0);
     let index = css.indexOf("{", start), depth = 1;

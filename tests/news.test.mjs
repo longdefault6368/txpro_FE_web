@@ -244,10 +244,35 @@ test("news sitemap paginates actual public CMS articles and keeps editorial link
   assert.deepEqual(calls, [[1, 24], [2, 24]]);
   assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/000000000000000000000002")));
   assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/chon-xe-phu-hop")));
+  for (const path of ["/tai-xe/dang-tin", "/chu-hang/form-tao-don", "/tracking", "/login", "/register", "/thong-tin/thanh-toan-ky-quy", "/thong-tin/khieu-nai-boi-thuong"]) {
+    assert.ok(entries.some(item => item.url === "https://www.example.com" + path));
+  }
   assert.ok(!entries.some(item => item.url.includes("/admin")));
   const offline = await buildNewsSitemap("https://www.example.com", async () => { throw new Error("Offline"); });
   assert.ok(offline.some(item => item.url.endsWith("/tin-tuc/dang-xe-trong-hieu-qua")));
   assert.equal((await buildNewsSitemap(null, read)).length, 0);
+});
+
+test("homepage structured data uses TXE PRO and omits unknown contact fields", () => {
+  const { websiteStructuredData, structuredDataScript, HOME_TITLE } = loader()("src/lib/site-seo.ts");
+  const data = websiteStructuredData("https://www.example.com", {});
+  assert.equal(data["@graph"][0].name, "TXE PRO");
+  assert.equal(data["@graph"][1].name, "TXE PRO");
+  assert.equal(data["@graph"][0].url, "https://www.example.com");
+  assert.equal("telephone" in data["@graph"][0], false);
+  assert.equal("address" in data["@graph"][0], false);
+  const withContact = websiteStructuredData(null, { companyName: "Công ty TXE PRO", phoneSupport: "0898080820", addressHcm: "Huế" });
+  assert.equal(withContact["@graph"][0].legalName, "Công ty TXE PRO");
+  assert.equal(withContact["@graph"][0].telephone, "0898080820");
+  assert.equal(withContact["@graph"][0].address.streetAddress, "Huế");
+  assert.equal(structuredDataScript(data).includes("<"), false);
+  assert.match(HOME_TITLE, /Tìm xe chở hàng/);
+  const { resolveMetadataOrigin, PRODUCTION_SITE_ORIGIN, rootMetadata } = loader()("src/lib/site-seo.ts");
+  assert.equal(resolveMetadataOrigin(null, "production"), PRODUCTION_SITE_ORIGIN);
+  assert.equal(resolveMetadataOrigin(null, "development"), PRODUCTION_SITE_ORIGIN);
+  assert.equal(resolveMetadataOrigin(null, "test"), null);
+  assert.equal(resolveMetadataOrigin("https://staging.example", "production"), "https://staging.example");
+  assert.equal(rootMetadata(PRODUCTION_SITE_ORIGIN).metadataBase.href, PRODUCTION_SITE_ORIGIN + "/");
 });
 
 test("combined news pages have no gaps or duplicates at the CMS/editorial boundary", () => {

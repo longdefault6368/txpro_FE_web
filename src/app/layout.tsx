@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { siteOrigin } from "@/lib/news-seo";
+import { resolveMetadataOrigin, rootMetadata } from "@/lib/site-seo";
 import NextTopLoader from "nextjs-toploader";
 import GlobalChatWidget from "@/components/common/GlobalChatWidget";
 import ScrollToTop from "@/components/common/ScrollToTop";
@@ -15,13 +17,7 @@ const plusJakartaSans = localFont({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "TXEPRO - Hệ Sinh Thái Vận Tải Thông Minh",
-  description: "TXEPRO - Nền tảng kết nối chủ hàng và tài xế thời gian thực. Tối ưu chi phí, an toàn và minh bạch.",
-  icons: {
-    icon: "/logo-circle.png",
-  },
-};
+export const metadata: Metadata = rootMetadata(resolveMetadataOrigin(siteOrigin(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL)));
 
 export default function RootLayout({
   children,

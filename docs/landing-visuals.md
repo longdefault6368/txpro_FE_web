@@ -4,9 +4,9 @@
 - Banner dùng navy, xanh điện cho hành động chính, ngọc nhạt cho điểm nhấn. Các phần đọc nội dung vẫn dùng nền sáng.
 - Hai thẻ đăng tìm xe/đăng xe trống nổi bật hơn thẻ tra cứu. Phần minh họa sản phẩm và điều khoản có nền đậm để tạo nhịp giữa các vùng sáng.
 - Khối Bạn muốn làm gì hôm nay dùng HomeQuickActions riêng: hai thẻ chính xanh primary/navy có ảnh xe đồng bộ catalog, hai thẻ công cụ gọn ở dưới. Toàn bộ card là liên kết bàn phím dùng được, giữ đúng 4 đích cũ; không thêm API hoặc thao tác ghi. Chuyển một cột trên mobile, typography tối đa bold và giảm hiệu ứng theo prefers-reduced-motion.
-- Banner có hiệu ứng xuất hiện một lần, kèm hai quỹ đạo chậm (42/58 giây), điểm sáng và ảnh xe nổi nhẹ 5 px. Có nút Hiệu ứng để tạm dừng/bật lại.
+- Banner có hiệu ứng xuất hiện một lần, kèm hai quỹ đạo chậm (42/58 giây) và điểm sáng. Ảnh xe đứng yên, không nhấp lên xuống. Các slide căn theo mép trên để chữ không nhảy khi banner tự chuyển.
 - Chuyển động nền chỉ chạy khi banner trong khung nhìn, tab đang hiển thị và không bật giảm chuyển động. Tự dừng khi cuộn qua, ẩn tab hoặc rời trang; trình duyệt thiếu API cần thiết giữ hình tĩnh.
-- Phần nội dung xuất hiện một lần khi đi vào khung nhìn, thời lượng 520 ms, giãn tối đa 90 ms. Nút chính có vệt sáng ngắn khi hover; icon thẻ tác vụ, số thứ tự và mũi tên có phản hồi nhẹ.
+- Phần trượt từ hai bên giữ 280 ms. Phần từ trên xuống hạ trong 560 ms, mỗi mục lệch 80 ms, để không bị giật. Banner và ảnh minh họa cũng hạ chậm hơn, khoảng 0,72–0,78 giây. Nút chính có vệt sáng ngắn khi hover; icon thẻ tác vụ, số thứ tự và mũi tên có phản hồi nhẹ.
 - Không dùng scroll listener, thư viện animation mới, parallax hoặc thay đổi layout theo từng frame.
 - Nội dung mặc định luôn hiển thị. Không có JavaScript hoặc thiếu Web Animations thì các nút và nội dung vẫn dùng được.
 - Tôn trọng prefers-reduced-motion, kể cả thay đổi tùy chọn trong khi đang chạy hiệu ứng. Hủy observer/animation khi rời trang.

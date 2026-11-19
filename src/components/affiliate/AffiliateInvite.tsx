@@ -6,7 +6,7 @@ import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import { useCompanyInfo } from '@/context/CompanyInfoContext';
 import { appDownloadLink } from '@/utils/app-downloads';
-import { googlePlayReferralUrl, referralClipboardPayload, saveReferralCode, validReferralCode } from '@/utils/affiliate';
+import { appStoreReferralUrl, googlePlayReferralUrl, referralClipboardPayload, saveReferralCode, validReferralCode } from '@/utils/affiliate';
 import { postingRequest } from '@/utils/posting-api';
 import s from './Affiliate.module.css';
 
@@ -23,7 +23,9 @@ export default function AffiliateInvite({ code: raw }: { code: string }) {
     }).catch(e => { if (active) setError(e instanceof Error ? e.message : 'Không kiểm tra được mã giới thiệu.'); });
     return () => { active = false; };
   }, [code]);
-  const android = googlePlayReferralUrl(companyInfo.googlePlayUrl, code), ios = appDownloadLink(companyInfo.appStoreUrl, 'ios');
+  const android = googlePlayReferralUrl(companyInfo.googlePlayUrl, code);
+  const iosStore = appStoreReferralUrl(companyInfo.appStoreUrl, code);
+  const ios = iosStore ? { href: iosStore, available: true } : appDownloadLink(companyInfo.appStoreUrl, 'ios');
   async function downloadIos(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
     if (!ios.available) { window.location.assign(ios.href); return; }

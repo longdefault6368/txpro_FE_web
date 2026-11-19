@@ -14,12 +14,20 @@ const getInitialNews = cache((page: number, category: string, search: string) =>
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const query = readNewsQuery(await searchParams);
   const origin = await getNewsSiteOrigin();
-  const title = "Tin tức & cẩm nang tìm xe, vận chuyển" + (query.page > 1 ? " – Trang " + query.page : "") + " | TXE PRO";
-  const description = "Cách chọn xe chở hàng, đăng xe trống, đóng gói nội thất và chuẩn bị chuyến đi. Cẩm nang thực tế dành cho chủ hàng và tài xế TXE PRO.";
-  const url = origin ? origin + newsPageHref(query.page, query.category, query.search) : undefined;
+  const sections: Record<string, { title: string; description: string }> = {
+    guide: { title: "Cẩm nang tìm xe và vận chuyển", description: "Hướng dẫn chọn xe chở hàng, đóng gói và chuẩn bị chuyến đi trên TXE PRO." },
+    news: { title: "Tin tức TXE PRO", description: "Tin mới về tìm xe, kết nối tài xế và theo dõi hành trình trên TXE PRO." },
+    community: { title: "Cộng đồng khách hàng và tài xế", description: "Kinh nghiệm từ khách hàng và tài xế khi tìm xe, đăng xe trống và giao nhận." },
+    promotion: { title: "Ưu đãi và thông báo TXE PRO", description: "Thông báo ưu đãi và chương trình dành cho khách hàng, tài xế trên TXE PRO." },
+    product: { title: "Cập nhật sản phẩm TXE PRO", description: "Thay đổi tính năng tìm xe, đăng xe và theo dõi hành trình trên TXE PRO." },
+  };
+  const section = query.category === "all" ? null : sections[query.category];
+  const title = (section?.title || "Tin tức & cẩm nang tìm xe, vận chuyển") + (query.page > 1 ? " – Trang " + query.page : "") + " | TXE PRO";
+  const description = section?.description || "Cách chọn xe chở hàng, đăng xe trống, đóng gói nội thất và chuẩn bị chuyến đi. Cẩm nang thực tế dành cho chủ hàng và tài xế TXE PRO.";
+  const url = origin ? origin + newsPageHref(query.page, query.category, "") : undefined;
   const images = origin ? [{ url: origin + "/images/news/chon-xe-phu-hop.webp", width: 1400, height: 788, alt: "Cẩm nang tìm xe và vận chuyển TXE PRO" }] : [];
   return { title, description, alternates: url ? { canonical: url } : undefined,
-    robots: { index: !query.search && query.category === "all", follow: true },
+    robots: { index: !query.search, follow: true },
     openGraph: { type: "website", locale: "vi_VN", siteName: "TXE PRO", title, description, url, images },
     twitter: { card: "summary_large_image", title, description, images: images.map(image => image.url) } };
 }
@@ -29,7 +37,7 @@ export default async function NewsPage({ searchParams }: Props) {
   const editorial = filterEditorials(getEditorialArticles(), query.category, query.search);
   const { items: articles } = paginateNews(initialData, editorial, query.page);
   const collection = newsCollectionData(articles, origin);
-  if (origin) collection.url = origin + newsPageHref(query.page, query.category, query.search);
+  if (origin) collection.url = origin + newsPageHref(query.page, query.category, "");
   return <><Header /><main>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeStructuredJson(collection) }} />
     <NewsFeed key={JSON.stringify(query)} initialData={initialData} initialPage={query.page} initialCategory={query.category} initialSearch={query.search} />

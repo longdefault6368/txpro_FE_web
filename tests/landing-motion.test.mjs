@@ -64,9 +64,49 @@ test("only intersecting sections animate once without persistent hidden styles",
   assert.equal(fixture.animations.length, 1);
   assert.equal(fixture.observer.observed.has(target), false);
   assert.deepEqual(target.style, {});
-  assert.equal(fixture.animations[0].timing.fill, "none");
-  assert.ok(fixture.animations[0].timing.duration <= 600);
+  assert.equal(fixture.animations[0].timing.fill, "backwards");
+  assert.equal(fixture.animations[0].timing.duration, 560);
+  assert.equal(fixture.animations[0].frames[0].transform, "translate3d(0,18px,0)");
   fixture.cleanup();
+});
+test("side reveals stay quick while staggered vertical reveals ease in separately", () => {
+  const animations = [];
+  const element = reveal => ({
+    getAttribute: () => reveal,
+    animate(frames, timing) {
+      const animation = { frames, timing, cancelled: 0, onfinish: null, oncancel: null, cancel() { this.cancelled++; this.oncancel?.(); } };
+      animations.push(animation);
+      return animation;
+    },
+  });
+  const left = element("left");
+  const right = element("right");
+  const first = element("");
+  const second = element("");
+  const staggered = element("stagger");
+  staggered.children = [first, second];
+  let observer;
+  class Observer {
+    constructor(callback) { this.callback = callback; observer = this; }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  startLandingMotion({ querySelectorAll: () => [left, right, staggered] }, {
+    media: { matches: false, addEventListener() {}, removeEventListener() {} },
+    Observer,
+  });
+  observer.callback([left, right, staggered].map(target => ({ target, isIntersecting: true })));
+  assert.equal(animations[0].timing.duration, 280);
+  assert.equal(animations[0].timing.fill, "none");
+  assert.equal(animations[0].frames[0].transform, "translate3d(-12px,0,0)");
+  assert.equal(animations[1].timing.duration, 280);
+  assert.equal(animations[1].frames[0].transform, "translate3d(12px,0,0)");
+  assert.equal(animations[2].timing.duration, 560);
+  assert.equal(animations[2].timing.delay, 0);
+  assert.equal(animations[2].timing.easing, "cubic-bezier(.22,.61,.36,1)");
+  assert.equal(animations[3].timing.delay, 80);
+  assert.equal(animations[3].frames[0].transform, "translate3d(0,18px,0)");
 });
 test("finishing and leaving the page cleans up listeners and active animations", () => {
   const fixture = setup();
