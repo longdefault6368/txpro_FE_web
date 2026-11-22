@@ -47,7 +47,7 @@ export const vietnameseNews: Record<string, ArticleCopy> = {
           example: "Xe trống sau khi trả hàng buổi chiều: hãy đặt giờ có thể nhận chuyến tiếp theo, thay vì giờ bạn vẫn đang bốc dỡ. Nếu lịch thay đổi, cập nhật tin để chủ hàng đối chiếu đúng.",
           note: "Đăng nhiều tin không thay thế việc chủ động kiểm tra khả năng đáp ứng thời gian của từng chuyến." },
         { heading: "Kiểm tra tin sau đăng và phản hồi khi xe được chọn",
-          paragraphs: ["Trước khi bấm đăng, xem lại giá, lịch và thông tin phương tiện. Nếu hệ thống yêu cầu điều kiện tài khoản hoặc quyền lợi để đăng tin, đọc thông báo đang hiển thị và hoàn tất theo hướng dẫn. Không mặc định một tin đã mở thành công chỉ vì đã nhập xong biểu mẫu; hãy kiểm tra kết quả và danh sách của tài khoản.",
+          paragraphs: ["Trước khi bấm đăng, xem lại [giá cước trên tin xe trống](/tin-tuc/de-xuat-gia-cuoc-xe), lịch và thông tin phương tiện. Nếu hệ thống yêu cầu điều kiện tài khoản hoặc quyền lợi để đăng tin, đọc thông báo đang hiển thị và hoàn tất theo hướng dẫn. Không mặc định một tin đã mở thành công chỉ vì đã nhập xong biểu mẫu; hãy kiểm tra kết quả và danh sách của tài khoản.",
           "Khi có lời mời hoặc thông báo xe được chọn, đọc kỹ đơn, ảnh hàng nếu có, tuyến đường và thời gian trước khi phản hồi. Trạng thái hiển thị trong danh sách giúp bạn phân biệt tin còn mở với đơn đang thực hiện. Khi thay đổi lịch cá nhân, chủ động điều chỉnh hoặc tạm dừng đúng tin để tránh giữ thông tin không còn phù hợp trên hệ thống."],
           checklist: ["Kiểm tra kết quả đăng và trạng thái tin.", "Đối chiếu lịch thực tế trước khi nhận chuyến.", "Cập nhật tin khi lịch xe hoặc điều kiện nhận thay đổi."] }
       ],

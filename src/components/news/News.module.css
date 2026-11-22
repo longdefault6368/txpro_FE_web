@@ -39,6 +39,9 @@
 .horizontal p{display:none}
 .horizontal .read{padding-top:9px}
 .tools{margin:30px 0}
+.audienceTabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px;padding:4px;width:fit-content;max-width:100%;border:1px solid #dce5ef;border-radius:14px;background:#f4f8fc}
+.audienceTabs button{padding:10px 20px;border-radius:10px;font-size:15px;font-weight:600;color:#53697e;cursor:pointer}
+.audienceTabs button[aria-selected=true]{background:var(--navy);color:white}
 .search{display:flex;align-items:center;gap:12px;padding:7px 7px 7px 17px;border:1px solid #cfdeec;border-radius:13px;max-width:630px;background:#f9fbfd}
 .search>svg{flex-shrink:0;color:#6b8299}
 .search input{width:100%;min-width:0;font-size:15px;background:transparent;outline:none;padding:9px 0}
@@ -96,6 +99,7 @@
 .articleActions a{display:inline-flex;align-items:center;gap:9px;color:var(--blue);font-weight:600}
 .related{padding-top:85px}
 .articleIntro{font-size:18px;color:#294761;line-height:1.85}
+.articleIntro a,.storyText a,.takeaways a,.checklist a,.example a,.editorialNote a,.conclusion a{color:var(--blue);font-weight:600}
 .takeaways{padding:22px 25px;margin:30px 0 44px;background:#f5f9fe;border-left:3px solid #136dec;border-radius:0 12px 12px 0}
 .takeaways h2{display:flex;gap:10px;align-items:center;font-size:18px;line-height:1.5;font-weight:700;color:var(--navy);margin-bottom:15px}
 .takeaways h2 svg{flex-shrink:0;color:var(--blue)}

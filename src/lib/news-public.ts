@@ -1,5 +1,5 @@
 import { API_BASE, API_BASE_URL } from "@/config/env";
-import type { NewsArticle, NewsCategory } from "./news-content";
+import type { NewsArticle, NewsAudience, NewsCategory } from "./news-content";
 
 export class NewsRequestError extends Error {
   constructor(public status: number) { super("News request failed"); }
@@ -12,11 +12,12 @@ export function normalizeNews(value: unknown): NewsArticle | null {
   const item = value as Record<string, unknown>;
   if (typeof item.id !== "string" || !/^[a-f\d]{24}$/i.test(item.id) ||
       typeof item.title !== "string" || !item.title.trim() || item.published === false) return null;
-  if (typeof item.audience === "string" && item.audience !== "all") return null;
+  if (typeof item.audience === "string" && !["all", "driver", "shipper"].includes(item.audience)) return null;
   const date = typeof item.publishedAt === "string" ? Date.parse(item.publishedAt) : NaN;
   if (Number.isFinite(date) && date > Date.now()) return null;
+  const slug = typeof item.slug === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.slug) ? item.slug : undefined;
   return {
-    id: item.id, title: item.title.trim(),
+    id: item.id, slug, title: item.title.trim(),
     summary: typeof item.summary === "string" ? item.summary : "",
     content: typeof item.content === "string" ? item.content : "",
     category: categories.includes(String(item.category)) ? item.category as NewsCategory : "news",
@@ -56,11 +57,12 @@ async function read(path: string, signal?: AbortSignal) {
   }
 }
 
-export async function getPublicNews({ page = 1, limit = 12, category = "all", search = "", signal }: {
-  page?: number; limit?: number; category?: string; search?: string; signal?: AbortSignal;
+export async function getPublicNews({ page = 1, limit = 12, category = "all", audience = "all", search = "", signal }: {
+  page?: number; limit?: number; category?: string; audience?: NewsAudience | string; search?: string; signal?: AbortSignal;
 } = {}): Promise<NewsPage> {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (category !== "all") params.set("category", category);
+  if (audience === "driver" || audience === "shipper") params.set("audience", audience);
   if (search.trim()) params.set("search", search.trim().slice(0, 120));
   const data = await read("?" + params, signal);
   if (!Array.isArray(data.items) || !data.pagination || !Number.isInteger(data.pagination.totalPages)) throw new NewsRequestError(502);
@@ -74,8 +76,11 @@ export async function getPublicNews({ page = 1, limit = 12, category = "all", se
 }
 
 export async function getPublicNewsArticle(id: string): Promise<NewsArticle> {
-  if (!/^[a-f\d]{24}$/i.test(id)) throw new NewsRequestError(404);
-  const item = normalizeNews(await read("/" + id));
+  const key = String(id || "");
+  if (!/^[a-f\d]{24}$/i.test(key) && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(key)) {
+    throw new NewsRequestError(404);
+  }
+  const item = normalizeNews(await read("/" + encodeURIComponent(key)));
   if (!item) throw new NewsRequestError(404);
   return item;
 }

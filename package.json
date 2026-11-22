@@ -17,6 +17,7 @@
     "test:roles:backend": "node --test --test-concurrency=1 tests/account-role-switch-backend.test.mjs",
     "test:landing": "node --test tests/landing-presentation.test.mjs tests/landing-motion.test.mjs tests/ambient-motion.test.mjs tests/community.test.mjs",
     "test:news": "node --test tests/news.test.mjs",
+    "news:upsert-editorials": "node scripts/upsert-editorial-news.mjs",
     "test:home-posting": "node --test tests/home-posting.test.mjs",
     "test:catalog": "node --test tests/catalog-picker.test.mjs",
     "test:posting:ui": "node --test tests/posting-experience.test.mjs tests/posting-time.test.mjs",

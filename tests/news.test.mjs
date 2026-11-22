@@ -38,14 +38,14 @@ function loader({ language = "vi", fetch = async () => { throw new Error("Unexpe
   return path => load(resolve(root, path));
 }
 
-test("fourteen complete guides have unique URLs and bundled covers", () => {
+test("eighteen complete guides have unique URLs and bundled covers", () => {
   const { getEditorialArticles } = loader()("src/lib/news-content.ts");
   for (const language of ["vi", "en", "zh"]) {
     const articles = getEditorialArticles(language);
-    assert.equal(articles.length, 14);
-    assert.equal(new Set(articles.map(item => item.id)).size, 14);
-    assert.equal(new Set(articles.map(item => item.imageUrl)).size, 14, "every article needs a different cover");
-    assert.equal(new Set(articles.map(item => createHash("sha256").update(readFileSync(resolve(root, "public", item.imageUrl.slice(1)))).digest("hex"))).size, 14, "different filenames must not hide duplicate images");
+    assert.equal(articles.length, 18);
+    assert.equal(new Set(articles.map(item => item.id)).size, 18);
+    assert.equal(new Set(articles.map(item => item.imageUrl)).size, 18, "every article needs a different cover");
+    assert.equal(new Set(articles.map(item => createHash("sha256").update(readFileSync(resolve(root, "public", item.imageUrl.slice(1)))).digest("hex"))).size, 18, "different filenames must not hide duplicate images");
     for (const item of articles) {
       assert.ok(item.title.length >= (language === "zh" ? 8 : 10));
       assert.ok(item.summary.length > 15);
@@ -152,9 +152,11 @@ test("invalid image schemes and incomplete or private records are rejected", () 
   const { normalizeNews, newsImageSource } = loader()("src/lib/news-public.ts");
   const base = { id: "123456789012345678901234", title: "News" };
   assert.equal(normalizeNews({ ...base, published: false }), null);
-  assert.equal(normalizeNews({ ...base, audience: "driver" }), null);
+  assert.ok(normalizeNews({ ...base, audience: "driver" }));
+  assert.equal(normalizeNews({ ...base, audience: "admin" }), null);
   assert.equal(normalizeNews({ ...base, publishedAt: "2099-01-01" }), null);
   assert.equal(normalizeNews({ ...base, id: "../admin" }), null);
+  assert.equal(normalizeNews({ ...base, slug: "uu-dai-thang-9" }).slug, "uu-dai-thang-9");
   for (const source of ["javascript:alert(1)", "data:image/svg+xml,<svg/>", "//evil.example/a", "https://user:password@host.test/x"]) {
     assert.equal(newsImageSource(source), "/splash1.png");
   }
@@ -208,7 +210,12 @@ test("news listing renders crawlable article links on the server, including when
     }
     assert.equal((html.match(/<h1[ >]/g) || []).length, 1);
     assert.ok(!html.includes("Đang tải bài viết"));
+    assert.ok(html.includes("Tài xế"));
+    assert.ok(html.includes("Khách hàng"));
   }
+  const drivers = renderToStaticMarkup(React.createElement(Feed, { initialData: null, initialAudience: "driver" }));
+  assert.ok(drivers.includes('href="/tin-tuc/dang-xe-trong-hieu-qua"'));
+  assert.ok(!drivers.includes('href="/tin-tuc/chup-anh-hang-hoa-ro-rang"'));
 });
 
 test("article metadata and structured data agree on canonical URLs, images and real publication dates", () => {
@@ -238,11 +245,16 @@ test("news sitemap paginates actual public CMS articles and keeps editorial link
   const calls = [];
   const read = async ({ page, limit }) => {
     calls.push([page, limit]);
-    return { items: [{ id: String(page).padStart(24, "0"), title: "Public", imageUrl: "", summary: "", content: "", category: "news", publishedAt: null }], pagination: { page, totalPages: 2, total: 2 } };
+    return { items: [
+      { id: String(page).padStart(24, "0"), slug: "tin-cms-trang-" + page, title: "Public", imageUrl: "", summary: "", content: "", category: "news", publishedAt: null },
+      { id: "c504588a16b5452346a06d78", title: "Bài không slug", imageUrl: "", summary: "", content: "", category: "news", publishedAt: null },
+    ], pagination: { page, totalPages: 2, total: 2 } };
   };
   const entries = await buildNewsSitemap("https://www.example.com", read);
   assert.deepEqual(calls, [[1, 24], [2, 24]]);
-  assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/000000000000000000000002")));
+  assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/tin-cms-trang-2")));
+  assert.ok(!entries.some(item => item.url.includes("c504588a16b5452346a06d78")));
+  assert.ok(!entries.some(item => /\/tin-tuc\/[a-f0-9]{24}$/i.test(item.url)));
   assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/chon-xe-phu-hop")));
   for (const path of ["/tai-xe/dang-tin", "/chu-hang/form-tao-don", "/tracking", "/login", "/register", "/thong-tin/thanh-toan-ky-quy", "/thong-tin/khieu-nai-boi-thuong"]) {
     assert.ok(entries.some(item => item.url === "https://www.example.com" + path));
@@ -294,18 +306,23 @@ test("combined news pages have no gaps or duplicates at the CMS/editorial bounda
     assert.deepEqual(all, [...remote, ...editorial].map(item => item.id));
     assert.equal(new Set(all).size, all.length);
   }
-  assert.equal(paginateNews(null, editorial, 2).items.length, 5);
+  assert.equal(paginateNews(null, editorial, 2).items.length, 9);
   assert.equal(readNewsQuery({ page: "-1", category: ["guide"] }).page, 1);
   assert.equal(readNewsQuery({ category: ["guide"] }).category, "all");
   assert.equal(newsPageHref(2, "guide", "xe trống"), "/tin-tuc?page=2&category=guide&search=xe+tr%E1%BB%91ng");
+  assert.equal(newsPageHref(1, "all", "", "driver"), "/tin-tuc?audience=driver");
+  assert.equal(readNewsQuery({ audience: "shipper" }).audience, "shipper");
+  const driverGuides = load("src/lib/news-pagination.ts").filterEditorials(editorial, "all", "", "driver");
+  assert.ok(driverGuides.some(item => item.id === "dang-xe-trong-hieu-qua"));
+  assert.ok(!driverGuides.some(item => item.id === "chup-anh-hang-hoa-ro-rang"));
 });
 
-test("listing renders nine uniform cards, then the last five on a separate crawlable page", () => {
+test("listing renders nine uniform cards, then the remaining guides on a separate crawlable page", () => {
   const load = loader();
   const Feed = load("src/components/news/NewsFeed.tsx").default;
   const editorial = load("src/lib/news-content.ts").getEditorialArticles();
   const links = [];
-  for (const [page, expected] of [[1, 9], [2, 5]]) {
+  for (const [page, expected] of [[1, 9], [2, 9]]) {
     const html = renderToStaticMarkup(React.createElement(Feed, { initialData: null, initialPage: page }));
     const ids = [...html.matchAll(/href="\/tin-tuc\/([^"]+)"/g)].map(item => item[1]);
     assert.equal(ids.length, expected);

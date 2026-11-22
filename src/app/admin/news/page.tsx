@@ -21,6 +21,7 @@ import { useAdminPageRefresh } from "@/hooks/useAdminPageRefresh";
 
 type NewsCategory = "news" | "guide" | "community" | "promotion" | "product";
 type NewsAudience = "all" | "driver" | "shipper";
+type NewsChannel = "web" | "app" | "both";
 
 interface AdminNewsItem {
   id: string;
@@ -29,6 +30,8 @@ interface AdminNewsItem {
   content: string;
   category: NewsCategory;
   audience: NewsAudience;
+  channel: NewsChannel;
+  slug: string;
   imageUrl: string;
   published: boolean;
   publishedAt: string | null;
@@ -42,6 +45,8 @@ interface NewsForm {
   content: string;
   category: NewsCategory;
   audience: NewsAudience;
+  channel: NewsChannel;
+  slug: string;
   imageUrl: string;
   published: boolean;
   publishedAt: string;
@@ -62,17 +67,36 @@ const AUDIENCE_LABELS: Record<NewsAudience, { label: string; badge: string }> = 
   shipper: { label: "Chủ hàng", badge: "bg-indigo-50 text-indigo-700 border-indigo-200" },
 };
 
+const CHANNEL_LABELS: Record<NewsChannel, { label: string; badge: string }> = {
+  both: { label: "Web và app", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  web: { label: "Website", badge: "bg-sky-50 text-sky-700 border-sky-200" },
+  app: { label: "Ứng dụng", badge: "bg-violet-50 text-violet-700 border-violet-200" },
+};
+
 const EMPTY_FORM: NewsForm = {
   title: "",
   summary: "",
   content: "",
   category: "news",
   audience: "all",
+  channel: "both",
+  slug: "",
   imageUrl: "",
   published: true,
   publishedAt: "",
   expiresAt: "",
 };
+
+function slugFromTitle(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/gi, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
 
 function toDateTimeLocal(iso?: string | null) {
   if (!iso) return "";
@@ -102,6 +126,7 @@ export default function AdminNewsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [audience, setAudience] = useState<string>("all");
+  const [channelFilter, setChannelFilter] = useState<string>("all");
   const [publishedFilter, setPublishedFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -111,6 +136,7 @@ export default function AdminNewsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<AdminNewsItem | null>(null);
   const [form, setForm] = useState<NewsForm>(EMPTY_FORM);
+  const [slugTouched, setSlugTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const requestSequenceRef = useRef(0);
@@ -129,6 +155,7 @@ export default function AdminNewsPage() {
       if (search.trim()) params.append("search", search.trim());
       if (category !== "all") params.append("category", category);
       if (audience !== "all") params.append("audience", audience);
+      if (channelFilter !== "all") params.append("channel", channelFilter);
       if (publishedFilter !== "all") params.append("published", publishedFilter);
 
       const res = await fetchWithAuth(`${API_BASE}/admin/news?${params.toString()}`);
@@ -149,7 +176,7 @@ export default function AdminNewsPage() {
     } finally {
       if (requestId === requestSequenceRef.current) setLoading(false);
     }
-  }, [page, search, category, audience, publishedFilter]);
+  }, [page, search, category, audience, channelFilter, publishedFilter]);
   useAdminPageRefresh(() => { if (!mutationRef.current && !modalOpen) void fetchNews(); });
 
   useEffect(() => {
@@ -165,18 +192,22 @@ export default function AdminNewsPage() {
 
   const openCreate = () => {
     setEditing(null);
+    setSlugTouched(false);
     setForm(EMPTY_FORM);
     setModalOpen(true);
   };
 
   const openEdit = (item: AdminNewsItem) => {
     setEditing(item);
+    setSlugTouched(true);
     setForm({
       title: item.title,
       summary: item.summary || "",
       content: item.content || "",
       category: item.category,
       audience: item.audience,
+      channel: item.channel || "both",
+      slug: item.slug || slugFromTitle(item.title),
       imageUrl: item.imageUrl || "",
       published: item.published,
       publishedAt: toDateTimeLocal(item.publishedAt),
@@ -189,6 +220,7 @@ export default function AdminNewsPage() {
     if (saving || uploading) return;
     setModalOpen(false);
     setEditing(null);
+    setSlugTouched(false);
     setForm(EMPTY_FORM);
   };
 
@@ -246,6 +278,8 @@ export default function AdminNewsPage() {
         content: form.content.trim() || form.summary.trim(),
         category: form.category,
         audience: form.audience,
+        channel: form.channel,
+        slug: form.slug.trim(),
         imageUrl: normalizePersistedImagePath(form.imageUrl),
         published: form.published,
         expiresAt: form.category === "promotion" && form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
@@ -265,6 +299,7 @@ export default function AdminNewsPage() {
       }
       setModalOpen(false);
       setEditing(null);
+      setSlugTouched(false);
       setForm(EMPTY_FORM);
       await fetchNews();
     } catch (err) {
@@ -318,7 +353,7 @@ export default function AdminNewsPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-900">Tin tức & Ưu đãi</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Nội dung đăng tại đây sẽ hiện trên tab tin tức của tài xế và chủ hàng.
+            Chọn hiện trên website, ứng dụng hoặc cả hai. Đường dẫn bài viết mặc định lấy từ tiêu đề và có thể sửa.
           </p>
         </div>
         <button
@@ -387,6 +422,19 @@ export default function AdminNewsPage() {
             <option value="shipper">Chủ hàng</option>
           </select>
           <select
+            value={channelFilter}
+            onChange={(e) => {
+              setChannelFilter(e.target.value);
+              setPage(1);
+            }}
+            className="text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+          >
+            <option value="all">Tất cả nơi hiển thị</option>
+            <option value="web">Website</option>
+            <option value="app">Ứng dụng</option>
+            <option value="both">Web và app</option>
+          </select>
+          <select
             value={publishedFilter}
             onChange={(e) => {
               setPublishedFilter(e.target.value);
@@ -433,6 +481,7 @@ export default function AdminNewsPage() {
                   <th className="py-3.5 px-4">Bài viết</th>
                   <th className="py-3.5 px-4">Loại</th>
                   <th className="py-3.5 px-4">Đối tượng</th>
+                  <th className="py-3.5 px-4">Hiển thị</th>
                   <th className="py-3.5 px-4">Xuất bản</th>
                   <th className="py-3.5 px-4 text-right">Thao tác</th>
                 </tr>
@@ -441,6 +490,7 @@ export default function AdminNewsPage() {
                 {items.map((item) => {
                   const cat = CATEGORY_LABELS[item.category] || CATEGORY_LABELS.news;
                   const aud = AUDIENCE_LABELS[item.audience] || AUDIENCE_LABELS.all;
+                  const channel = CHANNEL_LABELS[item.channel] || CHANNEL_LABELS.both;
                   const image = getServerMediaUrl(item.imageUrl);
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/80">
@@ -452,6 +502,7 @@ export default function AdminNewsPage() {
                           <div className="min-w-0">
                             <div className="font-bold text-slate-900 truncate max-w-[360px]">{item.title}</div>
                             <div className="text-xs text-slate-500 mt-0.5 truncate max-w-[360px]">{item.summary || "Không có tóm tắt"}</div>
+                            {item.slug && <div className="text-[11px] text-slate-400 mt-0.5 truncate max-w-[360px]">/tin-tuc/{item.slug}</div>}
                           </div>
                         </div>
                       </td>
@@ -463,6 +514,11 @@ export default function AdminNewsPage() {
                       <td className="py-3.5 px-4">
                         <span className={`inline-flex px-2.5 py-1 rounded-full border text-[11px] font-bold ${aud.badge}`}>
                           {aud.label}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex px-2.5 py-1 rounded-full border text-[11px] font-bold ${channel.badge}`}>
+                          {channel.label}
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
@@ -546,12 +602,34 @@ export default function AdminNewsPage() {
                 <span className="text-xs font-bold text-slate-600">Tiêu đề *</span>
                 <input
                   value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  onChange={(e) => {
+                    const title = e.target.value;
+                    setForm((prev) => ({
+                      ...prev,
+                      title,
+                      slug: slugTouched ? prev.slug : slugFromTitle(title),
+                    }));
+                  }}
                   className="mt-1.5 w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"
                   placeholder="Ví dụ: Ưu đãi phí sàn tháng 9"
                 />
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-xs font-bold text-slate-600">Đường dẫn (slug)</span>
+                <input
+                  value={form.slug}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    setForm((prev) => ({ ...prev, slug: e.target.value }));
+                  }}
+                  className="mt-1.5 w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"
+                  placeholder="uu-dai-phi-san-thang-9"
+                />
+                <span className="mt-1 block text-xs text-slate-500">
+                  Mặc định lấy từ tiêu đề. Có thể sửa. Trên website: /tin-tuc/{form.slug || "duong-dan"}
+                </span>
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <label className="block">
                   <span className="text-xs font-bold text-slate-600">Loại</span>
                   <select
@@ -574,6 +652,18 @@ export default function AdminNewsPage() {
                     <option value="all">Tất cả</option>
                     <option value="driver">Tài xế</option>
                     <option value="shipper">Chủ hàng</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-bold text-slate-600">Hiển thị trên</span>
+                  <select
+                    value={form.channel}
+                    onChange={(e) => setForm({ ...form, channel: e.target.value as NewsChannel })}
+                    className="mt-1.5 w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"
+                  >
+                    <option value="both">Web và app</option>
+                    <option value="web">Website</option>
+                    <option value="app">Ứng dụng</option>
                   </select>
                 </label>
               </div>
@@ -658,7 +748,7 @@ export default function AdminNewsPage() {
                     onChange={(e) => setForm({ ...form, published: e.target.checked })}
                     className="w-4 h-4 rounded border-slate-300"
                   />
-                  <span className="text-sm font-semibold text-slate-700">Hiện trên app ngay</span>
+                  <span className="text-sm font-semibold text-slate-700">Xuất bản</span>
                 </label>
               </div>
             </div>

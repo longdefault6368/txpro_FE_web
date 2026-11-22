@@ -92,7 +92,7 @@ const drafts: Draft[] = [
  takeaways: ["Đọc thời gian cập nhật cùng điểm GPS.", "Xem trạng thái để biết bước đã được ghi nhận.", "Liên hệ bằng thông tin cụ thể khi vị trí chưa rõ."],
  sections: [
  { heading: "Mỗi vị trí hiển thị có một thời điểm cập nhật",
- paragraphs: ["Khi mở theo dõi, nhìn cả vị trí và thời gian GPS được cập nhật. Một điểm từ trước không cho biết chắc xe đang đứng nguyên tại đó. Tín hiệu, mạng, thiết bị và quyền vị trí có thể ảnh hưởng việc gửi mẫu mới; thời gian cập nhật giúp bạn hiểu mức độ mới của thông tin đang được nhìn thấy.",
+ paragraphs: ["Trước khi đọc GPS, mở đúng đơn bằng [mã đơn trên trang tra cứu](/tin-tuc/theo-doi-don-theo-ma) hoặc trong ứng dụng. Khi đã đúng chuyến, nhìn cả vị trí và thời gian GPS được cập nhật. Một điểm từ trước không cho biết chắc xe đang đứng nguyên tại đó. Tín hiệu, mạng, thiết bị và quyền vị trí có thể ảnh hưởng việc gửi mẫu mới; thời gian cập nhật giúp bạn hiểu mức độ mới của thông tin đang được nhìn thấy.",
  "Nếu lần cập nhật đã lâu, tránh tự kết luận tài xế dừng chuyến hoặc đi sai đường. Chờ mẫu mới hoặc liên hệ để làm rõ khi cần. Khi hỏi, nêu mã đơn và thời điểm đang thấy. Điều này cụ thể hơn chỉ nói “bản đồ không chạy” mà chưa biết mình đang quan sát dữ liệu của lần nào."],
  image: media("dang-xe-trong.webp", "Tài xế xem thông tin tại nơi đỗ xe", "Kiểm tra kết nối và thiết bị khi xe đang dừng ở nơi an toàn."),
  checklist: ["Đang xem đúng đơn.", "Có đọc thời gian GPS cập nhật.", "Phân biệt dữ liệu cũ với vị trí mới."] },
@@ -273,9 +273,121 @@ const drafts: Draft[] = [
  ],
  conclusion: "Ưu đãi Đối tác TXE PRO trả 30.000 đồng cho mỗi tài xế hợp lệ và 20.000 đồng cho mỗi chủ hàng hợp lệ, rồi thưởng thêm một lần ở các mốc 200, 500, 1.000, 2.000 và 5.000 thành viên. Hãy đăng ký trên ứng dụng, thêm tài khoản ngân hàng và chỉ chia sẻ mã cho người tạo tài khoản mới. Tiền được cộng khi đủ điều kiện, không cộng trước. TXE PRO – Hàng tìm xe, xe tìm hàng."
  }
+},
+{
+ id: "dang-nhu-cau-tim-xe",
+ title: "Cách đăng đơn tìm xe tải, xe van khi cần chuyển hàng",
+ summary: "Cần thuê xe tải hoặc xe van? Chuẩn bị hàng, điểm nhận, điểm trả và giờ giao rồi đăng đơn tìm xe trên TXE PRO.",
+ imageUrl: "/images/news/dang-nhu-cau-tim-xe.png",
+ guide: {
+ intro: "Khi cần thuê xe tải, xe van hoặc xe chở hàng trong ngày, nhiều người mở điện thoại rồi mới nhớ hàng chưa đóng, kho chưa có người hoặc giờ nhận còn đang ước lượng. Đăng đơn tìm xe chỉ có ích khi mô tả đúng hành trình thực tế: nhận ở đâu, trả ở đâu, lúc nào và loại xe nào. TXE PRO dùng đúng các thông tin đó để lọc xe trống. Bài này đi từ khâu chuẩn bị hàng đến lúc bấm Tìm xe trên [trang đăng đơn tìm xe](/chu-hang/form-tao-don). Đây là hướng dẫn thao tác, không phải cam kết có xe ngay sau khi gửi.",
+ takeaways: ["Chuẩn bị hàng, người bàn giao và giờ giao nhận trước khi thuê xe.", "Điền đủ điểm nhận, điểm trả, thời gian và loại xe tải hoặc xe van.", "Gửi đơn tìm xe chưa khóa voucher hay ký quỹ; bước đặt xe mới kiểm tra quyền lợi."],
+ sections: [
+ { heading: "Chuẩn bị hàng, giờ nhận và điểm giao trước khi thuê xe",
+ paragraphs: ["Trước khi đăng đơn tìm xe, hãy chốt hàng đã sẵn sàng bàn giao chưa, ai có mặt tại điểm nhận và điểm trả, kho hoặc tòa nhà có khung giờ cho xe vào không. Giờ trên điện thoại không thay giờ hẹn thật. Ghi loại hàng, số kiện, món lớn nhất và việc bốc xếp để chọn đúng xe tải, xe van hay xe chở người. Nếu chưa rõ loại xe, đọc thêm [cách chọn xe chở hàng phù hợp](/tin-tuc/chon-xe-phu-hop).",
+ "Ảnh hàng giúp tài xế hình dung kiện hàng, nhưng không thay mô tả bằng chữ. Chuẩn bị tối đa ba ảnh rõ, đủ sáng, không lộ giấy tờ. Chuyến đi ngay cần người giao nhận đang ở đúng nơi. Chuyến đặt trước cần đối chiếu ngày giờ trên lịch kho, không lấy lại giờ đã điền lần trước nếu kế hoạch đã đổi."],
+ image: media("chup-anh-hang-hoa.webp", "Chuẩn bị ảnh hàng hóa trước khi thuê xe tải", "Ảnh kiện hàng rõ giúp đối chiếu tải trọng và không gian xe trước khi đăng đơn tìm xe."),
+ checklist: ["Hàng, người bàn giao và người nhận đã xác định.", "Điểm nhận, điểm trả và giờ giao nhận đã đối chiếu.", "Xe tải, xe van hoặc số chỗ phù hợp với hàng hoặc hành khách."] },
+ { heading: "Chọn điểm nhận, điểm trả, thời gian và loại xe",
+ paragraphs: ["Mở [Tìm xe ngay](/chu-hang/form-tao-don) trên website hoặc mục tương ứng trong ứng dụng, đăng nhập tài khoản khách hàng. Chọn vị trí nhận hàng và vị trí trả trên bản đồ, rồi đối chiếu địa chỉ với cổng vào thật. Nếu xe tải không vào được tận nơi, ghi điểm hẹn trong ghi chú. Thời gian có thể đi ngay hoặc đặt ngày giờ; đọc lại mốc trên tóm tắt form. Cách ghim điểm chi tiết nằm ở [chọn điểm nhận và trả trên bản đồ](/tin-tuc/chon-diem-nhan-tra-tren-ban-do).",
+ "Chọn nhóm phương tiện cùng danh mục với ứng dụng. Chở hàng thì bổ sung tải trọng hoặc loại hàng hóa khi màn hình yêu cầu. Ô tô chở người và xe máy theo số chỗ, không điền như xe tải. Ghi chú chỉ nên nêu điểm hẹn, yêu cầu bốc xếp hoặc lưu ý ngắn để tài xế đọc được ngay."],
+ image: media("diem-giao-nhan.webp", "Chọn điểm nhận hàng trên bản đồ khi đăng đơn tìm xe", "Điểm ghim và địa chỉ cần khớp nơi xe tải hoặc xe van có thể dừng để nhận hàng."),
+ example: "Mẫu điền khi thuê xe tải: nhận tại cổng B khu xưởng, trả tầng trệt tòa nhà có thang hàng, một pallet hàng khô, giờ kho mở cửa buổi sáng. Đây là ví dụ mô tả, không phải đơn hàng thật.",
+ note: "Gửi đơn tìm xe chưa giữ voucher hay ký quỹ. Khoản bảo đảm chỉ được kiểm tra khi bạn xác nhận đặt một tin xe cụ thể." },
+ { heading: "Gửi đơn tìm xe và kiểm tra kết quả",
+ paragraphs: ["Trước khi gửi, đọc tóm tắt: điểm nhận, điểm trả, thời gian, loại xe và ghi chú. Sai một dòng thì sửa trên form, đừng tạo thêm đơn trùng. Khi đã khớp, bấm Tìm xe. Hệ thống lọc xe trống theo loại xe, tuyến và thời gian bạn khai; không bảo đảm mọi lần thuê xe tải đều có kết quả ngay.",
+ "Sau khi đăng, mở danh sách xe phù hợp hoặc [Tin/đơn của tôi](/don-cua-ban). Nếu chưa thấy xe, kiểm tra lại loại phương tiện, khung giờ và hai điểm trên bản đồ. Giữ mã đơn khi cần hỗ trợ. Bước [chọn chuyến và xem giá thuê xe](/tin-tuc/tim-chuyen-phu-hop-gia-de-xuat) là bước tiếp theo, tách với việc chỉ mới gửi đơn tìm xe."] }
+ ],
+ conclusion: "Thuê xe tải hay xe van bắt đầu từ hàng, người liên hệ và giờ giao nhận thật, rồi điền đúng điểm nhận, điểm trả và loại xe trên TXE PRO. Gửi đơn tìm xe để lọc xe trống; voucher hoặc ký quỹ chưa bị khóa ở bước này. Khi danh sách hiện ra, đối chiếu từng tin trước khi đặt. TXE PRO – Hàng tìm xe, xe tìm hàng."
+ }
+},
+{
+ id: "tim-chuyen-phu-hop-gia-de-xuat",
+ title: "Cách chọn chuyến và xem giá thuê xe sau khi đăng đơn",
+ summary: "Sau khi đăng đơn tìm xe, so sánh tin xe trống, giá vận chuyển tài xế đưa ra rồi xác nhận đặt xe khi loại xe và giờ nhận đã khớp.",
+ imageUrl: "/images/news/tim-chuyen-phu-hop.webp",
+ guide: {
+ intro: "Đã gửi đơn tìm xe chưa có nghĩa đã thuê được xe. Việc còn lại là đọc các tin xe trống khớp tuyến: loại xe, giờ nhận và giá vận chuyển tài xế đưa ra. Khác với bài [chọn loại xe chở hàng trước khi đăng đơn](/tin-tuc/chon-xe-phu-hop), bài này chỉ bước sau khi danh sách hiện ra: so sánh chuyến, đọc giá, rồi xác nhận đặt xe. Chọn một tin chưa đồng nghĩa tài xế đã nhận; đơn chỉ tiếp tục khi tài xế chấp nhận.",
+ takeaways: ["Giá thuê xe trên tin do tài xế đưa ra, cần đọc cùng loại xe và giờ nhận.", "So sánh vài tin: ưu tiên xe và lịch khớp hàng, không chỉ chọn giá thấp.", "Xác nhận đặt xe mới kiểm tra voucher hoặc ký quỹ; chờ tài xế nhận đơn."],
+ sections: [
+ { heading: "Xem danh sách xe trống khớp đơn tìm xe",
+ paragraphs: ["Khi đã bấm Tìm xe từ [đơn tìm xe tải hoặc xe van](/tin-tuc/dang-nhu-cau-tim-xe), hệ thống lọc tin xe trống theo loại phương tiện, tuyến và thời gian đã khai. Mở từng tin để xem xe, loại xe hoặc biển số, lịch sẵn sàng và giá vận chuyển. Ảnh hàng bạn gửi hỗ trợ tài xế, nhưng bạn vẫn phải tự đối chiếu tin với kiện hàng thật.",
+ "Danh sách trống thường do sai nhóm xe, giờ quá hẹp hoặc điểm ghim lệch tuyến. Sửa đúng [form tìm xe](/chu-hang/form-tao-don) rồi tìm lại, đừng tạo nhiều đơn trùng. Giữ mã đơn khi xem [Tin/đơn của tôi](/don-cua-ban) hoặc khi cần hỗ trợ."],
+ image: media("chon-xe-phu-hop.webp", "Danh sách xe tải phù hợp sau khi đăng đơn tìm xe", "Mỗi tin xe trống cần đọc loại xe, giờ nhận hàng và giá vận chuyển trước khi chọn chuyến."),
+ checklist: ["Loại xe hoặc tải trọng khớp hàng cần chuyển.", "Khung giờ tin xe phủ được giờ nhận thực tế.", "Giá thuê xe và điều kiện trên màn hình đã đọc đủ."] },
+ { heading: "Đọc giá vận chuyển cùng loại xe và giờ nhận",
+ paragraphs: ["Giá trên tin là số tài xế nhập khi đăng xe trống, hiện thẳng cho khách hàng, không phải báo giá ẩn sau khi đặt. Đọc giá cùng mô tả xe, phạm vi nhận trả nếu có và ghi chú của tài xế. Giá thuê xe tải thấp hơn chưa chắc phù hợp nếu thùng nhỏ hơn hàng, giờ lệch ca kho hoặc xe không vào được điểm giao.",
+ "Hai tin gần nhau về giá thì ưu tiên tin khớp giờ nhận và loại xe. Cần làm rõ bốc xếp, hàng cồng kềnh hoặc cổng vào thì hỏi trên đúng tin đó trong ứng dụng, trước khi đặt. Đừng coi giá trên tin là toàn bộ tiền phải trả nếu màn hình còn điều kiện voucher, ký quỹ hoặc phí hệ thống ở bước xác nhận."],
+ example: "Hai tin cùng tuyến: một xe tải đúng tải, giờ nhận trùng ca kho, giá cao hơn; một xe nhỏ hơn, giờ lệch. Chọn tin khớp hàng và giờ trước khi so sánh số tiền. Đây là tình huống tham khảo, không phải báo giá thật.",
+ note: "Giá trên tin do tài xế đưa ra. Khoản bảo đảm của khách hàng được kiểm tra khi bấm Xác nhận và đặt xe, không phải lúc chỉ mở danh sách." },
+ { heading: "Xác nhận đặt xe, ký quỹ và chờ tài xế nhận đơn",
+ paragraphs: ["Khi đã chọn chuyến, đọc lại điểm nhận, điểm trả, thời gian, xe và giá thuê xe trên màn hình xác nhận. Bấm Xác nhận và đặt xe để gửi yêu cầu tới tài xế. Lúc này hệ thống kiểm tra voucher hoặc số dư ký quỹ của đúng chuyến đó. Nếu cần nạp thêm, thanh toán theo màn hình rồi xác nhận lại; chỉ quét mã chưa tạo xong đơn.",
+ "Đơn đi tiếp khi tài xế chấp nhận. Theo dõi trạng thái trong [Đơn của bạn](/don-cua-ban), không coi vừa bấm đặt là xe đã chạy. Tài xế chưa nhận thì giữ đơn hoặc chọn tin khác khi màn hình cho phép. Sau khi được nhận, dùng mã đơn để [tra cứu đơn hàng trên bản đồ](/tin-tuc/theo-doi-don-theo-ma) và các bước giao nhận của đúng chuyến đó."],
+ image: media("trao-doi-truoc-chuyen.webp", "Xác nhận đặt xe và giá vận chuyển trước khi gửi yêu cầu", "Đọc lại loại xe, giờ nhận hàng và giá thuê xe trên màn hình xác nhận trước khi đặt.") }
+ ],
+ conclusion: "Chọn chuyến sau khi đăng đơn tìm xe là đọc tin xe trống khớp hàng, đối chiếu giá vận chuyển với loại xe và giờ nhận, rồi xác nhận đặt xe khi thông tin đã đủ. Giá do tài xế đưa ra trên tin; quyền lợi khách hàng được kiểm tra ở bước đặt. Chuyến chỉ tiếp tục khi tài xế nhận đơn. TXE PRO – Hàng tìm xe, xe tìm hàng."
+ }
+},
+{
+ id: "de-xuat-gia-cuoc-xe",
+ title: "Cách đưa giá cước khi đăng xe tải, xe van trống",
+ summary: "Tài xế nhập giá vận chuyển trên tin xe trống: chuẩn bị tuyến, giờ nhận, loại xe rồi điền mức giá khách hàng sẽ thấy khi tìm xe.",
+ imageUrl: "/images/news/de-xuat-gia-cuoc-xe.webp",
+ guide: {
+ intro: "Khi đăng xe trống, giá cước là số khách hàng đọc ngay trên tin, không phải báo giá sau khi họ đã đặt. Nhiều tài xế loay hoay giữa tuyến, giờ nhận và ô giá vì chưa biết khách sẽ đối chiếu thế nào. Bài này tách với [cách đăng xe trống đủ tuyến và lịch](/tin-tuc/dang-xe-trong-hieu-qua): ở đây chỉ khâu đưa giá vận chuyển cho xe tải, xe van hoặc xe đang trống. Form đăng tin nằm ở [Đăng xe trống](/tai-xe/dang-tin). Số bạn nhập sẽ hiện trên tin; đây không phải bảng giá cố định của hệ thống.",
+ takeaways: ["Giá trên tin do tài xế nhập, khách hàng thấy đúng số đó khi chọn chuyến.", "Điền tuyến, giờ nhận, loại xe và tải trọng trước, rồi mới chốt mức giá.", "Sau khi đăng, mở lại tin để kiểm tra giá và trạng thái trước khi nhận đơn."],
+ sections: [
+ { heading: "Chuẩn bị tuyến, giờ nhận và loại xe trước khi nhập giá",
+ paragraphs: ["Giá chỉ có nghĩa khi gắn với một chuyến cụ thể. Trước khi gõ số, xác định xe nào sẽ nhận, hàng nào nhận chở, khoảng tải trọng, điểm có thể nhận và khung giờ xe thật sự trống. Đăng sai xe hoặc sai giờ rồi hạ giá không giúp tin khớp hơn. Hồ sơ phương tiện, tuyến và lịch nên đúng như [hướng dẫn đăng xe trống](/tin-tuc/dang-xe-trong-hieu-qua) trước khi quan tâm ô giá.",
+ "Nếu dùng lịch tự động, giá gắn với lịch đó, không tự đổi theo từng ngày nếu bạn không sửa. [Cập nhật lịch xe trống](/tin-tuc/quan-ly-lich-xe-trong) khi ca kho, chiều về hoặc phạm vi nhận thay đổi. Ghi chú chỉ nên nêu điều kiện bốc xếp hoặc điểm hẹn ngắn; đừng nhét mức giá thứ hai vào ghi chú vì khách đọc giá chính trên tin."] },
+ { heading: "Nhập giá vận chuyển trên tin xe trống",
+ paragraphs: ["Trên [form đăng xe trống](/tai-xe/dang-tin), ô giá là số nguyên lớn hơn 0, đơn vị đồng, bắt buộc trước khi gửi tin. Đây là giá khách hàng thấy khi tin khớp [đơn tìm xe](/tin-tuc/dang-nhu-cau-tim-xe), cùng loại xe và giờ nhận. Không có bước báo giá ẩn sau khi họ đặt. Hãy nhập mức bạn chấp nhận thực hiện chuyến đó, không nhập số tạm để rồi đổi khi đã có yêu cầu.",
+ "Khách hàng [so sánh vài tin trước khi đặt](/tin-tuc/tim-chuyen-phu-hop-gia-de-xuat): họ đọc giá cùng loại xe, tải trọng và giờ nhận, không chỉ chọn số thấp. Tin rẻ nhưng xe nhỏ hơn hàng hoặc giờ lệch ca kho thường bị bỏ. Nếu điều kiện bốc xếp, hàng cồng kềnh hay cổng vào ảnh hưởng công sức, nói rõ trên tin hoặc trao đổi trước khi nhận đơn, đừng để khách hiểu giá đã gồm mọi việc khi bạn chưa nêu."],
+ image: media("dang-xe-trong.webp", "Tài xế điền giá cước trên tin xe tải trống", "Giá vận chuyển trên tin xe trống là số khách hàng đọc khi so sánh chuyến sau khi tìm xe."),
+ example: "Xe tải trống sau khi trả hàng buổi chiều, nhận trong khu vực đã khai, hàng khô đúng tải: nhập giá cho đúng khung giờ và tuyến đó. Đây là ví dụ thao tác, không phải mức giá mẫu hay bảng cước.",
+ note: "Giá trên tin do tài xế đưa ra. TXE PRO không cam kết tin sẽ được chọn vì giá cao hay thấp; khách còn đối chiếu xe, giờ nhận và tuyến." },
+ { heading: "Kiểm tra tin sau đăng và khi có yêu cầu đặt xe",
+ paragraphs: ["Sau khi gửi, mở danh sách tin của tài khoản và đọc lại giá, lịch, xe. Nếu hệ thống báo cần đủ điều kiện tài khoản hoặc quyền lợi để đăng, làm đúng thông báo đang hiện, đừng gửi thêm tin trùng. Tin lịch tự động cần mở lại ngày đã chọn để chắc giá và giờ vẫn đúng ca bạn chạy.",
+ "Khi có yêu cầu đặt xe, đối chiếu đơn với tin: hàng, điểm nhận trả, giờ và giá trên màn hình. Chấp nhận khi khớp; từ chối hoặc trao đổi khi hàng lệch mô tả. Nếu lịch cá nhân đổi, sửa hoặc tạm dừng tin thay vì giữ giá và giờ không còn thực hiện được. Giữ mã đơn khi cần hỗ trợ cho đúng chuyến."],
+ image: media("lich-van-chuyen.webp", "Đối chiếu giá cước với lịch xe trống trước khi nhận đơn", "Giá trên tin cần đi cùng khung giờ xe thật sự trống, không tách khỏi lịch nhận chuyến."),
+ checklist: ["Giá trên tin khớp mức chấp nhận thực hiện chuyến.", "Loại xe, tuyến và giờ nhận vẫn đúng lịch thật.", "Đọc lại đơn trước khi chấp nhận yêu cầu đặt xe."] }
+ ],
+ conclusion: "Đưa giá cước khi đăng xe trống là nhập số khách hàng sẽ thấy trên tin, sau khi tuyến, giờ nhận và loại xe đã đúng khả năng chạy. Giá không thay việc chuẩn bị tin hay việc khách còn so sánh xe. Kiểm tra tin sau đăng và đọc lại đơn trước khi nhận. TXE PRO – Hàng tìm xe, xe tìm hàng."
+ }
+},
+{
+ id: "theo-doi-don-theo-ma",
+ title: "Cách tra cứu đơn hàng theo mã và theo dõi trên bản đồ",
+ summary: "Nhập mã đơn bắt đầu bằng ORD- để xem trạng thái chuyến, các mốc hành trình và vị trí mới nhất trên bản đồ.",
+ imageUrl: "/images/news/theo-doi-don-theo-ma.webp",
+ guide: {
+ intro: "Sau khi đặt xe, nhiều người cần một chỗ nhập mã đơn để biết chuyến đang ở bước nào, chứ không chỉ mở bản đồ rồi đoán. TXE PRO gắn mỗi chuyến với mã bắt đầu bằng ORD-. Trang [Theo dõi đơn hàng](/tracking) dùng đúng mã đó để hiện trạng thái, các mốc đã ghi nhận và vị trí trên bản đồ khi có dữ liệu. Bài này khác [cách đọc thời gian GPS trên màn hình theo dõi](/tin-tuc/theo-doi-chuyen-di-va-gps): ở đây là tìm đúng đơn theo mã, rồi mới đọc bản đồ. Tra cứu cho biết bước hệ thống đã ghi, không thay xác nhận giao nhận tại điểm trả.",
+ takeaways: ["Dùng mã đơn dạng ORD- lấy từ đơn đã đặt, không gõ biển số hay tên tài xế.", "Trạng thái và mốc hành trình cho biết bước đã ghi nhận; bản đồ là vị trí cập nhật gần nhất.", "Đăng nhập thì xem đủ hơn trên đúng tài khoản; bản đồ không chứng minh hàng đã bàn giao."],
+ sections: [
+ { heading: "Lấy mã đơn và nhập đúng trên trang tra cứu",
+ paragraphs: ["Mã đơn hiện sau khi bạn xác nhận đặt xe, trong [Đơn của bạn](/don-cua-ban), trên thông báo hoặc đường dẫn theo dõi được gửi kèm nếu có. Sao chép nguyên chuỗi, gồm tiền tố ORD- và các đoạn sau dấu gạch. Trang tra cứu chỉ nhận mã đúng định dạng đó, tối đa một trăm ký tự. Biển số, số điện thoại hay một phần mã đều không ra kết quả.",
+ "Mở [Theo dõi đơn hàng](/tracking), dán mã vào ô tra cứu rồi gửi. Nếu mã trống, sai tiền tố hoặc quá dài, màn hình báo nhập lại; sửa đúng chuỗi, đừng tạo đơn mới chỉ để theo dõi. Có nhiều chuyến trong ngày thì đối chiếu mã trên đúng đơn trước khi tra, tránh xem nhầm hành trình của chuyến khác."],
+ image: media("gps-hanh-trinh.webp", "Nhập mã đơn để theo dõi chuyến xe trên bản đồ", "Mã đơn bắt đầu bằng ORD- là khóa để mở trạng thái và vị trí của đúng chuyến đang chạy."),
+ checklist: ["Mã lấy từ đúng đơn đã đặt, đủ tiền tố ORD-.", "Đã dán nguyên chuỗi, không thiếu đoạn sau dấu gạch.", "Kết quả đang mở khớp mã trên Đơn của bạn."] },
+ { heading: "Đọc trạng thái, mốc hành trình và bản đồ",
+ paragraphs: ["Sau khi tra cứu được, đọc mã trên kết quả cho khớp mã vừa nhập. Trạng thái cho biết đơn đang ở bước nào: đã tạo, tài xế đã nhận, đã bắt đầu chuyến, đã đến điểm trả, đã hủy hoặc đã xong tùy nội dung đang hiện. Các mốc bên dưới ghi thời điểm hệ thống nhận từng bước; mốc chưa có giờ nghĩa là bước đó chưa được ghi nhận, không phải bản đồ bị lỗi.",
+ "Khối bản đồ hiện lộ trình hoặc vị trí mới nhất khi đơn còn dữ liệu vị trí. Thời điểm cập nhật GPS cần đọc cùng điểm trên bản đồ; cách hiểu dữ liệu cũ nằm ở [theo dõi chuyến đi và thời gian GPS](/tin-tuc/theo-doi-chuyen-di-va-gps). Nếu bạn đang đăng nhập đúng tài khoản của đơn, thông tin thường đủ hơn bản xem công khai. Nút cập nhật tải lại dữ liệu đang có, không tạo mốc mới."],
+ example: "Mã ORD- khớp đơn, trạng thái tài xế đã nhận, mốc bắt đầu chuyến chưa có giờ, bản đồ còn điểm lúc nhận đơn: chuyến chưa được ghi nhận là đã chạy. Chờ mốc mới hoặc liên hệ trên đúng đơn, đừng kết luận xe đã đến điểm trả.",
+ note: "Trang theo dõi hiển thị bước hệ thống đã ghi. Xe gần điểm trả trên bản đồ chưa thay xác nhận giao nhận thực tế." },
+ { heading: "Khi bản đồ chưa khớp bước giao nhận",
+ paragraphs: ["Nếu tra cứu báo không tìm thấy, kiểm tra khoảng trắng, chữ thường đã được viết hoa trên form, và bạn đang xem đúng mã của đơn đó. Đơn hủy, từ chối hoặc xong vẫn tra được trạng thái cuối khi mã còn hiệu lực; đừng kỳ vọng bản đồ tiếp tục chạy sau khi chuyến đã kết thúc. Cần hỗ trợ thì gửi đúng mã đơn, thời điểm đang xem và nội dung màn hình, không chỉ nói “không theo dõi được”.",
+ "Bản đồ hỗ trợ gặp nhau và nắm hành trình; bước kiểm đếm hàng khi nhận và trả vẫn theo [kiểm tra hàng lúc giao nhận](/tin-tuc/kiem-tra-hang-khi-giao-nhan). Giữ mã để đối chiếu tin nhắn, hỗ trợ và chứng từ của đúng chuyến. TXE PRO dùng mã đơn để nối khách hàng, tài xế và trạng thái trên một hành trình: hàng tìm xe, xe tìm hàng."],
+ image: media("ban-giao-hang.webp", "Đối chiếu hàng khi giao nhận sau khi theo dõi đơn", "Bản đồ và mã đơn hỗ trợ gặp nhau; bước kiểm đếm hàng lúc nhận trả vẫn cần xác nhận tại chỗ.") }
+ ],
+ conclusion: "Theo dõi chuyến theo mã đơn là nhập đúng chuỗi ORD- trên trang tra cứu, đọc trạng thái cùng các mốc đã ghi nhận, rồi xem bản đồ như vị trí cập nhật gần nhất. Đăng nhập đúng tài khoản giúp đủ thông tin hơn. Bản đồ không thay bước xác nhận giao nhận. TXE PRO – Hàng tìm xe, xe tìm hàng."
+ }
 }
 ];
-export const extraEditorials: NewsArticle[] = drafts.map(draft => ({
+const listFirst = ["dang-nhu-cau-tim-xe", "tim-chuyen-phu-hop-gia-de-xuat", "de-xuat-gia-cuoc-xe", "theo-doi-don-theo-ma"];
+export const extraEditorials: NewsArticle[] = [
+  ...listFirst.map(id => drafts.find(draft => draft.id === id)!),
+  ...drafts.filter(draft => !listFirst.includes(draft.id)),
+].map(draft => ({
  id: draft.id, title: draft.title, summary: draft.summary, imageUrl: draft.imageUrl,
  category: draft.category || "guide", publishedAt: null, editorial: true, originalLanguage: "vi",
  readingGuide: draft.guide,

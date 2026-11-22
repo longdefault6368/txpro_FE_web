@@ -11,12 +11,19 @@ export function siteOrigin(value: string | undefined): string | null {
   } catch { return null; }
 }
 export const newsPath = (id: string) => "/tin-tuc/" + encodeURIComponent(id);
+export const isOpaqueNewsKey = (value: string) => /^[a-f\d]{24}$/i.test(value);
+export const newsHref = (article: Pick<NewsArticle, "id"> & { slug?: string | null }) =>
+  newsPath(article.slug || article.id);
+export const newsSitemapPath = (article: Pick<NewsArticle, "id"> & { slug?: string | null }) => {
+  const key = article.slug || article.id;
+  return isOpaqueNewsKey(key) ? null : newsPath(key);
+};
 export function articleMetadata(article: NewsArticle, origin: string | null): Metadata {
   const title = newsPlainText(article.title) + " | TXE PRO";
   const description = newsPlainText(article.summary).replace(/\s+/g, " ").slice(0, 165);
   const image = newsImageSource(article.imageUrl);
   const images = origin ? [{ url: new URL(image, origin).href, alt: newsPlainText(article.title) }] : [];
-  const url = origin ? origin + newsPath(article.id) : undefined;
+  const url = origin ? origin + newsHref(article) : undefined;
   return { title, description, alternates: url ? { canonical: url } : undefined,
     openGraph: { type: "article", locale: "vi_VN", siteName: "TXE PRO", title, description, url, images,
       ...(article.publishedAt ? { publishedTime: article.publishedAt } : {}) },
@@ -26,7 +33,7 @@ export function articleMetadata(article: NewsArticle, origin: string | null): Me
 export function articleStructuredData(article: NewsArticle, origin: string | null) {
   return { "@context": "https://schema.org", "@type": "Article", headline: newsPlainText(article.title),
     description: newsPlainText(article.summary), inLanguage: "vi",
-    ...(origin ? { mainEntityOfPage: origin + newsPath(article.id), image: [new URL(newsImageSource(article.imageUrl), origin).href] } : {}),
+    ...(origin ? { mainEntityOfPage: origin + newsHref(article), image: [new URL(newsImageSource(article.imageUrl), origin).href] } : {}),
     ...(article.publishedAt ? { datePublished: article.publishedAt } : {}),
     author: { "@type": "Organization", name: "TXE PRO" },
     publisher: { "@type": "Organization", name: "TXE PRO", ...(origin ? { url: origin } : {}) },
@@ -38,7 +45,7 @@ export function newsCollectionData(articles: NewsArticle[], origin: string | nul
     ...(origin ? { url: origin + "/tin-tuc" } : {}), inLanguage: "vi",
     mainEntity: { "@type": "ItemList", itemListElement: articles.map((article, index) => ({
       "@type": "ListItem", position: index + 1, name: newsPlainText(article.title),
-      ...(origin ? { url: origin + newsPath(article.id) } : {}),
+      ...(origin ? { url: origin + newsHref(article) } : {}),
     })) },
   };
 }

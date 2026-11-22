@@ -11,9 +11,10 @@ export type NewsReadingGuide = {
   }[];
 };
 export type NewsCategory = "news" | "guide" | "community" | "promotion" | "product";
+export type NewsAudience = "all" | "driver" | "shipper";
 export type NewsArticle = {
-  id: string; title: string; summary: string; content: string;
-  category: NewsCategory; imageUrl: string; publishedAt: string | null;
+  id: string; slug?: string; title: string; summary: string; content: string;
+  category: NewsCategory; audience?: NewsAudience; imageUrl: string; publishedAt: string | null;
   editorial?: boolean;
   originalLanguage?: string;
   readingGuide?: NewsReadingGuide;
@@ -23,6 +24,26 @@ const t = (vi: string, en: string, zh: string): Text => ({ vi, en, zh });
 type Editorial = {
   id: string; category: NewsCategory; imageUrl: string; title: Text; summary: Text;
   sections: { heading: Text; text: Text }[];
+};
+const editorialAudience: Record<string, NewsAudience> = {
+  "chon-xe-phu-hop": "shipper",
+  "dang-xe-trong-hieu-qua": "driver",
+  "chuan-bi-do-noi-that": "shipper",
+  "san-sang-truoc-chuyen-di": "all",
+  "tim-xe-theo-ngay-gio": "shipper",
+  "chup-anh-hang-hoa-ro-rang": "shipper",
+  "chon-diem-nhan-tra-tren-ban-do": "shipper",
+  "theo-doi-chuyen-di-va-gps": "all",
+  "trao-doi-truoc-khi-dat-xe": "shipper",
+  "chuan-bi-hang-de-vo": "shipper",
+  "quan-ly-lich-xe-trong": "driver",
+  "kiem-tra-hang-khi-giao-nhan": "all",
+  "chuong-trinh-doi-tac-txe-pro": "all",
+  "uu-dai-doi-tac-txe-pro": "all",
+  "dang-nhu-cau-tim-xe": "shipper",
+  "tim-chuyen-phu-hop-gia-de-xuat": "shipper",
+  "de-xuat-gia-cuoc-xe": "driver",
+  "theo-doi-don-theo-ma": "all",
 };
 
 // Original evergreen guides: no invented dates, promotions, statistics or testimonials.
@@ -130,11 +151,12 @@ export function getEditorialArticles(language = "vi"): NewsArticle[] {
       readingGuide?.conclusion,
     ].filter(Boolean).join("\n\n");
     return {
-      id: item.id, category: item.category, imageUrl: item.imageUrl, editorial: true,
+      id: item.id, category: item.category, audience: editorialAudience[item.id] || "all",
+      imageUrl: item.imageUrl, editorial: true,
       title: rewritten?.title || item.title[lang], summary: rewritten?.summary || item.summary[lang], publishedAt: null,
       content, readingGuide,
     };
-  }).concat(extraEditorials);
+  }).concat(extraEditorials.map(item => ({ ...item, audience: editorialAudience[item.id] || item.audience || "all" })));
 }
 
 /** Convert CMS markup into inert text, never inject stored HTML into the page. */
