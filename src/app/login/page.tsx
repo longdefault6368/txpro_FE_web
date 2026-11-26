@@ -9,6 +9,7 @@ import { useAffiliateAuth } from '@/components/auth/AuthAudienceContext';
 import AuthField from "@/components/auth/AuthField";
 import s from "@/components/auth/Auth.module.css";
 import { API_BASE } from "@/utils/api";
+import { normalizeAdminPermissions, resolvePostLoginDestination } from "@/utils/admin-access";
 import { safePostingReturn } from "@/utils/posting-contract";
 
 // Helper to retrieve or generate deviceId consistent with backend validator
@@ -86,6 +87,7 @@ export default function LoginPage() {
       phoneOrEmail: identifier.trim(),
       password: password,
       deviceId: getDeviceId(),
+      clientType: "web",
     };
 
     try {
@@ -100,23 +102,45 @@ export default function LoginPage() {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        localStorage.setItem("txpro_token", data.data.accessToken || "");
-        localStorage.setItem("txpro_refresh_token", data.data.refreshToken || "");
-        
         const userProfile = data.data.userProfile || data.data.user || {};
         const userRole = userProfile.role || data.data.role || "chu-hang";
         const userName = userProfile.fullName || userProfile.name || "Người dùng TXEPRO";
+        const adminRole = userProfile.adminRole || data.data.adminRole || undefined;
+        const adminPermissions = normalizeAdminPermissions(
+          userProfile.adminPermissions ?? data.data.adminPermissions
+        );
+        const next = safePostingReturn(new URLSearchParams(window.location.search).get("next"));
+        const outcome = resolvePostLoginDestination({
+          userRole,
+          affiliate,
+          next,
+          adminRole,
+          adminPermissions,
+        });
+        if (outcome.blockedError) {
+          setError(outcome.blockedError);
+          return;
+        }
 
+        localStorage.setItem("txpro_token", data.data.accessToken || "");
+        localStorage.setItem("txpro_refresh_token", data.data.refreshToken || "");
         localStorage.setItem("txpro_user_session", JSON.stringify({
           id: userProfile.id || userProfile._id || "",
+          email: userProfile.email || undefined,
           sessionStartedAt: new Date().toISOString(),
           name: userName,
-          role: userRole === "admin" ? "Admin" : userRole === "tai-xe" ? "Tài Xế" : "Chủ Hàng",
-          rawRole: userRole
+          role: userRole === "admin" ? "Admin" : userRole === "tai-xe" ? "Tài Xế" : userRole === "doi-tac" ? "Đối Tác" : "Chủ Hàng",
+          rawRole: userRole,
+          ...(userRole === "admin"
+            ? {
+                adminRole,
+                adminPermissions,
+                avatar: userProfile.avatar || data.data.avatar || null,
+              }
+            : {}),
         }));
         setSuccess(true);
-        const next = safePostingReturn(new URLSearchParams(window.location.search).get("next"));
-        const targetRoute = userRole === "admin" ? "/admin" : affiliate ? '/doi-tac' : next || "/user";
+        const targetRoute = outcome.targetRoute || "/user";
         window.dispatchEvent(new Event("txpro_session_updated"));
         setTimeout(() => router.push(targetRoute), 1200);
       } else {

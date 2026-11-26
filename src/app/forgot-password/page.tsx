@@ -205,9 +205,9 @@ export default function ForgotPasswordPage() {
             <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-primary-500 to-indigo-600 rounded-t-3xl"></div>
             
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-slate-900 tracking-tight">
+              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
                 {step === "phone" ? "Khôi Phục Mật Khẩu" : "Đặt Lại Mật Khẩu"}
-              </h2>
+              </h1>
               <p className="text-slate-500 text-sm mt-2">
                 {step === "phone" 
                   ? "Nhập số điện thoại đăng ký tài khoản để nhận mã OTP khôi phục" 

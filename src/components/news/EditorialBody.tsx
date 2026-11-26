@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Check, Lightbulb, ListChecks, Quote } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import type { NewsReadingGuide } from "@/lib/news-content";
@@ -10,10 +11,11 @@ function LinkedText({ text }: { text: string }) {
   const nodes = [];
   const pattern = /\[([^\]]+)\]\((\/[a-z0-9/?#=&_%\-]+)\)/gi;
   let last = 0;
-  for (const match of text.matchAll(pattern)) {
-    const at = match.index ?? 0;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    const at = match.index;
     if (at > last) nodes.push(text.slice(last, at));
-    nodes.push(<a key={at} href={match[2]}>{match[1]}</a>);
+    nodes.push(<Link key={at} href={match[2]}>{match[1]}</Link>);
     last = at + match[0].length;
   }
   if (last < text.length) nodes.push(text.slice(last));

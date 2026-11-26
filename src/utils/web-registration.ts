@@ -12,13 +12,13 @@ type RegistrationResult = { user?: { id?: string; _id?: string; name?: string; f
 export function commitRegistrationSession(storage: Storage, result: RegistrationResult, expectedSession: string | null) {
   if (storage.getItem('txpro_user_session') !== expectedSession) throw new Error('Tài khoản đang dùng đã thay đổi. Vui lòng đăng nhập lại.');
   const user = result?.user, tokens = result?.tokens;
-  if (!user || !['tai-xe', 'chu-hang'].includes(user.role || '') || !(user.id || user._id) || !tokens?.accessToken || !tokens?.refreshToken) throw new Error('Tài khoản đã xác thực nhưng chưa đủ thông tin phiên đăng nhập. Vui lòng đăng nhập để tiếp tục.');
+  if (!user || !['tai-xe', 'chu-hang', 'doi-tac'].includes(user.role || '') || !(user.id || user._id) || !tokens?.accessToken || !tokens?.refreshToken) throw new Error('Tài khoản đã xác thực nhưng chưa đủ thông tin phiên đăng nhập. Vui lòng đăng nhập để tiếp tục.');
   try {
     storage.setItem('txpro_token', tokens.accessToken); storage.setItem('txpro_refresh_token', tokens.refreshToken);
-    storage.setItem('txpro_user_session', JSON.stringify({ id: user.id || user._id, name: user.fullName || user.name || 'TXE PRO', role: user.role === 'tai-xe' ? 'Tài Xế' : 'Chủ Hàng', rawRole: user.role, sessionStartedAt: new Date().toISOString() }));
+    storage.setItem('txpro_user_session', JSON.stringify({ id: user.id || user._id, name: user.fullName || user.name || 'TXE PRO', role: user.role === 'tai-xe' ? 'Tài Xế' : user.role === 'doi-tac' ? 'Đối Tác' : 'Chủ Hàng', rawRole: user.role, sessionStartedAt: new Date().toISOString() }));
   } catch {
     for (const key of ['txpro_token', 'txpro_refresh_token', 'txpro_user_session']) { try { storage.removeItem(key); } catch { /* Storage unavailable. */ } }
     throw new Error('Không lưu được phiên đăng nhập. Vui lòng đăng nhập lại.');
   }
-  return user.role === 'tai-xe' ? '/tai-xe/phuong-tien' : '/chu-hang/form-tao-don';
+  return user.role === 'doi-tac' ? '/doi-tac' : user.role === 'tai-xe' ? '/tai-xe/phuong-tien' : '/chu-hang/form-tao-don';
 }

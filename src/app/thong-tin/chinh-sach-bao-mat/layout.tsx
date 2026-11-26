@@ -1,4 +1,10 @@
-import { publicPageMetadata } from "@/lib/site-seo";
+import { siteOrigin } from "@/lib/news-seo";
+import {
+  breadcrumbStructuredData,
+  publicPageMetadata,
+  resolveMetadataOrigin,
+  structuredDataScript,
+} from "@/lib/site-seo";
 
 export const metadata = publicPageMetadata({
   path: "/thong-tin/chinh-sach-bao-mat",
@@ -7,5 +13,16 @@ export const metadata = publicPageMetadata({
 });
 
 export default function PrivacyLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  const origin = resolveMetadataOrigin(siteOrigin(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL));
+  const breadcrumb = breadcrumbStructuredData(origin, [
+    { name: "Trang chủ", path: "/" },
+    { name: "Chính sách bảo mật", path: "/thong-tin/chinh-sach-bao-mat" },
+  ]);
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredDataScript(breadcrumb) }} />
+      {children}
+    </>
+  );
 }

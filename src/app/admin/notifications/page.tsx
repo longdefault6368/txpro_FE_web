@@ -34,6 +34,13 @@ import {
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { useToast } from "@/context/ToastContext";
+import {
+  canAccessAdminPath,
+  filterAdminNotifications,
+  hasFullAdminAccess,
+  readCurrentAdminAccessFromStorage,
+  resolveAdminNotificationLink,
+} from "@/utils/admin-access";
 
 type NotificationCategory = "all" | "users" | "kyc" | "orders" | "support" | "system";
 
@@ -131,6 +138,10 @@ export default function AdminNotificationsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<AdminNotificationItem[]>([]);
+  const [adminAccess, setAdminAccess] = useState<{ adminRole: string; permissions: string[] }>({
+    adminRole: "",
+    permissions: [],
+  });
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
 
@@ -154,8 +165,41 @@ export default function AdminNotificationsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [detailItem, setDetailItem] = useState<AdminNotificationItem | null>(null);
 
+  const canViewUsers = useMemo(
+    () => canAccessAdminPath("/admin/users", adminAccess.adminRole, adminAccess.permissions),
+    [adminAccess]
+  );
+  const canViewOrders = useMemo(
+    () => canAccessAdminPath("/admin/orders", adminAccess.adminRole, adminAccess.permissions),
+    [adminAccess]
+  );
+  const canViewSupport = useMemo(
+    () => canAccessAdminPath("/admin/support", adminAccess.adminRole, adminAccess.permissions),
+    [adminAccess]
+  );
+
+  const scopedNotifications = useMemo(
+    () => filterAdminNotifications(notifications, adminAccess.adminRole, adminAccess.permissions),
+    [notifications, adminAccess]
+  );
+
+  const effectiveCategory: NotificationCategory = useMemo(() => {
+    if ((category === "users" || category === "kyc") && !canViewUsers) return "all";
+    if (category === "orders" && !canViewOrders) return "all";
+    if (category === "support" && !canViewSupport) return "all";
+    return category;
+  }, [category, canViewUsers, canViewOrders, canViewSupport]);
+
   const fetchNotifications = async () => {
     setLoading(true);
+    const access = readCurrentAdminAccessFromStorage();
+    setAdminAccess(access);
+    if (!canAccessAdminPath("/admin/notifications", access.adminRole, access.permissions)) {
+      setNotifications([]);
+      setIsOffline(false);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetchWithAuth(`${API_BASE}/admin/users/notifications/feed`);
       if (res.ok) {
@@ -182,7 +226,16 @@ export default function AdminNotificationsPage() {
   };
 
   useEffect(() => {
-    fetchNotifications();
+    void fetchNotifications();
+    const syncAccess = () => {
+      setAdminAccess(readCurrentAdminAccessFromStorage());
+    };
+    window.addEventListener("storage", syncAccess);
+    window.addEventListener("txpro-admin-session-updated", syncAccess);
+    return () => {
+      window.removeEventListener("storage", syncAccess);
+      window.removeEventListener("txpro-admin-session-updated", syncAccess);
+    };
   }, []);
 
   const applyDatePreset = (preset: string) => {
@@ -260,12 +313,25 @@ export default function AdminNotificationsPage() {
   };
 
   const handleMarkAllRead = async () => {
+    const visibleUnread = scopedNotifications.filter((item) => !item.read);
+    if (visibleUnread.length === 0) return;
+    const visibleIds = new Set(visibleUnread.map((item) => item.id));
     try {
-      await fetchWithAuth(`${API_BASE}/admin/users/notifications/read-all`, { method: "PATCH" });
+      if (hasFullAdminAccess(adminAccess.adminRole, adminAccess.permissions)) {
+        await fetchWithAuth(`${API_BASE}/admin/users/notifications/read-all`, { method: "PATCH" });
+      } else {
+        await Promise.allSettled(
+          visibleUnread.map((item) =>
+            fetchWithAuth(`${API_BASE}/admin/users/notifications/${item.id}/read`, { method: "PATCH" })
+          )
+        );
+      }
     } catch (e) {
       console.warn("Failed to mark all notifications read on backend", e);
     }
-    setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+    setNotifications((prev) =>
+      prev.map((item) => (visibleIds.has(item.id) ? { ...item, read: true } : item))
+    );
     setSelectedIds([]);
     toast.success("Đã đánh dấu tất cả thông báo là đã đọc", {
       title: "Cập nhật thông báo",
@@ -308,33 +374,21 @@ export default function AdminNotificationsPage() {
       handleToggleRead(item);
     }
 
-    let targetLink = item.link;
-    if (!targetLink || targetLink === "/admin/support") {
-      if (item.type === "chat" || item.meta?.chatId) {
-        const chatId = item.meta?.chatId || (item as any).chatId;
-        const senderId = item.meta?.senderId || (item as any).senderId;
-        targetLink = chatId
-          ? `/admin/support?tab=chats&chatId=${chatId}${senderId ? `&userId=${senderId}` : ""}`
-          : (senderId ? `/admin/support?tab=chats&userId=${senderId}` : `/admin/support?tab=chats`);
-      } else if (item.type === "support_ticket" && item.meta?.ticketId) {
-        targetLink = `/admin/support?tab=tickets&ticketId=${item.meta.ticketId}`;
-      }
-    }
-
-    if (targetLink) {
+    const targetLink = resolveAdminNotificationLink(item);
+    if (targetLink && canAccessAdminPath(targetLink, adminAccess.adminRole, adminAccess.permissions)) {
       router.push(targetLink);
     }
   };
 
   // Filtered & Sorted notifications
   const filteredNotifications = useMemo(() => {
-    let result = notifications.filter((item) => {
+    const result = scopedNotifications.filter((item) => {
       // Category filter
-      if (category === "users" && item.type !== "user_registered") return false;
-      if (category === "kyc" && item.type !== "kyc_pending") return false;
-      if (category === "orders" && item.type !== "order_cancelled") return false;
-      if (category === "support" && item.type !== "support_ticket" && item.type !== "chat") return false;
-      if (category === "system" && item.type !== "system") return false;
+      if (effectiveCategory === "users" && item.type !== "user_registered") return false;
+      if (effectiveCategory === "kyc" && item.type !== "kyc_pending") return false;
+      if (effectiveCategory === "orders" && item.type !== "order_cancelled") return false;
+      if (effectiveCategory === "support" && item.type !== "support_ticket" && item.type !== "chat") return false;
+      if (effectiveCategory === "system" && item.type !== "system") return false;
 
       // Read status filter
       if (readFilter === "unread" && item.read) return false;
@@ -380,7 +434,7 @@ export default function AdminNotificationsPage() {
     });
 
     return result;
-  }, [notifications, category, readFilter, startDate, endDate, search, sortField, sortOrder]);
+  }, [scopedNotifications, effectiveCategory, readFilter, startDate, endDate, search, sortField, sortOrder]);
 
   // Pagination calculation
   const totalItems = filteredNotifications.length;
@@ -395,14 +449,14 @@ export default function AdminNotificationsPage() {
   // Stats calculation
   const stats = useMemo(() => {
     return {
-      total: notifications.length,
-      unread: notifications.filter((n) => !n.read).length,
-      users: notifications.filter((n) => n.type === "user_registered").length,
-      kyc: notifications.filter((n) => n.type === "kyc_pending").length,
-      orders: notifications.filter((n) => n.type === "order_cancelled").length,
-      support: notifications.filter((n) => n.type === "support_ticket" || n.type === "chat").length,
+      total: scopedNotifications.length,
+      unread: scopedNotifications.filter((n) => !n.read).length,
+      users: scopedNotifications.filter((n) => n.type === "user_registered").length,
+      kyc: scopedNotifications.filter((n) => n.type === "kyc_pending").length,
+      orders: scopedNotifications.filter((n) => n.type === "order_cancelled").length,
+      support: scopedNotifications.filter((n) => n.type === "support_ticket" || n.type === "chat").length,
     };
-  }, [notifications]);
+  }, [scopedNotifications]);
 
   // Selection handlers
   const handleSelectAllCurrentPage = () => {
@@ -473,7 +527,7 @@ export default function AdminNotificationsPage() {
         <div
           onClick={() => { setCategory("all"); setCurrentPage(1); }}
           className={`bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition-all hover:border-primary-400 ${
-            category === "all" ? "border-primary-500 ring-2 ring-primary-500/10" : "border-slate-200/60"
+            effectiveCategory === "all" ? "border-primary-500 ring-2 ring-primary-500/10" : "border-slate-200/60"
           }`}
         >
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tất cả</p>
@@ -488,42 +542,50 @@ export default function AdminNotificationsPage() {
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chưa đọc</p>
           <p className="text-2xl font-bold text-red-500 mt-1">{stats.unread}</p>
         </div>
-        <div
-          onClick={() => { setCategory("users"); setCurrentPage(1); }}
-          className={`bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition-all hover:border-blue-400 ${
-            category === "users" ? "border-blue-500 ring-2 ring-blue-500/10" : "border-slate-200/60"
-          }`}
-        >
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thành viên mới</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1">{stats.users}</p>
-        </div>
-        <div
-          onClick={() => { setCategory("kyc"); setCurrentPage(1); }}
-          className={`bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition-all hover:border-amber-400 ${
-            category === "kyc" ? "border-amber-500 ring-2 ring-amber-500/10" : "border-slate-200/60"
-          }`}
-        >
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chờ duyệt eKYC</p>
-          <p className="text-2xl font-bold text-amber-500 mt-1">{stats.kyc}</p>
-        </div>
-        <div
-          onClick={() => { setCategory("orders"); setCurrentPage(1); }}
-          className={`bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition-all hover:border-red-400 ${
-            category === "orders" ? "border-red-500 ring-2 ring-red-500/10" : "border-slate-200/60"
-          }`}
-        >
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Đơn bị hủy</p>
-          <p className="text-2xl font-bold text-red-600 mt-1">{stats.orders}</p>
-        </div>
-        <div
-          onClick={() => { setCategory("support"); setCurrentPage(1); }}
-          className={`bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition-all hover:border-emerald-400 ${
-            category === "support" ? "border-emerald-500 ring-2 ring-emerald-500/10" : "border-slate-200/60"
-          }`}
-        >
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hỗ trợ & Chat</p>
-          <p className="text-2xl font-bold text-emerald-600 mt-1">{stats.support}</p>
-        </div>
+        {canViewUsers && (
+          <div
+            onClick={() => { setCategory("users"); setCurrentPage(1); }}
+            className={`bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition-all hover:border-blue-400 ${
+              effectiveCategory === "users" ? "border-blue-500 ring-2 ring-blue-500/10" : "border-slate-200/60"
+            }`}
+          >
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thành viên mới</p>
+            <p className="text-2xl font-bold text-blue-600 mt-1">{stats.users}</p>
+          </div>
+        )}
+        {canViewUsers && (
+          <div
+            onClick={() => { setCategory("kyc"); setCurrentPage(1); }}
+            className={`bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition-all hover:border-amber-400 ${
+              effectiveCategory === "kyc" ? "border-amber-500 ring-2 ring-amber-500/10" : "border-slate-200/60"
+            }`}
+          >
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chờ duyệt eKYC</p>
+            <p className="text-2xl font-bold text-amber-500 mt-1">{stats.kyc}</p>
+          </div>
+        )}
+        {canViewOrders && (
+          <div
+            onClick={() => { setCategory("orders"); setCurrentPage(1); }}
+            className={`bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition-all hover:border-red-400 ${
+              effectiveCategory === "orders" ? "border-red-500 ring-2 ring-red-500/10" : "border-slate-200/60"
+            }`}
+          >
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Đơn bị hủy</p>
+            <p className="text-2xl font-bold text-red-600 mt-1">{stats.orders}</p>
+          </div>
+        )}
+        {canViewSupport && (
+          <div
+            onClick={() => { setCategory("support"); setCurrentPage(1); }}
+            className={`bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition-all hover:border-emerald-400 ${
+              effectiveCategory === "support" ? "border-emerald-500 ring-2 ring-emerald-500/10" : "border-slate-200/60"
+            }`}
+          >
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hỗ trợ & Chat</p>
+            <p className="text-2xl font-bold text-emerald-600 mt-1">{stats.support}</p>
+          </div>
+        )}
       </div>
 
       {/* Filter and Search Bar Card */}
@@ -548,7 +610,7 @@ export default function AdminNotificationsPage() {
           {/* Category Dropdown Filter */}
           <div className="relative w-full sm:w-56">
             <select
-              value={category}
+              value={effectiveCategory}
               onChange={(e) => {
                 setCategory(e.target.value as NotificationCategory);
                 setCurrentPage(1);
@@ -556,10 +618,10 @@ export default function AdminNotificationsPage() {
               className="appearance-none w-full pl-10 pr-8 py-3 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:border-primary-500 bg-white cursor-pointer"
             >
               <option value="all">Tất cả phân loại</option>
-              <option value="users">Thành viên mới</option>
-              <option value="kyc">Chờ duyệt eKYC</option>
-              <option value="orders">Đơn hàng bị hủy</option>
-              <option value="support">Hỗ trợ & Chat</option>
+              {canViewUsers && <option value="users">Thành viên mới</option>}
+              {canViewUsers && <option value="kyc">Chờ duyệt eKYC</option>}
+              {canViewOrders && <option value="orders">Đơn hàng bị hủy</option>}
+              {canViewSupport && <option value="support">Hỗ trợ & Chat</option>}
               <option value="system">Hệ thống</option>
             </select>
             <Filter className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -880,18 +942,24 @@ export default function AdminNotificationsPage() {
 
                         {/* Navigation link / object */}
                         <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
-                          {notif.link ? (
-                            <button
-                              type="button"
-                              onClick={(e) => handleItemNavigate(notif, e)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-primary-50 text-slate-600 hover:text-primary-700 text-[11px] font-bold transition-all border border-slate-200/60 hover:border-primary-200 cursor-pointer"
-                            >
-                              <span>Đi đến mục</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </button>
-                          ) : (
-                            <span className="text-[11px] text-slate-400">---</span>
-                          )}
+                          {(() => {
+                            const targetLink = resolveAdminNotificationLink(notif);
+                            const canNavigate =
+                              Boolean(targetLink) &&
+                              canAccessAdminPath(targetLink, adminAccess.adminRole, adminAccess.permissions);
+                            return canNavigate ? (
+                              <button
+                                type="button"
+                                onClick={(e) => handleItemNavigate(notif, e)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-primary-50 text-slate-600 hover:text-primary-700 text-[11px] font-bold transition-all border border-slate-200/60 hover:border-primary-200 cursor-pointer"
+                              >
+                                <span>Đi đến mục</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">---</span>
+                            );
+                          })()}
                         </td>
 
                         {/* Timestamp */}
@@ -1067,7 +1135,7 @@ export default function AdminNotificationsPage() {
                 <div className="pt-3 border-t border-slate-200/60 mt-2 text-[11px] text-slate-500 space-y-1">
                   <p className="font-bold text-slate-700">Thông tin bổ sung:</p>
                   {detailItem.meta.phone && <p>• SĐT liên hệ: <span className="font-semibold text-slate-800">{detailItem.meta.phone}</span></p>}
-                  {detailItem.meta.role && <p>• Vai trò: <span className="font-semibold text-slate-800">{detailItem.meta.role === "tai-xe" ? "Tài xế" : "Chủ hàng"}</span></p>}
+                  {detailItem.meta.role && <p>• Vai trò: <span className="font-semibold text-slate-800">{detailItem.meta.role === "tai-xe" ? "Tài xế" : detailItem.meta.role === "doi-tac" ? "Đối tác" : "Chủ hàng"}</span></p>}
                   {detailItem.meta.orderCode && <p>• Mã đơn: <span className="font-semibold text-slate-800">{detailItem.meta.orderCode}</span></p>}
                   {detailItem.meta.ticketId && <p>• Mã ticket: <span className="font-semibold text-slate-800">{detailItem.meta.ticketId}</span></p>}
                 </div>
@@ -1085,20 +1153,26 @@ export default function AdminNotificationsPage() {
               </button>
 
               <div className="flex items-center gap-2">
-                {detailItem.link && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const item = detailItem;
-                      setDetailItem(null);
-                      handleItemNavigate(item);
-                    }}
-                    className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-xs transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
-                  >
-                    <span>Đi đến trang xử lý</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                {(() => {
+                  const targetLink = resolveAdminNotificationLink(detailItem);
+                  const canNavigate =
+                    Boolean(targetLink) &&
+                    canAccessAdminPath(targetLink, adminAccess.adminRole, adminAccess.permissions);
+                  return canNavigate ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const item = detailItem;
+                        setDetailItem(null);
+                        handleItemNavigate(item);
+                      }}
+                      className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-xs transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
+                    >
+                      <span>Đi đến trang xử lý</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  ) : null;
+                })()}
                 <button
                   type="button"
                   onClick={() => setDetailItem(null)}

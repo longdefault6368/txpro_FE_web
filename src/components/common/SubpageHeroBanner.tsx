@@ -20,6 +20,9 @@ interface SubpageHeroBannerProps {
 }
 
 const SUBPAGE_NAV_ITEMS = [
+  { href: "/dich-vu", label: { vi: "Dịch vụ", en: "Services", zh: "运输服务" } },
+  { href: "/tuyen-duong", label: { vi: "Tuyến đường", en: "Routes", zh: "热门线路" } },
+  { href: "/tai-xe", label: { vi: "Tài xế", en: "Drivers", zh: "司机专区" } },
   { href: "/thong-tin/gioi-thieu", label: { vi: "Giới thiệu", en: "About", zh: "项目介绍" } },
   { href: "/thong-tin/quy-che-hoat-dong", label: { vi: "Quy chế", en: "Operating Rules", zh: "运营规则" } },
   { href: "/thong-tin/huong-dan-chu-hang", label: { vi: "Đăng nhu cầu", en: "Post a request", zh: "发布需求" } },
@@ -57,7 +60,7 @@ export default function SubpageHeroBanner({
       {/* 1. CINEMATIC BACKGROUND IMAGE */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/splash1.png"
+          src="/splash1.webp"
           alt=""
           fill
           priority
@@ -89,24 +92,36 @@ export default function SubpageHeroBanner({
       {/* 3. BANNER CONTENT (Z-10) */}
       <div className="relative z-10 max-w-6xl mx-auto text-center">
         {/* Breadcrumb Bar */}
-        <nav className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/70 backdrop-blur-md border border-white/15 text-xs text-slate-200 mb-5 max-w-full overflow-x-auto shadow-lg shadow-black/20">
-          <Link href="/" className="hover:text-white transition-colors flex items-center gap-1 shrink-0">
-            <Home className="w-3.5 h-3.5" />
-          </Link>
-          {crumbs.map((crumb, idx) => (
-            <div key={idx} className="flex items-center gap-2 shrink-0">
-              <ChevronRight className="w-3 h-3 text-slate-400" />
-              {crumb.href ? (
-                <Link href={crumb.href} className="hover:text-primary-300 transition-colors">
-                  {crumb.label}
-                </Link>
-              ) : (
-                <span className="text-primary-300 font-semibold truncate max-w-[200px] sm:max-w-none">
-                  {crumb.label}
-                </span>
-              )}
-            </div>
-          ))}
+        <nav
+          aria-label="Breadcrumb"
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/70 backdrop-blur-md border border-white/15 text-xs text-slate-200 mb-5 max-w-full overflow-x-auto shadow-lg shadow-black/20"
+        >
+          {crumbs[0]?.href !== "/" && (
+            <Link href="/" aria-label="Trang chủ" className="hover:text-white transition-colors flex items-center gap-1 shrink-0">
+              <Home className="w-3.5 h-3.5" aria-hidden="true" />
+            </Link>
+          )}
+          {crumbs.map((crumb, idx) => {
+            const isFirstHome = idx === 0 && crumb.href === "/";
+            const isLast = idx === crumbs.length - 1;
+            return (
+              <div key={idx} className="flex items-center gap-2 shrink-0">
+                {(idx > 0 || crumbs[0]?.href !== "/") && (
+                  <ChevronRight className="w-3 h-3 text-slate-400" aria-hidden="true" />
+                )}
+                {crumb.href && !isLast ? (
+                  <Link href={crumb.href} className="hover:text-primary-300 transition-colors inline-flex items-center gap-1.5">
+                    {isFirstHome && <Home className="w-3.5 h-3.5" aria-hidden="true" />}
+                    <span>{crumb.label}</span>
+                  </Link>
+                ) : (
+                  <span aria-current="page" className="text-primary-300 font-semibold truncate max-w-[200px] sm:max-w-none">
+                    {crumb.label}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Badge */}
@@ -134,9 +149,12 @@ export default function SubpageHeroBanner({
 
         {/* Shared Quick Navigation Pills for all subpages */}
         <div className="mt-8 pt-6 border-t border-white/10">
-          <div className="flex items-center justify-start sm:justify-center gap-2 overflow-x-auto pb-2 scrollbar-none text-xs font-semibold">
+          <div className="flex items-center justify-start gap-2 overflow-x-auto pb-2 scrollbar-none text-xs font-semibold md:flex-wrap md:justify-center md:overflow-visible md:pb-0">
             {SUBPAGE_NAV_ITEMS.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive =
+                pathname === item.href ||
+                ((item.href === "/dich-vu" || item.href === "/tuyen-duong") &&
+                  Boolean(pathname?.startsWith(item.href + "/")));
               const label = item.label[langKey] || item.label.vi;
               return (
                 <Link

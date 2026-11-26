@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import {
   UserCheck,
   UserPlus,
@@ -41,26 +42,44 @@ import {
   Square,
   Table as TableIcon,
   LayoutGrid,
+  CalendarClock,
+  Handshake,
+  Briefcase,
+  Megaphone,
+  Newspaper,
+  ExternalLink,
+  Eye,
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { getServerMediaUrl } from "@/utils/media";
+import TeamAffiliatePartnersTab from "@/components/admin/TeamAffiliatePartnersTab";
+import TeamMemberDetailDrawer, {
+  type StaffDetailTarget,
+} from "@/components/admin/TeamMemberDetailDrawer";
 import {
   AdminRole,
   ADMIN_ROLE_CONFIG,
   ADMIN_PERMISSION_MODULES,
   DEFAULT_ROLE_PERMISSIONS,
-} from "../layout";
+} from "@/config/admin-roles";
 
 const MODULE_ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
   notifications: Bell,
   users: Users,
   orders: Package,
+  incidents: ShieldAlert,
   analytics: BarChart3,
+  affiliates: Handshake,
   support: Headset,
+  contacts: Mail,
+  careers: Briefcase,
+  "email-marketing": Megaphone,
+  news: Newspaper,
   logs: TerminalSquare,
   settings: Settings,
   team: UserCheck,
+  attendance: CalendarClock,
 };
 
 const PATH_SHORT_LABELS: Record<string, string> = {
@@ -68,11 +87,18 @@ const PATH_SHORT_LABELS: Record<string, string> = {
   "/admin/notifications": "Thông báo",
   "/admin/users": "Người Dùng",
   "/admin/orders": "Đơn hàng",
+  "/admin/incidents": "Tranh chấp & Sự cố",
   "/admin/analytics": "Phân tích",
+  "/admin/affiliates": "Đối tác & Giới thiệu",
   "/admin/support": "Hỗ trợ & Chat",
+  "/admin/contacts": "Liên hệ website",
+  "/admin/tuyen-dung": "Tuyển dụng",
+  "/admin/email-marketing": "Email marketing",
+  "/admin/news": "Tin tức & Ưu đãi",
   "/admin/logs": "Nhật ký hệ thống",
   "/admin/settings": "Cài đặt hệ thống",
   "/admin/team": "Ban Quản Trị",
+  "/admin/attendance": "Chấm công",
 };
 
 export interface RoleItem {
@@ -137,6 +163,7 @@ interface TeamMember {
   role: string;
   adminRole: string;
   adminPermissions?: string[];
+  baseSalaryVnd?: number;
   isActive: boolean;
   lastLoginAt?: string | null;
   createdAt: string;
@@ -197,7 +224,8 @@ function TeamMemberAvatar({
 }
 
 export default function AdminTeamPage() {
-  const [activeTab, setActiveTab] = useState<"team" | "roles">("team");
+  const [activeTab, setActiveTab] = useState<"team" | "roles" | "partners">("team");
+  const [partnersCount, setPartnersCount] = useState<number | null>(null);
   const [matrixViewMode, setMatrixViewMode] = useState<"table" | "cards">("table");
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -244,6 +272,8 @@ export default function AdminTeamPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
+  const [detailRefreshToken, setDetailRefreshToken] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null);
 
@@ -255,9 +285,13 @@ export default function AdminTeamPage() {
     password: "",
     adminRole: "cskh" as string,
     adminPermissions: [...(DEFAULT_ROLE_PERMISSIONS.cskh || [])] as string[],
+    baseSalaryVnd: 2000000,
   });
   const [targetAdminRole, setTargetAdminRole] = useState<string>("cskh");
   const [targetPermissions, setTargetPermissions] = useState<string[]>([...(DEFAULT_ROLE_PERMISSIONS.cskh || [])]);
+  const [targetSalary, setTargetSalary] = useState(2000000);
+  const [salaryDrafts, setSalaryDrafts] = useState<Record<string, number>>({});
+  const [savingSalaryId, setSavingSalaryId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Toast state
@@ -349,6 +383,7 @@ export default function AdminTeamPage() {
           role: "admin",
           adminRole: resolvedRole,
           adminPermissions: resolvedPermissions,
+          baseSalaryVnd: Number.isFinite(Number(u.baseSalaryVnd)) ? Number(u.baseSalaryVnd) : 2000000,
           isActive: u.isActive !== false,
           lastLoginAt: u.lastLoginAt,
           createdAt: u.createdAt || new Date().toISOString(),
@@ -357,6 +392,7 @@ export default function AdminTeamPage() {
       });
 
       setTeam(formattedList);
+      setSalaryDrafts({});
     } catch (err: any) {
       console.warn("Fetch team error, using local fallback", err);
       showToast(false, err?.message || "Lỗi khi tải danh sách quản trị viên");
@@ -458,6 +494,13 @@ export default function AdminTeamPage() {
     }
     fetchTeam();
     fetchRolePermissions();
+    fetchWithAuth(`${API_BASE}/admin/affiliates/overview`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const total = json?.data?.partners?.total;
+        if (typeof total === "number") setPartnersCount(total);
+      })
+      .catch(() => null);
   }, []);
 
   const handleToggleRoleModule = (roleKey: string, modulePath: string) => {
@@ -679,6 +722,7 @@ export default function AdminTeamPage() {
         role: "admin",
         adminRole: assignedRole,
         adminPermissions: createForm.adminPermissions,
+        baseSalaryVnd: Number(createForm.baseSalaryVnd) || 0,
         isActive: true,
       };
 
@@ -730,6 +774,7 @@ export default function AdminTeamPage() {
         password: "",
         adminRole: "cskh",
         adminPermissions: [...(DEFAULT_ROLE_PERMISSIONS.cskh || [])],
+        baseSalaryVnd: 2000000,
       });
       await fetchTeam();
     } catch (err: any) {
@@ -746,6 +791,7 @@ export default function AdminTeamPage() {
       const payload = {
         adminRole: targetAdminRole,
         adminPermissions: targetPermissions,
+        baseSalaryVnd: Number(targetSalary) || 0,
       };
       const res = await fetchWithAuth(`${API_BASE}/admin/users/${selectedMember._id}/admin-role`, {
         method: "PATCH",
@@ -771,11 +817,45 @@ export default function AdminTeamPage() {
       showToast(true, `Đã cập nhật vai trò & quyền xem của [${selectedMember.name}]`);
       setShowRoleModal(false);
       setSelectedMember(null);
+      setDetailRefreshToken((v) => v + 1);
       await fetchTeam();
     } catch (err: any) {
       showToast(false, err?.message || "Lỗi khi đổi quyền");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSaveSalary = async (member: TeamMember, nextValue?: number) => {
+    const value = Number(nextValue ?? salaryDrafts[member._id] ?? member.baseSalaryVnd ?? 2000000);
+    if (!Number.isInteger(value) || value < 0) {
+      showToast(false, "Mức lương không hợp lệ.");
+      return;
+    }
+    if (value === (member.baseSalaryVnd ?? 2000000)) return;
+    setSavingSalaryId(member._id);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${member._id}/salary`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseSalaryVnd: value }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.message || "Không lưu được mức lương");
+      }
+      setTeam((prev) => prev.map((item) => (item._id === member._id ? { ...item, baseSalaryVnd: value } : item)));
+      setSalaryDrafts((prev) => {
+        const next = { ...prev };
+        delete next[member._id];
+        return next;
+      });
+      showToast(true, `Đã lưu lương của [${member.name}]`);
+      setDetailRefreshToken((v) => v + 1);
+    } catch (err: any) {
+      showToast(false, err?.message || "Lỗi khi lưu mức lương");
+    } finally {
+      setSavingSalaryId(null);
     }
   };
 
@@ -903,7 +983,7 @@ export default function AdminTeamPage() {
                 <UserPlus className="w-4 h-4" /> Thêm Quản Trị Viên Mới
               </button>
             </>
-          ) : (
+          ) : activeTab === "roles" ? (
             <button
               onClick={fetchRolePermissions}
               className="p-2.5 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-600 transition-colors cursor-pointer flex items-center gap-2 text-xs font-bold"
@@ -912,12 +992,20 @@ export default function AdminTeamPage() {
               <RefreshCw className={`w-4 h-4 ${loadingRolePerms ? "animate-spin text-primary-600" : ""}`} />
               Làm mới quyền
             </button>
+          ) : (
+            <Link
+              href="/admin/affiliates"
+              className="btn-primary py-2.5 px-4 text-xs font-bold rounded-xl flex items-center gap-2 shadow-md shadow-primary-600/20"
+            >
+              <span>Quản Lý Đối Tác Đầy Đủ</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
           )}
         </div>
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-slate-200 gap-2">
+      <div className="flex flex-wrap border-b border-slate-200 gap-2">
         <button
           onClick={() => setActiveTab("team")}
           className={`flex items-center gap-2 py-3 px-5 text-sm font-bold border-b-2 transition-all cursor-pointer ${activeTab === "team"
@@ -953,6 +1041,25 @@ export default function AdminTeamPage() {
           >
             {rolesList.length} vai trò
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("partners")}
+          className={`flex items-center gap-2 py-3 px-5 text-sm font-bold border-b-2 transition-all cursor-pointer ${activeTab === "partners"
+              ? "border-primary-600 text-primary-600 bg-primary-50/50 rounded-t-xl"
+              : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+            }`}
+        >
+          <Handshake className="w-4 h-4" />
+          <span>Đối Tác Affiliate</span>
+          {partnersCount !== null && (
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-bold ${activeTab === "partners" ? "bg-primary-100 text-primary-700" : "bg-slate-100 text-slate-600"
+                }`}
+            >
+              {partnersCount} đối tác
+            </span>
+          )}
         </button>
       </div>
 
@@ -1006,28 +1113,29 @@ export default function AdminTeamPage() {
               <span className="text-primary-600 font-bold">← Vuốt ngang để xem đủ cột →</span>
             </div>
             <div className="overflow-x-auto w-full max-w-full overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
-              <table className="w-full min-w-[880px] text-left border-collapse">
+              <table className="w-full min-w-[1100px] text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                     <th className="py-4 px-6 min-w-[200px]">Quản Trị Viên</th>
                     <th className="py-4 px-4 min-w-[140px]">Cấp Bậc</th>
+                    <th className="py-4 px-4 min-w-[160px]">Mức lương</th>
                     <th className="py-4 px-4 min-w-[180px]">Quyền Hạn Chính</th>
                     <th className="py-4 px-4 w-[110px]">Trạng Thái</th>
                     <th className="py-4 px-4 min-w-[150px]">Đăng Nhập Cuối</th>
-                    <th className="py-4 px-6 text-right w-[110px]">Thao Tác</th>
+                    <th className="py-4 px-6 text-right min-w-[210px]">Thao Tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-medium">
                   {loading && team.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-20 text-center text-slate-400">
+                      <td colSpan={7} className="py-20 text-center text-slate-400">
                         <RefreshCw className="w-8 h-8 animate-spin text-primary-500 mx-auto mb-2" />
                         Đang tải danh sách ban quản trị...
                       </td>
                     </tr>
                   ) : filteredTeam.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-16 text-center text-slate-400">
+                      <td colSpan={7} className="py-16 text-center text-slate-400">
                         <UserCheck className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                         Không tìm thấy nhân sự phù hợp
                       </td>
@@ -1049,16 +1157,23 @@ export default function AdminTeamPage() {
                         <tr key={member._id} className="hover:bg-slate-50/70 transition-colors">
                           {/* Name & Contact */}
                           <td className="py-4 px-6">
-                            <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setDetailMemberId(member._id)}
+                              className="flex items-center gap-3 text-left group cursor-pointer w-full"
+                              title="Bấm để xem chi tiết nhân sự và lịch chấm công"
+                            >
                               <TeamMemberAvatar avatar={member.avatar} name={member.name} />
                               <div className="min-w-0">
-                                <p className="font-bold text-slate-900 text-sm truncate">{member.name}</p>
+                                <p className="font-bold text-slate-900 group-hover:text-primary-600 transition-colors text-sm truncate">
+                                  {member.name}
+                                </p>
                                 <p className="text-slate-500 text-[11px] flex flex-col gap-0.5 mt-0.5">
                                   {member.email && <span className="flex items-center gap-1 truncate"><Mail className="w-3 h-3 flex-shrink-0" /> {member.email}</span>}
                                   {member.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 flex-shrink-0" /> {member.phone}</span>}
                                 </p>
                               </div>
-                            </div>
+                            </button>
                           </td>
 
                           {/* Role Badge */}
@@ -1067,6 +1182,38 @@ export default function AdminTeamPage() {
                               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: roleCfg.color }} />
                               {isSuper ? "Admin" : roleCfg.label}
                             </span>
+                          </td>
+
+                          <td className="py-4 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                min={0}
+                                step={100000}
+                                value={salaryDrafts[member._id] ?? member.baseSalaryVnd ?? 2000000}
+                                onChange={(e) => setSalaryDrafts((prev) => ({ ...prev, [member._id]: Number(e.target.value) }))}
+                                onBlur={() => void handleSaveSalary(member)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    void handleSaveSalary(member);
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }}
+                                className="w-[120px] px-2.5 py-1.5 border border-slate-200 rounded-xl text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:border-primary-500"
+                              />
+                              <span className="text-[10px] font-bold text-slate-400">₫</span>
+                              <button
+                                type="button"
+                                title="Lưu mức lương"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => void handleSaveSalary(member)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                              </button>
+                              {savingSalaryId === member._id && <RefreshCw className="w-3.5 h-3.5 animate-spin text-primary-500" />}
+                            </div>
                           </td>
 
                           {/* Permissions Summary */}
@@ -1131,6 +1278,16 @@ export default function AdminTeamPage() {
                           <td className="py-4 px-6 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-2">
                               <button
+                                type="button"
+                                onClick={() => setDetailMemberId(member._id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-primary-200 bg-primary-50/70 hover:bg-primary-100/80 rounded-xl text-[11px] font-bold text-primary-700 transition-colors cursor-pointer"
+                                title="Xem chi tiết hồ sơ & lịch chấm công"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Chi tiết</span>
+                              </button>
+
+                              <button
                                 onClick={() => {
                                   setSelectedMember(member);
                                   setTargetAdminRole(member.adminRole);
@@ -1139,6 +1296,7 @@ export default function AdminTeamPage() {
                                       ? [...member.adminPermissions]
                                       : [...(DEFAULT_ROLE_PERMISSIONS[member.adminRole as AdminRole] || rolePermsMap[member.adminRole] || [])]
                                   );
+                                  setTargetSalary(member.baseSalaryVnd ?? 2000000);
                                   setShowRoleModal(true);
                                 }}
                                 className="p-2 border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 transition-colors cursor-pointer"
@@ -1226,7 +1384,7 @@ export default function AdminTeamPage() {
             </div>
           </div>
         </>
-      ) : (
+      ) : activeTab === "roles" ? (
         /* Tab 2: Phân Quyền Vai Trò */
         <div className="space-y-6">
 
@@ -1555,6 +1713,12 @@ export default function AdminTeamPage() {
             </div>
           </div>
         </div>
+      ) : (
+        /* Tab 3: Đối Tác Affiliate */
+        <TeamAffiliatePartnersTab
+          onCountChange={setPartnersCount}
+          onToast={showToast}
+        />
       )}
 
       {/* Modal: Thêm Quản Trị Viên Mới */}
@@ -1614,6 +1778,18 @@ export default function AdminTeamPage() {
                       className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Mức lương tháng (₫)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={100000}
+                    value={createForm.baseSalaryVnd}
+                    onChange={(e) => setCreateForm({ ...createForm, baseSalaryVnd: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  />
                 </div>
 
                 <div>
@@ -1832,7 +2008,7 @@ export default function AdminTeamPage() {
 
       {/* Modal: Đổi Cấp Bậc & Tùy Biến Quyền Quản Trị */}
       {showRoleModal && selectedMember && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
             <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
@@ -1874,6 +2050,18 @@ export default function AdminTeamPage() {
                     {getRoleMeta(selectedMember.adminRole).label}
                   </p>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Mức lương tháng (₫)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={100000}
+                  value={targetSalary}
+                  onChange={(e) => setTargetSalary(Number(e.target.value))}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                />
               </div>
 
               {/* Section 1: Choose Base Role */}
@@ -2398,9 +2586,62 @@ export default function AdminTeamPage() {
         </div>
       )}
 
+      {/* Drawer: Chi tiết nhân sự & lịch chấm công */}
+      {(() => {
+        const activeDetailMember = detailMemberId
+          ? team.find((m) => m._id === detailMemberId) || null
+          : null;
+        if (!activeDetailMember) return null;
+        const meta = getRoleMeta(activeDetailMember.adminRole);
+        const resolvedPerms =
+          activeDetailMember.adminRole === "super_admin"
+            ? ["*"]
+            : Array.isArray(activeDetailMember.adminPermissions) &&
+                activeDetailMember.adminPermissions.length > 0
+              ? activeDetailMember.adminPermissions
+              : rolePermsMap[activeDetailMember.adminRole] ||
+                (DEFAULT_ROLE_PERMISSIONS as Record<string, string[]>)[
+                  activeDetailMember.adminRole
+                ] ||
+                [];
+        const staffTarget: StaffDetailTarget = {
+          kind: "staff",
+          userId: activeDetailMember._id,
+          name: activeDetailMember.name,
+          email: activeDetailMember.email,
+          phone: activeDetailMember.phone,
+          adminRole: activeDetailMember.adminRole,
+          roleLabel: meta.label,
+          roleColor: meta.color,
+          roleBadgeClass: meta.badgeClass,
+          adminPermissions: resolvedPerms,
+          baseSalaryVnd: activeDetailMember.baseSalaryVnd ?? 2000000,
+          isActive: activeDetailMember.isActive,
+          lastLoginAt: activeDetailMember.lastLoginAt,
+          createdAt: activeDetailMember.createdAt,
+          avatar: activeDetailMember.avatar,
+        };
+        return (
+          <TeamMemberDetailDrawer
+            key={activeDetailMember._id}
+            target={staffTarget}
+            onClose={() => setDetailMemberId(null)}
+            onToast={showToast}
+            refreshToken={detailRefreshToken}
+            onEditStaffRole={() => {
+              setSelectedMember(activeDetailMember);
+              setTargetAdminRole(activeDetailMember.adminRole);
+              setTargetPermissions([...resolvedPerms]);
+              setTargetSalary(activeDetailMember.baseSalaryVnd ?? 2000000);
+              setShowRoleModal(true);
+            }}
+          />
+        );
+      })()}
+
       {/* Toast Notification */}
       {toast.show && (
-        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl border text-sm font-semibold flex items-center gap-3 transition-all ${toast.success
+        <div className={`fixed bottom-6 right-6 z-[70] px-5 py-3 rounded-2xl shadow-xl border text-sm font-semibold flex items-center gap-3 transition-all ${toast.success
             ? "bg-emerald-50 border-emerald-200 text-emerald-800"
             : "bg-red-50 border-red-200 text-red-800"
           }`}>

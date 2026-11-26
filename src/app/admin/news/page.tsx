@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   Filter,
   Eye,
+  ExternalLink,
+  CheckCircle2,
+  AlertTriangle,
   Inbox,
   Pencil,
   Plus,
@@ -18,6 +21,8 @@ import { getServerMediaUrl, normalizePersistedImagePath } from "@/utils/media";
 import { NewsContentEditor } from "@/components/admin/NewsContentEditor";
 import { NewsThumbnail } from "@/components/admin/NewsThumbnail";
 import { useAdminPageRefresh } from "@/hooks/useAdminPageRefresh";
+import { extractNewsSeoStats } from "@/lib/news-html";
+import { articleDescription } from "@/lib/news-seo";
 
 type NewsCategory = "news" | "guide" | "community" | "promotion" | "product";
 type NewsAudience = "all" | "driver" | "shipper";
@@ -538,6 +543,17 @@ export default function AdminNewsPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex justify-end gap-2">
+                          {item.published && item.channel !== "app" && (
+                            <a
+                              href={`/tin-tuc/${encodeURIComponent(item.slug || item.id)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Mở bài viết trên website"
+                              className="p-2 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
                           <button type="button" title="Xem trước bài viết trên app" onClick={() => setPreview(item)} className="p-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50"><Eye className="w-4 h-4" /></button>
                           <button
                             onClick={() => openEdit(item)}
@@ -598,37 +614,91 @@ export default function AdminNewsPage() {
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
-              <label className="block">
-                <span className="text-xs font-bold text-slate-600">Tiêu đề *</span>
-                <input
-                  value={form.title}
-                  onChange={(e) => {
-                    const title = e.target.value;
-                    setForm((prev) => ({
-                      ...prev,
-                      title,
-                      slug: slugTouched ? prev.slug : slugFromTitle(title),
-                    }));
-                  }}
-                  className="mt-1.5 w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"
-                  placeholder="Ví dụ: Ưu đãi phí sàn tháng 9"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-bold text-slate-600">Đường dẫn (slug)</span>
-                <input
-                  value={form.slug}
-                  onChange={(e) => {
-                    setSlugTouched(true);
-                    setForm((prev) => ({ ...prev, slug: e.target.value }));
-                  }}
-                  className="mt-1.5 w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"
-                  placeholder="uu-dai-phi-san-thang-9"
-                />
-                <span className="mt-1 block text-xs text-slate-500">
-                  Mặc định lấy từ tiêu đề. Có thể sửa. Trên website: /tin-tuc/{form.slug || "duong-dan"}
-                </span>
-              </label>
+              {(() => {
+                const titleLen = form.title.trim().length;
+                const summaryLen = form.summary.trim().length;
+                const seoStats = extractNewsSeoStats(form.content);
+                const serpTitle = (form.title.trim() || "Tiêu đề bài viết") + (/TXE\s*PRO\s*$/i.test(form.title.trim()) ? "" : " | TXE PRO");
+                const serpDesc = articleDescription({ summary: form.summary, content: form.content }) || "Mô tả ngắn hiển thị trên kết quả tìm kiếm Google…";
+                const slugChanged = Boolean(editing?.published && editing.slug && form.slug.trim() && form.slug.trim() !== editing.slug);
+                const checks = [
+                  { ok: titleLen >= 25 && titleLen <= 65, label: `Tiêu đề ${titleLen} ký tự (tốt nhất 35–60)` },
+                  { ok: summaryLen >= 80 && summaryLen <= 165, label: `Tóm tắt ${summaryLen} ký tự (tốt nhất 120–160)` },
+                  { ok: Boolean(form.imageUrl.trim()), label: form.imageUrl.trim() ? "Đã có ảnh bìa" : "Thiếu ảnh bìa" },
+                  { ok: seoStats.wordCount >= 300, label: `Nội dung ${seoStats.wordCount} từ (nên ≥ 300)` },
+                  { ok: seoStats.h2Count >= 1, label: seoStats.h2Count >= 1 ? `Có ${seoStats.h2Count} tiêu đề H2 (tạo mục lục)` : "Chưa có tiêu đề phụ H2" },
+                  { ok: seoStats.imagesMissingAlt === 0, label: seoStats.imagesMissingAlt === 0 ? "Ảnh trong bài đủ Alt text" : `${seoStats.imagesMissingAlt} ảnh trong bài thiếu Alt` },
+                  { ok: seoStats.internalLinkCount >= 1, label: seoStats.internalLinkCount >= 1 ? `Có ${seoStats.internalLinkCount} liên kết nội bộ` : "Nên thêm ≥ 1 link nội bộ (/tin-tuc/...)" },
+                ];
+                const passedCount = checks.filter((item) => item.ok).length;
+                return (
+                  <>
+                    <label className="block">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-600">Tiêu đề *</span>
+                        <span className={`text-[11px] font-semibold ${titleLen === 0 ? "text-slate-400" : titleLen >= 25 && titleLen <= 65 ? "text-emerald-700" : "text-amber-700"}`}>
+                          {titleLen} ký tự {titleLen > 65 ? "(hơi dài trên Google, nên ≤ 60)" : "(khuyến nghị 35–60)"}
+                        </span>
+                      </div>
+                      <input
+                        value={form.title}
+                        onChange={(e) => {
+                          const title = e.target.value;
+                          setForm((prev) => ({
+                            ...prev,
+                            title,
+                            slug: slugTouched ? prev.slug : slugFromTitle(title),
+                          }));
+                        }}
+                        className="mt-1.5 w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"
+                        placeholder="Ví dụ: Cách chọn xe tải chở hàng phù hợp theo tải trọng"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-bold text-slate-600">Đường dẫn (slug)</span>
+                      <input
+                        value={form.slug}
+                        onChange={(e) => {
+                          setSlugTouched(true);
+                          setForm((prev) => ({ ...prev, slug: e.target.value }));
+                        }}
+                        className="mt-1.5 w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"
+                        placeholder="cach-chon-xe-tai-cho-hang-phu-hop"
+                      />
+                      <span className="mt-1 block text-xs text-slate-500">
+                        Mặc định lấy từ tiêu đề. Có thể sửa. Trên website: /tin-tuc/{form.slug || "duong-dan"}
+                      </span>
+                      {slugChanged && (
+                        <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          Bài đã xuất bản: đổi đường dẫn (slug) có thể làm mất thứ hạng URL cũ trên Google.
+                        </span>
+                      )}
+                    </label>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wide text-slate-600">Xem trước Google & Kiểm tra SEO</span>
+                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${passedCount >= 6 ? "bg-emerald-100 text-emerald-800" : passedCount >= 4 ? "bg-amber-100 text-amber-800" : "bg-slate-200 text-slate-700"}`}>
+                          Đạt {passedCount}/{checks.length} tiêu chí
+                        </span>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <div className="text-xs text-emerald-700 truncate">https://txepro.vn/tin-tuc/{form.slug || "duong-dan-bai-viet"}</div>
+                        <div className="text-base font-semibold text-blue-700 leading-snug mt-0.5 line-clamp-1">{serpTitle}</div>
+                        <div className="text-xs text-slate-600 leading-relaxed mt-1 line-clamp-2">{serpDesc}</div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 text-xs">
+                        {checks.map((item) => (
+                          <div key={item.label} className={`flex items-center gap-1.5 ${item.ok ? "text-emerald-700" : "text-amber-700"}`}>
+                            {item.ok ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+                            <span>{item.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <label className="block">
                   <span className="text-xs font-bold text-slate-600">Loại</span>
@@ -668,13 +738,18 @@ export default function AdminNewsPage() {
                 </label>
               </div>
               <label className="block">
-                <span className="text-xs font-bold text-slate-600">Tóm tắt</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-600">Tóm tắt (Meta Description)</span>
+                  <span className={`text-[11px] font-semibold ${form.summary.trim().length >= 80 && form.summary.trim().length <= 165 ? "text-emerald-700" : "text-amber-700"}`}>
+                    {form.summary.trim().length} ký tự (khuyến nghị 120–160)
+                  </span>
+                </div>
                 <textarea
                   value={form.summary}
                   onChange={(e) => setForm({ ...form, summary: e.target.value })}
                   rows={2}
                   className="mt-1.5 w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"
-                  placeholder="Hiển thị trên thẻ tin"
+                  placeholder="Hiển thị trên thẻ tin và mô tả tìm kiếm Google (120–160 ký tự)"
                 />
               </label>
               <div>

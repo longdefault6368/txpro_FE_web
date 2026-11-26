@@ -194,7 +194,7 @@ interface User {
   email?: string;
   avatar?: string | null;
   portraitImage?: string | null;
-  role: "admin" | "tai-xe" | "chu-hang";
+  role: "admin" | "tai-xe" | "chu-hang" | "doi-tac";
   isActive: boolean;
   deletedAt?: string | null;
   accountClosure?: AccountClosure;
@@ -981,7 +981,7 @@ function AdminUsersContent() {
       phone: user.phone || "",
       email: user.email || "",
       password: "",
-      role: user.role === "admin" ? "chu-hang" : user.role,
+      role: user.role === "admin" || user.role === "doi-tac" ? "chu-hang" : user.role,
       isActive: user.isActive,
       language: user.language,
       kycStatus: user.kycStatus
@@ -2256,6 +2256,7 @@ function AdminUsersContent() {
                   <option value="">Tất cả Vai trò</option>
                   <option value="tai-xe">Tài Xế</option>
                   <option value="chu-hang">Chủ Hàng</option>
+                  <option value="doi-tac">Đối Tác Hệ Thống</option>
                 </select>
                 <Filter className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -2477,19 +2478,25 @@ function AdminUsersContent() {
 
                           {/* Role Select & Badge */}
                           <td className="py-4.5 px-6 whitespace-nowrap">
-                            <select
-                              value={user.role}
-                              disabled={Boolean(user.deletedAt)}
-                              onChange={(e) => handleChangeRole(user, e.target.value as ManagedUserRole)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold focus:outline-none border border-slate-200 bg-white transition-all cursor-pointer ${
-                                user.role === "tai-xe" 
-                                    ? "text-emerald-600 bg-emerald-50 border-emerald-100" 
-                                    : "text-blue-600 bg-blue-50 border-blue-100"
-                              }`}
-                            >
-                              <option value="chu-hang">Chủ Hàng</option>
-                              <option value="tai-xe">Tài Xế</option>
-                            </select>
+                            {user.role === "doi-tac" ? (
+                              <span className="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold border border-purple-200 bg-purple-50 text-purple-700">
+                                Đối Tác Hệ Thống
+                              </span>
+                            ) : (
+                              <select
+                                value={user.role}
+                                disabled={Boolean(user.deletedAt)}
+                                onChange={(e) => handleChangeRole(user, e.target.value as ManagedUserRole)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold focus:outline-none border border-slate-200 bg-white transition-all cursor-pointer ${
+                                  user.role === "tai-xe" 
+                                      ? "text-emerald-600 bg-emerald-50 border-emerald-100" 
+                                      : "text-blue-600 bg-blue-50 border-blue-100"
+                                }`}
+                              >
+                                <option value="chu-hang">Chủ Hàng</option>
+                                <option value="tai-xe">Tài Xế</option>
+                              </select>
+                            )}
                           </td>
 
                           {/* Orders & Money Activity */}

@@ -63,7 +63,7 @@ export default function TermsOfServicePage() {
           title: "Định nghĩa & Phạm vi áp dụng",
           icon: Layers,
           content: [
-            "Nền tảng TXEPRO: Là hệ sinh thái giải pháp vận tải số bao gồm website txeppro.vn, ứng dụng di động TXEPRO Shipper, TXEPRO Driver và hệ thống quản trị vận hành trung tâm.",
+            "Nền tảng TXEPRO: Là hệ sinh thái giải pháp vận tải số bao gồm website txepro.vn, ứng dụng di động TXEPRO Shipper, TXEPRO Driver và hệ thống quản trị vận hành trung tâm.",
             "Chủ hàng (Shipper): Là cá nhân hoặc pháp nhân có nhu cầu thuê dịch vụ vận chuyển hàng hóa và đăng tải thông tin đơn hàng trên nền tảng.",
             "Tài xế / Đối tác vận tải (Driver/Carrier): Là cá nhân có đầy đủ bằng lái hợp lệ hoặc doanh nghiệp vận tải sở hữu phương tiện, trực tiếp nhận và thực hiện việc chuyên chở.",
             "Vận đơn số (e-Waybill): Bản ghi điện tử thể hiện đầy đủ điểm đi, điểm đến, lộ trình, loại hàng hóa, tải trọng, cước phí và bằng chứng giao nhận (e-POD).",
@@ -376,10 +376,10 @@ export default function TermsOfServicePage() {
             <aside className="lg:col-span-4 space-y-6">
               <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-200/80 sticky top-28">
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <p className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                     <FileText className="w-4 h-4 text-primary-600" />
                     {pageCopy.tocTitle}
-                  </h3>
+                  </p>
                   <button
                     onClick={() => window.print()}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-slate-50 transition-colors"
@@ -424,7 +424,7 @@ export default function TermsOfServicePage() {
 
                 {/* Support Box */}
                 <div className="mt-6 pt-5 border-t border-slate-100 bg-slate-50 rounded-2xl p-4">
-                  <h4 className="text-xs font-bold text-slate-900">{pageCopy.contactSupport}</h4>
+                  <p className="text-xs font-bold text-slate-900">{pageCopy.contactSupport}</p>
                   <p className="text-xs text-slate-500 mt-1 leading-relaxed">{pageCopy.contactDesc}</p>
                   <Link
                     href="/thong-tin/lien-he"

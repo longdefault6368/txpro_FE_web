@@ -103,3 +103,148 @@ test("all is the default tab and compact cards retain actions and accessible ful
  assert.ok(posts.includes("Tạm dừng"));
  assert.ok(!posts.includes("/tracking?code="));
 });
+
+test("affiliate login rejects internal admin/attendance staff and custom admin roles never escalate to super_admin", () => {
+ const mod = (() => {
+  const cache = new Map();
+  function load(file) {
+   if (cache.has(file)) return cache.get(file).exports;
+   const module = { exports: {} }; cache.set(file, module);
+   const js = ts.transpileModule(readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
+   const req = id => {
+    if (id.startsWith("@/") || id.startsWith(".")) {
+     const target = id.startsWith("@/") ? resolve(root, "src", id.slice(2)) : resolve(dirname(file), id);
+     return load(target + (existsSync(target + ".tsx") ? ".tsx" : ".ts"));
+    }
+    return nativeRequire(id);
+   };
+   vm.runInNewContext("(function(require,module,exports){" + js + "\n})", {}, { filename: file })(req, module, module.exports);
+   return module.exports;
+  }
+  return load(resolve(root, "src/utils/admin-access.ts"));
+ })();
+
+ const blocked = mod.resolvePostLoginDestination({
+  userRole: "admin",
+  affiliate: true,
+  adminRole: "nh_n_vi_n",
+  adminPermissions: ["/admin/attendance"],
+ });
+ assert.ok(blocked.blockedError);
+ assert.equal(blocked.targetRoute, undefined);
+
+ const partner = mod.resolvePostLoginDestination({ userRole: "tai-xe", affiliate: true });
+ assert.equal(partner.blockedError, undefined);
+ assert.equal(partner.targetRoute, "/doi-tac");
+
+ const standalonePartner = mod.resolvePostLoginDestination({ userRole: "doi-tac", affiliate: false, next: "/user" });
+ assert.equal(standalonePartner.blockedError, undefined);
+ assert.equal(standalonePartner.targetRoute, "/doi-tac");
+
+ const staff = mod.resolvePostLoginDestination({
+  userRole: "admin",
+  affiliate: false,
+  adminRole: "nh_n_vi_n",
+  adminPermissions: ["/admin/attendance"],
+ });
+ assert.equal(staff.targetRoute, "/admin/attendance");
+
+ assert.deepEqual(
+  Array.from(mod.resolveEffectiveAdminPermissions({ adminRole: "nh_n_vi_n", sessionPermissions: ["/admin/attendance"] })),
+  ["/admin/attendance"]
+ );
+ assert.deepEqual(
+  Array.from(mod.resolveEffectiveAdminPermissions({ adminRole: "", sessionPermissions: [] })),
+  []
+ );
+ assert.equal(mod.resolveAdminRoleDisplay("nh_n_vi_n").shortLabel, "Nhân sự");
+ assert.deepEqual(
+  Array.from(mod.resolveEffectiveAdminPermissions({ adminRole: "super_admin", sessionPermissions: [] })),
+  ["*"]
+ );
+});
+
+test("admin path access and notification filtering strictly enforce role permissions", () => {
+ const mod = (() => {
+  const cache = new Map();
+  function load(file) {
+   if (cache.has(file)) return cache.get(file).exports;
+   const module = { exports: {} }; cache.set(file, module);
+   const js = ts.transpileModule(readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
+   const req = id => {
+    if (id.startsWith("@/") || id.startsWith(".")) {
+     const target = id.startsWith("@/") ? resolve(root, "src", id.slice(2)) : resolve(dirname(file), id);
+     return load(target + (existsSync(target + ".tsx") ? ".tsx" : ".ts"));
+    }
+    return nativeRequire(id);
+   };
+   vm.runInNewContext("(function(require,module,exports){" + js + "\n})", {}, { filename: file })(req, module, module.exports);
+   return module.exports;
+  }
+  return load(resolve(root, "src/utils/admin-access.ts"));
+ })();
+
+ // Attendance-only staff cannot access /admin/settings or /admin/notifications, only /admin/attendance & /admin/profile
+ assert.equal(mod.canAccessAdminPath("/admin/settings", "nh_n_vi_n", ["/admin/attendance"]), false);
+ assert.equal(mod.canAccessAdminPath("/admin/notifications", "nh_n_vi_n", ["/admin/attendance"]), false);
+ assert.equal(mod.canAccessAdminPath("/admin/attendance", "nh_n_vi_n", ["/admin/attendance"]), true);
+ assert.equal(mod.canAccessAdminPath("/admin/profile", "nh_n_vi_n", ["/admin/attendance"]), true);
+
+ // "/admin" (dashboard overview) must NOT leak access to sibling "/admin/settings", "/admin/team", "/admin/logs"
+ const opsPerms = ["/admin", "/admin/notifications", "/admin/orders", "/admin/users"];
+ assert.equal(mod.canAccessAdminPath("/admin", "operations", opsPerms), true);
+ assert.equal(mod.canAccessAdminPath("/admin/orders/drivers", "operations", opsPerms), true);
+ assert.equal(mod.canAccessAdminPath("/admin/settings", "operations", opsPerms), false);
+ assert.equal(mod.canAccessAdminPath("/admin/team", "operations", opsPerms), false);
+ assert.equal(mod.canAccessAdminPath("/admin/logs", "operations", opsPerms), false);
+
+ // Super admin has full access
+ assert.equal(mod.canAccessAdminPath("/admin/settings", "super_admin", []), true);
+ assert.equal(mod.canAccessAdminPath("/admin/notifications", "super_admin", []), true);
+
+ const sampleFeed = [
+  { id: "1", type: "user_registered", link: "/admin/users", read: false },
+  { id: "2", type: "kyc_pending", link: "/admin/users", read: false },
+  { id: "3", type: "order_cancelled", link: "/admin/orders", read: false },
+  { id: "4", type: "support_ticket", link: "/admin/support?tab=tickets&ticketId=t1", read: false },
+  { id: "5", type: "chat", link: "/admin/support?tab=chats&chatId=c1", read: false },
+  { id: "6", type: "system", link: "", read: false },
+  { id: "7", type: "system", link: "/admin/settings", read: false },
+ ];
+
+ // Attendance-only staff (no /admin/notifications) sees zero notifications
+ assert.deepEqual(
+  Array.from(mod.filterAdminNotifications(sampleFeed, "nh_n_vi_n", ["/admin/attendance"])).map((n) => n.id),
+  []
+ );
+
+ // KYC officer sees user_registered, kyc_pending, and general system broadcast (not orders/support/settings)
+ assert.deepEqual(
+  Array.from(
+   mod.filterAdminNotifications(sampleFeed, "kyc_officer", ["/admin/notifications", "/admin/users", "/admin/attendance"])
+  ).map((n) => n.id),
+  ["1", "2", "6"]
+ );
+
+ // CSKH sees support_ticket, chat, and general system broadcast
+ assert.deepEqual(
+  Array.from(
+   mod.filterAdminNotifications(sampleFeed, "cskh", ["/admin/notifications", "/admin/support", "/admin/attendance"])
+  ).map((n) => n.id),
+  ["4", "5", "6"]
+ );
+
+ // Accountant sees order_cancelled and general system broadcast
+ assert.deepEqual(
+  Array.from(
+   mod.filterAdminNotifications(sampleFeed, "accountant", ["/admin/notifications", "/admin/orders", "/admin/analytics"])
+  ).map((n) => n.id),
+  ["3", "6"]
+ );
+
+ // Super admin sees all notifications including settings-linked alerts
+ assert.deepEqual(
+  Array.from(mod.filterAdminNotifications(sampleFeed, "super_admin", [])).map((n) => n.id),
+  ["1", "2", "3", "4", "5", "6", "7"]
+ );
+});

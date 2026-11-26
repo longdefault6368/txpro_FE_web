@@ -272,10 +272,10 @@ export default function PrivacyPolicyPage() {
             <aside className="lg:col-span-4 space-y-6">
               <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-200/80 sticky top-28">
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <p className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-primary-600" />
                     {pageCopy.tocTitle}
-                  </h3>
+                  </p>
                   <button
                     onClick={() => window.print()}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-slate-50 transition-colors"
@@ -321,10 +321,10 @@ export default function PrivacyPolicyPage() {
                 {/* DPO Contact Box - Only show if emailPrivacy is configured */}
                 {companyInfo.emailPrivacy && (
                   <div className="mt-6 pt-5 border-t border-slate-100 bg-slate-50 rounded-2xl p-4">
-                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <p className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                       <UserCheck className="w-3.5 h-3.5 text-primary-600" />
                       {pageCopy.dpoTitle}
-                    </h4>
+                    </p>
                     <p className="text-xs text-slate-500 mt-1 leading-relaxed">{pageCopy.dpoDesc}</p>
                     <a
                       href={`mailto:${companyInfo.emailPrivacy}`}

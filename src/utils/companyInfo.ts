@@ -59,8 +59,12 @@ export const phoneLink = (phone: string) => /^\+?[\d\s().-]{5,40}$/.test(phone) 
 /**
  * Fetch authoritative company information from the selected backend.
  */
-export async function fetchCompanyInfo(): Promise<CompanyInfo> {
-  const res = await fetch(`${API_BASE}/contacts/company-info`, { cache: 'no-store', signal: AbortSignal.timeout(12000) });
+export async function fetchCompanyInfo(options?: { revalidate?: number }): Promise<CompanyInfo> {
+  const fetchOptions: RequestInit & { next?: { revalidate: number } } =
+    typeof options?.revalidate === 'number'
+      ? { next: { revalidate: options.revalidate }, signal: AbortSignal.timeout(12000) }
+      : { cache: 'no-store', signal: AbortSignal.timeout(12000) };
+  const res = await fetch(`${API_BASE}/contacts/company-info`, fetchOptions);
   if (!res.ok) throw new Error('Không tải được thông tin doanh nghiệp.');
   const body = await res.json();
   if (!body?.data || typeof body.data !== 'object') throw new Error('Thông tin doanh nghiệp chưa hợp lệ.');

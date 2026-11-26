@@ -1,7 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import ChatWidget from "./ChatWidget";
+
+const ChatWidget = dynamic(() => import("./ChatWidget"), { ssr: false });
 
 export default function GlobalChatWidget() {
   const pathname = usePathname();

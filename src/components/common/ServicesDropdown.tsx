@@ -1,9 +1,20 @@
 "use client";
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { ChevronDown, Search, Truck } from "lucide-react";
+import { ChevronDown, LayoutGrid, MapPinned, Search, Truck, UserCheck } from "lucide-react";
 import styles from "./ServicesDropdown.module.css";
-type Item = { href: string; label: string; description: string };
+
+type IconKind = "search" | "truck" | "grid" | "route" | "driver";
+type Item = { href: string; label: string; description: string; icon?: IconKind };
+
+const ICONS = {
+  search: Search,
+  truck: Truck,
+  grid: LayoutGrid,
+  route: MapPinned,
+  driver: UserCheck,
+} as const;
+
 export default function ServicesDropdown({ label, items, mobile = false, onNavigate }: {
   label: string; items: Item[]; mobile?: boolean; onNavigate?: () => void;
 }) {
@@ -23,7 +34,7 @@ export default function ServicesDropdown({ label, items, mobile = false, onNavig
     <summary className={styles.trigger}>{label}<ChevronDown size={14} aria-hidden="true" /></summary>
     <div className={styles.panel}>
       <div className={styles.surface}>{items.map((item, index) => {
-        const Icon = index === 0 ? Search : Truck;
+        const Icon = item.icon ? ICONS[item.icon] : (index === 0 ? Search : Truck);
         return <Link key={item.href} href={item.href} className={styles.item} onClick={() => { if (root.current) root.current.open = false; onNavigate?.(); }}>
           <span className={styles.icon}><Icon size={21} aria-hidden="true" /></span>
           <span><strong>{item.label}</strong><small>{item.description}</small></span>

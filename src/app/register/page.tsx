@@ -80,7 +80,7 @@ export default function RegisterPage() {
     if (requestLock.current || !validateForm()) return;
     requestLock.current = true; setLoading(true); setGeneralError(null);
     try {
-      await registrationRequest("/auth/register-otp", { name: fullName.trim(), phone: phone.trim().replace(/\s+/g, ""), email: email.trim() || undefined, password, role: affiliate ? 'chu-hang' : role, referralCode: affiliate ? undefined : referralCode.trim() || undefined });
+      await registrationRequest("/auth/register-otp", { name: fullName.trim(), phone: phone.trim().replace(/\s+/g, ""), email: email.trim() || undefined, password, role: affiliate ? 'doi-tac' : role, referralCode: affiliate ? undefined : referralCode.trim() || undefined });
       setStep("otp"); setOtpTimer(60);
     } catch (error) { setGeneralError(error instanceof Error ? error.message : "Không gửi được OTP đăng ký."); }
     finally { requestLock.current = false; setLoading(false); }
@@ -94,7 +94,7 @@ export default function RegisterPage() {
       const expectedSession = localStorage.getItem("txpro_user_session");
       let deviceId = localStorage.getItem("txpro_device_id");
       if (!deviceId) { deviceId = crypto.randomUUID(); localStorage.setItem("txpro_device_id", deviceId); }
-      const data = await registrationRequest<Parameters<typeof commitRegistrationSession>[1]>("/auth/verify-otp", { phone: phone.trim().replace(/\s+/g, ""), otp: otp.trim(), deviceId });
+      const data = await registrationRequest<Parameters<typeof commitRegistrationSession>[1]>("/auth/verify-otp", { phone: phone.trim().replace(/\s+/g, ""), otp: otp.trim(), deviceId, clientType: "web" });
       const destination = commitRegistrationSession(localStorage, data, expectedSession);
       clearReferralCode(localStorage);
       setSuccess(true); window.dispatchEvent(new Event("txpro_session_updated"));

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Phone, Mail, MapPin, Clock, ShieldCheck } from "lucide-react";
+import { Phone, Mail, MapPin, Clock } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useCompanyInfo } from "@/context/CompanyInfoContext";
 
@@ -19,14 +19,18 @@ const footerCopy = {
     taxLabel: "Mã số thuế:",
     links: {
       about: "Giới thiệu dự án",
+      services: "Dịch vụ vận chuyển",
+      routes: "Tuyến vận chuyển",
+      driverHub: "Dành cho tài xế",
       operation: "Quy chế hoạt động",
       help: "Trợ giúp & FAQ",
       careers: "Tuyển dụng",
       contact: "Liên hệ TXEPRO",
       shipperGuide: "Hướng dẫn khách hàng",
       driverGuide: "Hướng dẫn tài xế",
+      news: "Tin tức & cẩm nang",
       trackingGuide: "Tra cứu vận đơn",
-      faq: "Câu hỏi thường gặp",
+      post: "Đăng tìm xe / xe trống",
       terms: "Điều khoản sử dụng",
       privacy: "Chính sách bảo mật",
       payment: "Thanh toán & ký quỹ",
@@ -45,14 +49,18 @@ const footerCopy = {
     taxLabel: "Tax Code:",
     links: {
       about: "About the project",
+      services: "Transport services",
+      routes: "Freight routes",
+      driverHub: "For drivers",
       operation: "Operating rules",
       help: "Help & Support",
       careers: "Careers",
       contact: "Contact TXEPRO",
       shipperGuide: "Customer guide",
       driverGuide: "Driver guide",
+      news: "News & guides",
       trackingGuide: "Track an order",
-      faq: "Frequently Asked Questions",
+      post: "Post request / vehicle",
       terms: "Terms of use",
       privacy: "Privacy policy",
       payment: "Payment & escrow",
@@ -71,14 +79,18 @@ const footerCopy = {
     taxLabel: "税号:",
     links: {
       about: "项目介绍",
+      services: "运输服务",
+      routes: "热门线路",
+      driverHub: "司机专区",
       operation: "运营规则",
       help: "帮助与支持",
       careers: "招聘",
       contact: "联系 TXEPRO",
       shipperGuide: "客户指南",
       driverGuide: "司机指南",
+      news: "资讯与指南",
       trackingGuide: "运单查询",
-      faq: "常见问题",
+      post: "发布找车 / 空车",
       terms: "使用条款",
       privacy: "隐私政策",
       payment: "支付与担保",
@@ -92,8 +104,9 @@ const linkGroups = [
     titleKey: "company",
     links: [
       ["about", "/thong-tin/gioi-thieu"],
-      ["operation", "/thong-tin/quy-che-hoat-dong"],
-      ["help", "/tro-giup"],
+      ["services", "/dich-vu"],
+      ["routes", "/tuyen-duong"],
+      ["driverHub", "/tai-xe"],
       ["careers", "/tuyen-dung"],
       ["contact", "/thong-tin/lien-he"],
     ],
@@ -101,15 +114,18 @@ const linkGroups = [
   {
     titleKey: "guide",
     links: [
+      ["news", "/tin-tuc"],
       ["shipperGuide", "/thong-tin/huong-dan-chu-hang"],
       ["driverGuide", "/thong-tin/huong-dan-tai-xe"],
       ["trackingGuide", "/tracking"],
-      ["faq", "/tro-giup"],
+      ["post", "/dang-tin"],
+      ["help", "/tro-giup"],
     ],
   },
   {
     titleKey: "policy",
     links: [
+      ["operation", "/thong-tin/quy-che-hoat-dong"],
       ["terms", "/thong-tin/dieu-khoan-su-dung"],
       ["privacy", "/thong-tin/chinh-sach-bao-mat"],
       ["payment", "/thong-tin/thanh-toan-ky-quy"],
@@ -124,7 +140,7 @@ export default function Footer() {
   const copy = footerCopy[language] || footerCopy.vi;
 
   return (
-    <footer className="bg-slate-50 border-t border-slate-200 pt-16 pb-8">
+    <footer className="bg-slate-50 border-t border-slate-200 pt-16 pb-24 md:pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid gap-10 lg:grid-cols-[1.45fr_2fr] mb-12">
           <div>
@@ -188,9 +204,9 @@ export default function Footer() {
           <div className="grid gap-8 sm:grid-cols-3">
             {linkGroups.map((group) => (
               <div key={group.titleKey}>
-                <h4 className="text-slate-950 font-bold mb-4 text-sm uppercase tracking-wide">
+                <p className="text-slate-950 font-bold mb-4 text-sm uppercase tracking-wide">
                   {copy[group.titleKey]}
-                </h4>
+                </p>
                 <ul className="space-y-3 text-slate-600 text-sm font-semibold">
                   {group.links.map(([labelKey, href]) => (
                     <li key={href}>

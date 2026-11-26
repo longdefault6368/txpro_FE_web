@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { AdminOrderState, getAdminOrderStatus } from "@/utils/admin-order-state";
+import {
+  canAccessAdminPath,
+  filterAdminNotifications,
+  hasFullAdminAccess,
+  readCurrentAdminAccessFromStorage,
+  resolveAdminNotificationLink,
+} from "@/utils/admin-access";
 import { useToast } from "@/context/ToastContext";
 import {
   Users, Truck, Package, ShoppingCart, TrendingUp, AlertCircle,
@@ -212,7 +219,6 @@ function AdminDashboardContent() {
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [notifications, setNotifications] = useState<AdminNotificationItem[]>([]);
   const [mapData, setMapData] = useState<MapData | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
 
@@ -228,6 +234,25 @@ function AdminDashboardContent() {
   const [mapFilter, setMapFilter] = useState<"all" | "drivers" | "orders" | "corridors">("all");
   const [selectedCorridor, setSelectedCorridor] = useState<CorridorItem | null>(null);
   const [hoveredHub, setHoveredHub] = useState<string | null>(null);
+  const [adminAccess, setAdminAccess] = useState<{ adminRole: string; permissions: string[] }>({
+    adminRole: "",
+    permissions: [],
+  });
+
+  const canAccessNotifications = useMemo(
+    () => canAccessAdminPath("/admin/notifications", adminAccess.adminRole, adminAccess.permissions),
+    [adminAccess]
+  );
+
+  const visibleNotifications = useMemo(
+    () => filterAdminNotifications(notifications, adminAccess.adminRole, adminAccess.permissions),
+    [notifications, adminAccess]
+  );
+
+  const visibleUnreadCount = useMemo(
+    () => visibleNotifications.filter((n) => !n.read).length,
+    [visibleNotifications]
+  );
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
@@ -237,11 +262,16 @@ function AdminDashboardContent() {
 
   const fetchOverview = async () => {
     setLoading(true);
+    const access = readCurrentAdminAccessFromStorage();
+    setAdminAccess(access);
+    const allowNotifs = canAccessAdminPath("/admin/notifications", access.adminRole, access.permissions);
 
     try {
       const [overviewRes, notifRes] = await Promise.allSettled([
         fetchWithAuth(`${API_BASE}/admin/users/overview`),
-        fetchWithAuth(`${API_BASE}/admin/users/notifications/feed`)
+        allowNotifs
+          ? fetchWithAuth(`${API_BASE}/admin/users/notifications/feed`)
+          : Promise.resolve(null),
       ]);
 
       if (overviewRes.status === "fulfilled" && overviewRes.value.ok) {
@@ -258,11 +288,12 @@ function AdminDashboardContent() {
         setIsOffline(true);
       }
 
-      if (notifRes.status === "fulfilled" && notifRes.value.ok) {
+      if (notifRes.status === "fulfilled" && notifRes.value && notifRes.value.ok) {
         const nData = await notifRes.value.json();
         const list: AdminNotificationItem[] = nData.data?.notifications || [];
         setNotifications(list);
-        setUnreadCount(nData.data?.unreadCount ?? list.filter(n => !n.read).length);
+      } else if (!allowNotifs) {
+        setNotifications([]);
       }
     } catch (err) {
       console.warn("Lỗi đồng bộ dữ liệu quản trị thực tế:", err);
@@ -273,7 +304,16 @@ function AdminDashboardContent() {
   };
 
   useEffect(() => {
-    fetchOverview();
+    void fetchOverview();
+    const syncAccess = () => {
+      setAdminAccess(readCurrentAdminAccessFromStorage());
+    };
+    window.addEventListener("storage", syncAccess);
+    window.addEventListener("txpro-admin-session-updated", syncAccess);
+    return () => {
+      window.removeEventListener("storage", syncAccess);
+      window.removeEventListener("txpro-admin-session-updated", syncAccess);
+    };
   }, []);
 
   // Robust Google Maps initialization
@@ -521,39 +561,43 @@ function AdminDashboardContent() {
   };
 
   const handleMarkAllNotifsRead = async () => {
+    if (!canAccessNotifications) return;
+    const visibleUnread = visibleNotifications.filter((n) => !n.read);
+    if (visibleUnread.length === 0) return;
+    const visibleIds = new Set(visibleUnread.map((n) => n.id));
     try {
-      await fetchWithAuth(`${API_BASE}/admin/users/notifications/read-all`, { method: "PATCH" });
-    } catch (e) {
+      if (hasFullAdminAccess(adminAccess.adminRole, adminAccess.permissions)) {
+        await fetchWithAuth(`${API_BASE}/admin/users/notifications/read-all`, { method: "PATCH" });
+      } else {
+        await Promise.allSettled(
+          visibleUnread.map((n) =>
+            fetchWithAuth(`${API_BASE}/admin/users/notifications/${n.id}/read`, { method: "PATCH" })
+          )
+        );
+      }
+    } catch {
       // Best-effort
     }
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    setUnreadCount(0);
+    setNotifications((prev) =>
+      prev.map((n) => (visibleIds.has(n.id) ? { ...n, read: true } : n))
+    );
     toast.success("Đã đánh dấu tất cả thông báo là đã đọc", {
       title: "Thông báo hệ thống",
     });
   };
 
   const getNotificationLink = (notif: AdminNotificationItem) => {
-    let link = notif.link;
-    if (!link || link === "/admin/support") {
-      if (notif.type === "chat" || notif.meta?.chatId) {
-        const chatId = notif.meta?.chatId || (notif as any).chatId;
-        const senderId = notif.meta?.senderId || (notif as any).senderId;
-        link = chatId
-          ? `/admin/support?tab=chats&chatId=${chatId}${senderId ? `&userId=${senderId}` : ""}`
-          : (senderId ? `/admin/support?tab=chats&userId=${senderId}` : `/admin/support?tab=chats`);
-      } else if (notif.type === "support_ticket" && notif.meta?.ticketId) {
-        link = `/admin/support?tab=tickets&ticketId=${notif.meta.ticketId}`;
-      }
+    const link = resolveAdminNotificationLink(notif);
+    if (link && canAccessAdminPath(link, adminAccess.adminRole, adminAccess.permissions)) {
+      return link;
     }
-    return link || "/admin/notifications";
+    return "/admin/notifications";
   };
 
   const handleNotificationClick = async (notif: AdminNotificationItem) => {
     if (!notif.read && notif.id) {
       fetchWithAuth(`${API_BASE}/admin/users/notifications/${notif.id}/read`, { method: "PATCH" }).catch(() => null);
       setNotifications((prev) => prev.map((n) => n.id === notif.id ? { ...n, read: true } : n));
-      setUnreadCount((prev) => Math.max(0, prev - 1));
     }
   };
 
@@ -1622,6 +1666,7 @@ function AdminDashboardContent() {
           </div>
 
           {/* Notifications Card */}
+          {canAccessNotifications && (
           <div className="bg-white rounded-2xl border border-slate-200/50 shadow-sm overflow-hidden flex flex-col">
             <div className="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-100 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -1631,9 +1676,9 @@ function AdminDashboardContent() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <h3 className="text-sm font-bold text-slate-800 truncate">Hoạt Động Mới Nhất</h3>
-                    {unreadCount > 0 && (
+                    {visibleUnreadCount > 0 && (
                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white shadow-xs">
-                        {unreadCount}
+                        {visibleUnreadCount}
                       </span>
                     )}
                   </div>
@@ -1644,7 +1689,7 @@ function AdminDashboardContent() {
               </div>
 
               <div className="flex items-center gap-1 flex-shrink-0">
-                {unreadCount > 0 && (
+                {visibleUnreadCount > 0 && (
                   <button
                     type="button"
                     onClick={handleMarkAllNotifsRead}
@@ -1666,7 +1711,7 @@ function AdminDashboardContent() {
             </div>
 
             {/* Notifications List */}
-            {notifications.length === 0 ? (
+            {visibleNotifications.length === 0 ? (
               <div className="py-8 flex flex-col items-center justify-center text-center px-4">
                 <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-300 flex items-center justify-center mb-2">
                   <Bell className="w-5 h-5" />
@@ -1676,7 +1721,7 @@ function AdminDashboardContent() {
               </div>
             ) : (
               <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
-                {notifications.slice(0, 5).map((notif) => {
+                {visibleNotifications.slice(0, 5).map((notif) => {
                   const isOrder = notif.type === "order_cancelled";
                   const isKyc = notif.type === "kyc_pending";
                   const isSupport = notif.type === "support_ticket" || notif.type === "chat";
@@ -1765,6 +1810,7 @@ function AdminDashboardContent() {
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
     </div>

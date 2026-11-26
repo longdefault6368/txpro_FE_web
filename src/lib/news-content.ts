@@ -14,9 +14,11 @@ export type NewsCategory = "news" | "guide" | "community" | "promotion" | "produ
 export type NewsAudience = "all" | "driver" | "shipper";
 export type NewsArticle = {
   id: string; slug?: string; title: string; summary: string; content: string;
-  category: NewsCategory; audience?: NewsAudience; imageUrl: string; publishedAt: string | null;
+  category: NewsCategory; audience?: NewsAudience; imageUrl: string;
+  publishedAt: string | null; updatedAt?: string | null;
   editorial?: boolean;
   originalLanguage?: string;
+  canonicalSlug?: string;
   readingGuide?: NewsReadingGuide;
 };
 type Text = { vi: string; en: string; zh: string };

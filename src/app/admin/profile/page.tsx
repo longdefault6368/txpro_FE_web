@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { getServerMediaUrl } from "@/utils/media";
-import { ADMIN_ROLE_CONFIG, type AdminRole } from "@/app/admin/layout";
+import { type AdminRole } from "@/config/admin-roles";
+import { resolveAdminRoleDisplay } from "@/utils/admin-access";
 
 interface AdminProfile {
   _id: string;
@@ -482,7 +483,7 @@ export default function AdminProfilePage() {
     }
   };
 
-  const roleCfg = ADMIN_ROLE_CONFIG[(profile?.adminRole || "super_admin") as AdminRole] || ADMIN_ROLE_CONFIG.super_admin;
+  const roleCfg = resolveAdminRoleDisplay(profile?.adminRole);
   const initials = (name || profile?.name || "AD").split(" ").pop()?.substring(0, 2).toUpperCase() || "AD";
 
   if (loading) {

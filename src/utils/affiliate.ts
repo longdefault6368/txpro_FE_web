@@ -4,6 +4,7 @@ export type AffiliatePolicy = { enabled: boolean; version: string; terms: string
   milestoneBasis: 'qualified' | 'registered' | 'unconfigured'; milestoneMode: 'each' | 'difference' | 'unconfigured'; minPayout: number; milestones: { count: number; amount: number }[] };
 export type AffiliateMemberStats = { registered: number; qualified: number; pending: number; drivers: number; shippers: number; qualifiedDrivers: number; qualifiedShippers: number };
 export type Partner = { _id: string; code: string; status: string; balance: number; totalEarned: number; reservedAmount: number; paidAmount: number; suspensionReason?: string;
+  attendanceEnabled?: boolean; baseSalaryVnd?: number;
   userId?: { _id?: string; name?: string; phone?: string; email?: string; role?: string } | null; termsVersion: string; acceptedAt?: string; createdAt?: string; stats?: AffiliateMemberStats; policySnapshot?: AffiliatePolicy };
 export type Referral = { id: string; role: string; registeredAt: string; qualifiedAt?: string; rewardAmount: number };
 export type Reward = { _id: string; kind: string; amount: number; threshold?: number; createdAt: string };

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Lock, ShieldCheck, Mail, ArrowRight, UserCheck, Check } from "lucide-react";
 import { API_BASE, executeFetch } from "@/utils/api";
+import { normalizeAdminPermissions, resolveAdminHomeRoute } from "@/utils/admin-access";
 
 // Helper to retrieve or generate deviceId consistent with backend validator
 const getDeviceId = () => {
@@ -28,18 +29,25 @@ export default function AdminLoginPage() {
 
   // Restore remembered credentials preference on mount
   useEffect(() => {
-    try {
-      const savedIdentifier = localStorage.getItem("txpro_remembered_admin_identifier");
-      if (savedIdentifier) {
-        setIdentifier(savedIdentifier);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      try {
+        const savedIdentifier = localStorage.getItem("txpro_remembered_admin_identifier");
+        if (savedIdentifier) {
+          setIdentifier(savedIdentifier);
+        }
+        const savedRemember = localStorage.getItem("txpro_admin_remember_me");
+        if (savedRemember !== null) {
+          setRememberMe(savedRemember === "true");
+        }
+      } catch {
+        // Ignore localStorage errors
       }
-      const savedRemember = localStorage.getItem("txpro_admin_remember_me");
-      if (savedRemember !== null) {
-        setRememberMe(savedRemember === "true");
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,16 +138,21 @@ export default function AdminLoginPage() {
           finalAdminRole = "cskh";
         }
 
+        const adminPermissions = normalizeAdminPermissions(
+          userProfile.adminPermissions ?? data.data?.adminPermissions
+        );
+
         // Store auth tokens & session
         localStorage.setItem("txpro_token", data.data?.accessToken || "");
         localStorage.setItem("txpro_refresh_token", data.data?.refreshToken || "");
         localStorage.setItem("txpro_user_session", JSON.stringify({
           id: userId,
+          email: userProfile.email || undefined,
           name: userName,
           role: "Admin",
           rawRole: "admin",
           adminRole: finalAdminRole,
-          adminPermissions: userProfile.adminPermissions || data.data?.adminPermissions || [],
+          adminPermissions,
           avatar: userProfile.avatar || data.data?.avatar || data.data?.user?.avatar || null,
         }));
 
@@ -152,13 +165,14 @@ export default function AdminLoginPage() {
           localStorage.removeItem("txpro_remembered_admin_identifier");
         }
 
+        const landingRoute = resolveAdminHomeRoute(finalAdminRole, adminPermissions);
         setSuccess(true);
-        setTimeout(() => router.push("/admin"), 1200);
+        setTimeout(() => router.push(landingRoute), 1200);
       } else {
         const errData = await res.json().catch(() => ({}));
         setError(errData.message || "Tài khoản hoặc mật khẩu không chính xác");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Admin login connection error:", err);
       setError("Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại đường truyền hoặc khởi động Backend!");
     } finally {

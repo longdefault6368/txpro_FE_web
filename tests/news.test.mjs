@@ -73,7 +73,7 @@ test("each guide renders a full article, navigation and related articles", () =>
   }
 });
 
-test("CMS markup is rendered as inert text, including encoded tags", () => {
+test("CMS HTML renders semantic structure safely while stripping scripts and unsafe tags", () => {
   const load = loader();
   const { newsPlainText } = load("src/lib/news-content.ts");
   const text = newsPlainText('<p>Đoạn một &amp; hai</p><script>alert(1)</script><p>&lt;img src=x onerror=alert(2)&gt;</p>');
@@ -86,6 +86,33 @@ test("CMS markup is rendered as inert text, including encoded tags", () => {
   } }));
   assert.ok(!html.includes("<script"));
   assert.ok(!html.includes("<img src=x"));
+
+  const richHtml = renderToStaticMarkup(React.createElement(View, { article: {
+    id: "123456789012345678901235", title: "Bài viết CMS", summary: "Tóm tắt bài CMS",
+    content: `<h3>Mục lớn một</h3>
+<p>Đọc thêm <a href="/tin-tuc/chon-xe-phu-hop">cẩm nang chọn xe</a> và <a href="https://example.com/ref">tài liệu ngoài</a> và <a href="javascript:alert(1)">link xấu</a>.</p>
+<ul><li>Bước một</li><li>Bước hai</li></ul>
+<div class="card-note"><strong>Lưu ý:</strong> Kiểm tra kỹ.</div>
+<figure><img src="/uploads/news/sample.webp" alt="Ảnh minh họa xe tải"><figcaption>Chú thích ảnh</figcaption></figure>
+<img src="x" onerror="alert(3)"><script>alert(4)</script>
+<h4>Mục con</h4>`,
+    category: "news", imageUrl: "/marketing/driver-pioneer.webp", publishedAt: "2026-11-20T08:00:00.000Z",
+  } }));
+  // Starts at h3 -> promoted to h2 with TOC anchor #phan-0; h4 promoted to h3
+  assert.ok(richHtml.includes('<h2 id="phan-0">Mục lớn một</h2>'));
+  assert.ok(richHtml.includes('href="#phan-0"'));
+  assert.ok(richHtml.includes("<h3>Mục con</h3>"));
+  assert.ok(richHtml.includes("<ul><li>Bước một</li><li>Bước hai</li></ul>"));
+  assert.ok(richHtml.includes('class="cardNote"'));
+  assert.ok(richHtml.includes('href="/tin-tuc/chon-xe-phu-hop"'));
+  assert.ok(richHtml.includes('href="https://example.com/ref" target="_blank" rel="noopener noreferrer"'));
+  assert.ok(!richHtml.includes("javascript:alert"));
+  assert.ok(richHtml.includes('src="https://news.test/uploads/news/sample.webp"'));
+  assert.ok(richHtml.includes('alt="Ảnh minh họa xe tải"'));
+  assert.ok(richHtml.includes("<figcaption>Chú thích ảnh</figcaption>"));
+  assert.ok(richHtml.includes('src="https://news.test/marketing/driver-pioneer.webp"'));
+  assert.ok(!richHtml.includes("onerror"));
+  assert.ok(!richHtml.includes("<script"));
 });
 
 test("expanded guides have complete text, two relevant inline images and captions in every language", () => {
@@ -161,7 +188,13 @@ test("invalid image schemes and incomplete or private records are rejected", () 
     assert.equal(newsImageSource(source), "/splash1.png");
   }
   assert.equal(newsImageSource("/uploads/news/x.png"), "https://news.test/uploads/news/x.png");
+  assert.equal(newsImageSource("/marketing/driver-pioneer.webp"), "https://news.test/marketing/driver-pioneer.webp");
   assert.equal(newsImageSource("/images/news/furniture.png"), "/images/news/furniture.png");
+  const { isTrustedNewsImageUrl } = loader()("src/lib/news-public.ts");
+  assert.equal(isTrustedNewsImageUrl("/images/news/furniture.webp"), true);
+  assert.equal(isTrustedNewsImageUrl("https://news.test/uploads/news/a.webp"), true);
+  assert.equal(isTrustedNewsImageUrl("https://news.test/marketing/b.webp"), true);
+  assert.equal(isTrustedNewsImageUrl("https://evil.example/c.png"), false);
 });
 
 test("public news requests are credential-free, filtered and deduplicated", async () => {
@@ -240,26 +273,42 @@ test("article metadata and structured data agree on canonical URLs, images and r
   assert.equal(JSON.parse(payload).headline, "</script><img src=x onerror=alert(1)>");
 });
 
-test("news sitemap paginates actual public CMS articles and keeps editorial links when CMS is unavailable", async () => {
+test("news sitemap paginates actual public CMS articles across audiences and keeps editorial links when CMS is unavailable", async () => {
   const { buildNewsSitemap } = loader()("src/lib/news-sitemap.ts");
   const calls = [];
-  const read = async ({ page, limit }) => {
-    calls.push([page, limit]);
+  const read = async ({ page, limit, audience }) => {
+    calls.push([audience || "all", page, limit]);
+    if (audience === "driver") {
+      return { items: [
+        { id: "d00000000000000000000001", slug: "tin-rieng-tai-xe", title: "Driver", imageUrl: "", summary: "", content: "", category: "promotion", publishedAt: "2026-11-20T00:00:00.000Z" },
+      ], pagination: { page: 1, totalPages: 1, total: 1 } };
+    }
+    if (audience === "shipper") {
+      return { items: [
+        { id: "e00000000000000000000001", slug: "tin-rieng-chu-hang", title: "Shipper", imageUrl: "", summary: "", content: "", category: "guide", publishedAt: "2026-11-21T00:00:00.000Z" },
+      ], pagination: { page: 1, totalPages: 1, total: 1 } };
+    }
     return { items: [
-      { id: String(page).padStart(24, "0"), slug: "tin-cms-trang-" + page, title: "Public", imageUrl: "", summary: "", content: "", category: "news", publishedAt: null },
+      { id: String(page).padStart(24, "0"), slug: "tin-cms-trang-" + page, title: "Public", imageUrl: "", summary: "", content: "", category: "news", publishedAt: "2026-11-19T00:00:00.000Z" },
       { id: "c504588a16b5452346a06d78", title: "Bài không slug", imageUrl: "", summary: "", content: "", category: "news", publishedAt: null },
     ], pagination: { page, totalPages: 2, total: 2 } };
   };
   const entries = await buildNewsSitemap("https://www.example.com", read);
-  assert.deepEqual(calls, [[1, 24], [2, 24]]);
-  assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/tin-cms-trang-2")));
+  assert.deepEqual(calls, [["all", 1, 24], ["all", 2, 24], ["driver", 1, 24], ["shipper", 1, 24]]);
+  const cms2 = entries.find(item => item.url.endsWith("/tin-tuc/tin-cms-trang-2"));
+  assert.ok(cms2);
+  assert.equal(cms2.lastModified, "2026-11-19T00:00:00.000Z");
+  assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/tin-rieng-tai-xe")));
+  assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/tin-rieng-chu-hang")));
   assert.ok(!entries.some(item => item.url.includes("c504588a16b5452346a06d78")));
   assert.ok(!entries.some(item => /\/tin-tuc\/[a-f0-9]{24}$/i.test(item.url)));
   assert.ok(entries.some(item => item.url.endsWith("/tin-tuc/chon-xe-phu-hop")));
-  for (const path of ["/tai-xe/dang-tin", "/chu-hang/form-tao-don", "/tracking", "/login", "/register", "/thong-tin/thanh-toan-ky-quy", "/thong-tin/khieu-nai-boi-thuong"]) {
+  for (const path of ["/tai-xe/dang-tin", "/chu-hang/form-tao-don", "/tracking", "/tuyen-dung", "/thong-tin/quy-che-hoat-dong", "/thong-tin/thanh-toan-ky-quy", "/thong-tin/khieu-nai-boi-thuong"]) {
     assert.ok(entries.some(item => item.url === "https://www.example.com" + path));
   }
-  assert.ok(!entries.some(item => item.url.includes("/admin")));
+  for (const excluded of ["/doi-tac", "/login", "/register", "/admin"]) {
+    assert.ok(!entries.some(item => item.url === "https://www.example.com" + excluded || item.url.includes(excluded + "/")));
+  }
   const offline = await buildNewsSitemap("https://www.example.com", async () => { throw new Error("Offline"); });
   assert.ok(offline.some(item => item.url.endsWith("/tin-tuc/dang-xe-trong-hieu-qua")));
   assert.equal((await buildNewsSitemap(null, read)).length, 0);
@@ -333,4 +382,90 @@ test("listing renders nine uniform cards, then the remaining guides on a separat
   assert.deepEqual(links, Array.from(editorial, item => item.id));
   const css = readFileSync(resolve(root, "src/components/news/News.module.css"), "utf8");
   assert.match(css, /\.grid\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+});
+
+test("listing page uses crawlable filter links, h2 card headings, and complete article SEO schema", () => {
+  const load = loader();
+  const Feed = load("src/components/news/NewsFeed.tsx").default;
+  const html = renderToStaticMarkup(React.createElement(Feed, { initialData: null }));
+  assert.ok(html.includes('href="/tin-tuc?audience=driver"'));
+  assert.ok(html.includes('href="/tin-tuc?category=guide"'));
+  assert.equal((html.match(/<h2[ >]/g) || []).length, 9);
+  assert.equal((html.match(/<h3[ >]/g) || []).length, 0);
+
+  const { articleMetadata, articleStructuredData } = load("src/lib/news-seo.ts");
+  const cmsNews = {
+    id: "123456789012345678901234", slug: "tin-moi-txe-pro", title: "Thông báo mở tuyến mới",
+    summary: "", content: "<h2>Nội dung chính</h2><p>Đoạn mô tả tự động trích xuất khi tóm tắt đang bỏ trống trên hệ thống.</p>",
+    category: "news", imageUrl: "/uploads/news/a.webp",
+    publishedAt: "2026-11-20T08:00:00.000Z", updatedAt: "2026-11-21T08:00:00.000Z",
+  };
+  const meta = articleMetadata(cmsNews, "https://txepro.vn");
+  const schema = articleStructuredData(cmsNews, "https://txepro.vn");
+  assert.ok(meta.description.includes("Đoạn mô tả tự động"));
+  assert.equal(meta.robots.googleBot["max-image-preview"], "large");
+  assert.equal(meta.openGraph.modifiedTime, "2026-11-21T08:00:00.000Z");
+  assert.equal(schema["@type"], "NewsArticle");
+  assert.equal(schema.dateModified, "2026-11-21T08:00:00.000Z");
+  assert.equal(schema.publisher.logo.url, "https://txepro.vn/logo-mark.webp");
+  assert.equal(schema.author.url, "https://txepro.vn");
+  assert.ok(schema.wordCount > 10);
+
+  const { extractNewsSeoStats } = load("src/lib/news-html.ts");
+  const stats = extractNewsSeoStats('<h2>Mục 1</h2><p>Xem <a href="/tin-tuc/a">bài A</a> và <a href="https://ext.test">ngoài</a></p><img src="/uploads/news/1.webp" alt="Xe tải"><img src="/uploads/news/2.webp" alt="">');
+  assert.equal(stats.h2Count, 1);
+  assert.equal(stats.imageCount, 2);
+  assert.equal(stats.imagesMissingAlt, 1);
+  assert.equal(stats.internalLinkCount, 1);
+  assert.equal(stats.externalLinkCount, 1);
+});
+
+test("phase 1 sitewide SEO helpers produce 1200x630 OG, full googleBot, rich schemas, and strict info slugs", () => {
+  const load = loader();
+  const siteSeo = load("src/lib/site-seo.ts");
+  const { CAREER_JOBS } = load("src/lib/careers-data.ts");
+  const { getHelpArticles } = load("src/lib/help-content.ts");
+  const { INFO_PAGE_SLUGS, isInfoPageSlug } = load("src/lib/info-pages.ts");
+
+  const meta = siteSeo.publicPageMetadata({ title: "Trang mẫu", description: "Mô tả mẫu", path: "/mau" });
+  assert.equal(meta.robots.googleBot["max-image-preview"], "large");
+  assert.equal(meta.twitter.card, "summary_large_image");
+  assert.equal(meta.openGraph.images[0].url, "/og-txepro.jpg");
+  assert.equal(meta.openGraph.images[0].width, 1200);
+  assert.equal(meta.openGraph.images[0].height, 630);
+
+  const siteGraph = siteSeo.websiteStructuredData("https://txepro.vn", {
+    companyName: "Công ty TXE PRO",
+    phoneSupport: "0898080820",
+    emailSupport: "support@txepro.vn",
+    googlePlayUrl: "https://play.google.com/store/apps/details?id=vn.txepro",
+  });
+  assert.equal(siteGraph["@graph"].length, 3);
+  assert.equal(siteGraph["@graph"][0]["@id"], "https://txepro.vn/#organization");
+  assert.equal(siteGraph["@graph"][0].logo["@type"], "ImageObject");
+  assert.equal(siteGraph["@graph"][0].contactPoint["@type"], "ContactPoint");
+  assert.equal("potentialAction" in siteGraph["@graph"][1], false);
+  assert.equal(siteGraph["@graph"][2]["@type"], "MobileApplication");
+  assert.equal(siteGraph["@graph"][2].offers.price, "0");
+
+  const faq = siteSeo.faqStructuredData(getHelpArticles("vi"));
+  assert.equal(faq["@type"], "FAQPage");
+  assert.ok(faq.mainEntity.length >= 10);
+
+  const jobs = siteSeo.jobPostingsStructuredData("https://txepro.vn", CAREER_JOBS, {});
+  assert.equal(jobs["@graph"].length, CAREER_JOBS.length);
+  assert.equal(jobs["@graph"][0]["@type"], "JobPosting");
+  assert.ok(jobs["@graph"].some(job => job.jobLocationType === "TELECOMMUTE"));
+
+  const crumbs = siteSeo.breadcrumbStructuredData("https://txepro.vn", [
+    { name: "Trang chủ", path: "/" },
+    { name: "Theo dõi đơn hàng", path: "/tracking" },
+  ]);
+  assert.equal(crumbs["@type"], "BreadcrumbList");
+  assert.equal(crumbs.itemListElement[1].item, "https://txepro.vn/tracking");
+
+  assert.equal(INFO_PAGE_SLUGS.length, 6);
+  assert.equal(isInfoPageSlug("gioi-thieu"), true);
+  assert.equal(isInfoPageSlug("khong-ton-tai"), false);
+  assert.equal(isInfoPageSlug("toString"), false);
 });

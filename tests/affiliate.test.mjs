@@ -222,3 +222,22 @@ test('payout retry reuses the same request key after an ambiguous network failur
   await submit(); await f.settle(); await submit(); await f.settle();
   assert.equal(requests.length, 2); assert.equal(requests[0].requestKey, requests[1].requestKey); assert.equal(requests[0].amount, 30000); f.dispose();
 });
+
+test('attendance-enabled partner shows attendance tab and hides affiliate payment and payout history tabs', async () => {
+  const attendanceSummary = {
+    ...summary,
+    partner: { ...partner, attendanceEnabled: true, baseSalaryVnd: 3000000 },
+  };
+  const f = harness(portal, async path => (path === '/affiliate/me' ? attendanceSummary : emptyPage), {
+    initial: { txpro_user_session: session },
+  });
+  await f.settle();
+  assert.ok(f.button('Chấm công & lương'));
+  assert.equal(f.button('Yêu cầu thanh toán'), undefined);
+  assert.equal(f.button('Lịch sử thanh toán'), undefined);
+  assert.equal(f.button('Rút tiền ngay'), undefined);
+  assert.ok(f.button('Link giới thiệu'));
+  assert.ok(f.button('Người được giới thiệu'));
+  assert.ok(f.button('Tiền thưởng & cấp độ'));
+  f.dispose();
+});

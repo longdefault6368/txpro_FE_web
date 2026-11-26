@@ -55,22 +55,40 @@ export default function NewsFeed({ compact = false, initialData, initialPage = 1
       {compact && <Link href="/tin-tuc" className={styles.allLink}>{c("Tất cả bài viết", "All articles", "全部文章")}<ArrowUpRight size={19} /></Link>}
     </div>
     {!compact && <div className={styles.tools}>
-      <div className={styles.audienceTabs} role="tablist" aria-label={c("Đối tượng bài viết", "Article audience", "文章对象")}>
-        {AUDIENCE_TABS.map(tab => <button key={tab.value} type="button" role="tab" aria-selected={tab.value === audience} onClick={() => { setAudience(tab.value); setPage(1); }}>{c(tab.vi, tab.en, tab.zh)}</button>)}
-      </div>
+      <nav className={styles.audienceTabs} aria-label={c("Đối tượng bài viết", "Article audience", "文章对象")}>
+        {AUDIENCE_TABS.map(tab => (
+          <Link
+            key={tab.value}
+            href={newsPageHref(1, category, search, tab.value)}
+            aria-current={tab.value === audience ? "page" : undefined}
+            onClick={() => { setAudience(tab.value); setPage(1); }}
+          >
+            {c(tab.vi, tab.en, tab.zh)}
+          </Link>
+        ))}
+      </nav>
       <form className={styles.search} onSubmit={event => { event.preventDefault(); setPage(1); setSearch(draft.trim()); }}>
         <Search size={19} /><input value={draft} maxLength={120} onChange={e => setDraft(e.target.value)} aria-label={c("Tìm bài viết", "Search articles", "搜索文章")} placeholder={c("Tìm nội dung bạn quan tâm…", "What would you like to read?", "搜索感兴趣的内容…")} />
         <button type="submit">{c("Tìm", "Search", "搜索")}</button>
       </form>
-      <div className={styles.filters} role="group" aria-label={c("Chủ đề bài viết", "Article categories", "文章分类")}>
-        {(["all", "news", "guide", "community", "product", "promotion"] as const).map(value => <button key={value} type="button" aria-pressed={value === category} onClick={() => { setCategory(value); setPage(1); }}>{value === "all" ? c("Tất cả", "All", "全部") : newsCategoryLabel(value, language)}</button>)}
-      </div>
+      <nav className={styles.filters} aria-label={c("Chủ đề bài viết", "Article categories", "文章分类")}>
+        {(["all", "news", "guide", "community", "product", "promotion"] as const).map(value => (
+          <Link
+            key={value}
+            href={newsPageHref(1, value, search, audience)}
+            aria-current={value === category ? "page" : undefined}
+            onClick={() => { setCategory(value); setPage(1); }}
+          >
+            {value === "all" ? c("Tất cả", "All", "全部") : newsCategoryLabel(value, language)}
+          </Link>
+        ))}
+      </nav>
     </div>}
     {!compact && failed && <div className={styles.notice} role="status"><span>{c("Chưa tải được tin mới. Bạn vẫn có thể đọc các bài cẩm nang bên dưới.", "New updates are unavailable. You can still read the guides below.", "暂时无法加载最新资讯，您仍可阅读下方指南。")}</span><button type="button" onClick={() => setRetry(value => value + 1)}><RefreshCw size={16} />{c("Thử lại", "Retry", "重试")}</button></div>}
     <div aria-busy={loading} aria-label={c("Danh sách bài viết", "Articles", "文章列表")}>
       {loading ? <><span className={styles.srOnly} role="status">{c("Đang tải bài viết", "Loading articles", "正在加载文章")}</span><NewsSkeleton compact={compact} /></> :
-        articles.length ? compact ? <div className={styles.previewGrid}>{articles.map((article, index) => <NewsCard key={article.id} article={article} featured={index === 0} horizontal={index > 0} />)}</div> :
-          <div className={styles.grid}>{articles.map((article, index) => <NewsCard key={article.id} article={article} priority={index === 0} />)}</div> :
+        articles.length ? compact ? <div className={styles.previewGrid}>{articles.map((article, index) => <NewsCard key={article.id} article={article} featured={index === 0} horizontal={index > 0} headingTag="h3" />)}</div> :
+          <div className={styles.grid}>{articles.map((article, index) => <NewsCard key={article.id} article={article} priority={index === 0} headingTag="h2" />)}</div> :
           <div className={styles.empty}><Newspaper size={34} /><h2>{c("Chưa có bài viết phù hợp", "No matching articles", "暂无匹配文章")}</h2><p>{c("Thử từ khóa khác hoặc chọn Tất cả để xem thêm nội dung.", "Try a different keyword or select All to explore more.", "请尝试其他关键词，或选择全部。")}</p></div>}
     </div>
     {!compact && pages > 1 && <nav className={styles.pagination} aria-label={c("Phân trang tin tức", "Article pages", "文章分页")}>

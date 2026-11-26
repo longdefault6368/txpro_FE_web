@@ -17,10 +17,22 @@ const CompanyInfoContext = createContext<CompanyInfoContextType>({
   refreshCompanyInfo: async () => {},
 });
 
-export const CompanyInfoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(DEFAULT_COMPANY_INFO);
+export const CompanyInfoProvider: React.FC<{
+  children: React.ReactNode;
+  initialData?: Partial<CompanyInfo>;
+}> = ({ children, initialData }) => {
+  const hasInitial = Boolean(
+    initialData &&
+      Object.entries(initialData).some(
+        ([key, value]) => key !== "shortName" && typeof value === "string" && value.trim().length > 0
+      )
+  );
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(() => ({
+    ...DEFAULT_COMPANY_INFO,
+    ...(initialData || {}),
+  }));
   const [loading, setLoading] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(hasInitial);
   const inFlight = useRef<Promise<void> | null>(null);
   const refreshPending = useRef(false);
 

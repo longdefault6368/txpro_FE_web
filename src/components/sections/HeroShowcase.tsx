@@ -78,7 +78,7 @@ export default function HeroShowcase({ scene }: { scene?: HeroScene } = {}) {
         <div className={styles.screen}>
           <div className={styles.brand}><Image src="/logo-mark.webp" alt="" width={30} height={30} /><span>TXE PRO</span></div>
           <div className={styles.screenIntro}>
-            <h2 className={styles.screenTitle}>{content.title}</h2>
+            <p className={styles.screenTitle}>{content.title}</p>
           </div>
           <div className={styles.vehicleChoices}>
             {content.vehicles.map(item => (

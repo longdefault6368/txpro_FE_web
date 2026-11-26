@@ -34,7 +34,7 @@ export default function AccountWorkspace() {
  const [financeRetry, setFinanceRetry] = useState(0), [voucherPage, setVoucherPage] = useState(1), [voucherBusy, setVoucherBusy] = useState(false);
  const lock = useRef(false), alive = useRef(true);
  const normalizedRole = profile?.role || "", isOffline = !profile || Boolean(loadError);
- const driver = normalizedRole === "tai-xe", admin = normalizedRole === "admin";
+ const driver = normalizedRole === "tai-xe", admin = normalizedRole === "admin", partnerOnly = normalizedRole === "doi-tac";
  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
  useEffect(() => {
   const session = localStorage.getItem("txpro_user_session");
@@ -45,14 +45,14 @@ export default function AccountWorkspace() {
   const controller = new AbortController(), session = localStorage.getItem("txpro_user_session");
   void postingRequest<{ user: AccountProfile }>("/auth/profile", { signal: controller.signal }).then(data => {
    if (controller.signal.aborted || session !== localStorage.getItem("txpro_user_session")) return;
-   if (!data?.user || !["tai-xe", "chu-hang", "admin"].includes(data.user.role)) throw new Error("Hồ sơ tài khoản chưa hợp lệ.");
+   if (!data?.user || !["tai-xe", "chu-hang", "doi-tac", "admin"].includes(data.user.role)) throw new Error("Hồ sơ tài khoản chưa hợp lệ.");
    setProfile(data.user); setLoadError("");
   }).catch(e => { if (!controller.signal.aborted) { setProfile(null); setLoadError(e instanceof Error ? e.message : "Chưa tải được tài khoản."); } })
    .finally(() => { if (!controller.signal.aborted) setLoading(false); });
   return () => controller.abort();
  }, [retry]);
  useEffect(() => {
-  if (tab !== "benefits" || !profile || admin) return;
+  if (tab !== "benefits" || !profile || admin || partnerOnly) return;
   const controller = new AbortController(), session = localStorage.getItem("txpro_user_session");
   const valid = () => !controller.signal.aborted && session === localStorage.getItem("txpro_user_session");
   void postingRequest<AccountWallet>("/common/wallet/balance", { signal: controller.signal }).then(value => { if (valid()) { setWallet(value); setWalletError(""); } }).catch(e => { if (valid()) setWalletError(e instanceof Error ? e.message : "Chưa tải được ví."); });
@@ -61,7 +61,7 @@ export default function AccountWorkspace() {
    if (valid()) { setVouchers(value); setVoucherPage(1); setVoucherError(""); }
   }).catch(e => { if (valid()) setVoucherError(e instanceof Error ? e.message : "Chưa tải được voucher."); });
   return () => controller.abort();
- }, [tab, profile, admin, financeRetry]);
+ }, [tab, profile, admin, partnerOnly, financeRetry]);
  function syncProfile(user: AccountProfile) {
   setProfile(previous => ({ ...previous, ...user }));
   try {
@@ -124,18 +124,18 @@ export default function AccountWorkspace() {
  }
  const name = profile?.name || profile?.fullName || "Tài khoản TXE PRO", avatar = getServerMediaUrl(profile?.avatar);
  return <><Header /><main className={s.page}>
-  <div className={s.topline}><Link href="/"><ArrowLeft size={16} />Trang chủ</Link><Link href="/don-cua-ban">Đơn của bạn<ArrowRight size={16} /></Link></div>
+  <div className={s.topline}><Link href="/"><ArrowLeft size={16} />Trang chủ</Link><Link href={partnerOnly ? "/doi-tac" : "/don-cua-ban"}>{partnerOnly ? "Trung tâm đối tác" : "Đơn của bạn"}<ArrowRight size={16} /></Link></div>
   {loading ? <div className={s.skeleton} role="status" aria-label="Đang tải tài khoản"><div /><div /><div /></div> : !profile ? <section className={s.card}><ShieldCheck size={34} /><h1>Tài khoản của bạn</h1><p className={s.error} role="alert">{loadError}</p><div className={s.buttonRow}><button className={s.secondary} onClick={() => { setLoading(true); setRetry(value => value + 1); }}><RefreshCw size={16} />Thử lại</button><Link className={s.primary} href="/login?next=%2Fuser">Đăng nhập</Link></div></section> : <>
   <section className={s.hero}><div className={s.identity}>
    <div className={s.avatar}>{avatar ? <AvatarPhoto key={avatar} src={avatar} name={name} /> : <UserRound size={38} />}
     <label className={s.camera} title="Đổi ảnh đại diện">{busy ? <Loader2 size={16} className={s.spin} /> : <Camera size={16} />}<input aria-label="Đổi ảnh đại diện" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || Boolean(action)} onChange={event => void uploadAvatar(event)} /></label>
-   </div><div><span className={s.eyebrow}>TÀI KHOẢN TXE PRO</span><h1>{name}</h1><div className={s.badges}><span>{driver ? "Tài xế" : admin ? "Quản trị viên" : "Chủ hàng"}</span><span data-active={profile.isActive === true}>{profile.isActive === true ? "Đang hoạt động" : profile.isActive === false ? "Đang bị hạn chế" : "Chưa có trạng thái"}</span></div></div>
+   </div><div><span className={s.eyebrow}>{partnerOnly ? "ĐỐI TÁC TXE PRO" : "TÀI KHOẢN TXE PRO"}</span><h1>{name}</h1><div className={s.badges}><span>{driver ? "Tài xế" : admin ? "Quản trị viên" : partnerOnly ? "Đối tác hệ thống" : "Chủ hàng"}</span><span data-active={profile.isActive === true}>{profile.isActive === true ? "Đang hoạt động" : profile.isActive === false ? "Đang bị hạn chế" : "Chưa có trạng thái"}</span></div></div>
   </div><div className={s.heroActions}><RoleSwitchButton currentRole={normalizedRole} disabled={isOffline || busy || Boolean(action)} /><button type="button" className={s.logout} disabled={busy || voucherBusy || Boolean(action)} onClick={() => setLogoutOpen(true)}><LogOut size={17} />Đăng xuất</button></div></section>
   {message && <div className={s.notice} role="status">{message}</div>}
   {profile.accountRestriction?.status === "active" && <div className={s.notice} role="status">Tài khoản đang bị hạn chế giao dịch.{profile.accountRestriction.permanent ? " Vui lòng liên hệ hỗ trợ để biết thêm thông tin." : profile.accountRestriction.restrictedUntil ? " Thời hạn: " + accountDate(profile.accountRestriction.restrictedUntil) + "." : ""} <Link href="/tro-giup">Liên hệ hỗ trợ</Link></div>}
   <div className={s.layout}><aside className={s.sidebar}>
-   <nav className={s.navigation} aria-label="Mục tài khoản">{([{ id: "profile", title: "Thông tin tài khoản", icon: <UserRound size={18} /> }, ...(!admin ? [{ id: "benefits", title: "Ví & quyền lợi", icon: <Wallet size={18} /> }] : []), { id: "security", title: "Bảo mật", icon: <LockKeyhole size={18} /> }] as const).map(item => <button type="button" key={item.id} aria-current={tab === item.id ? "page" : undefined} onClick={() => { setTab(item.id as Tab); setMessage(""); }}>{item.icon}{item.title}<ArrowRight size={15} /></button>)}</nav>
-   <div className={s.shortcuts}><span className={s.sectionLabel}>LỐI TẮT</span><Link href={admin ? "/admin" : "/don-cua-ban"}><Truck size={18} />{admin ? "Trang quản trị" : "Đơn của bạn"}<ArrowRight size={15} /></Link>{driver && <Link href="/tai-xe/phuong-tien"><Truck size={18} />Quản lý phương tiện<ArrowRight size={15} /></Link>}{!admin && <Link href={driver ? "/tai-xe/dang-tin" : "/chu-hang/form-tao-don"}><Truck size={18} />{driver ? "Đăng xe trống" : "Tìm xe ngay"}<ArrowRight size={15} /></Link>}<Link href="/tro-giup"><CircleHelp size={18} />Trợ giúp & hỗ trợ<ArrowRight size={15} /></Link></div>
+   <nav className={s.navigation} aria-label="Mục tài khoản">{([{ id: "profile", title: "Thông tin tài khoản", icon: <UserRound size={18} /> }, ...(!admin && !partnerOnly ? [{ id: "benefits", title: "Ví & quyền lợi", icon: <Wallet size={18} /> }] : []), { id: "security", title: "Bảo mật", icon: <LockKeyhole size={18} /> }] as const).map(item => <button type="button" key={item.id} aria-current={tab === item.id ? "page" : undefined} onClick={() => { setTab(item.id as Tab); setMessage(""); }}>{item.icon}{item.title}<ArrowRight size={15} /></button>)}</nav>
+   <div className={s.shortcuts}><span className={s.sectionLabel}>LỐI TẮT</span><Link href={admin ? "/admin" : partnerOnly ? "/doi-tac" : "/don-cua-ban"}><Truck size={18} />{admin ? "Trang quản trị" : partnerOnly ? "Trung tâm đối tác" : "Đơn của bạn"}<ArrowRight size={15} /></Link>{driver && <Link href="/tai-xe/phuong-tien"><Truck size={18} />Quản lý phương tiện<ArrowRight size={15} /></Link>}{!admin && !partnerOnly && <Link href={driver ? "/tai-xe/dang-tin" : "/chu-hang/form-tao-don"}><Truck size={18} />{driver ? "Đăng xe trống" : "Tìm xe ngay"}<ArrowRight size={15} /></Link>}<Link href="/tro-giup"><CircleHelp size={18} />Trợ giúp & hỗ trợ<ArrowRight size={15} /></Link></div>
   </aside><div className={s.content}>
   {tab === "profile" && <>
    <section className={s.card}><div className={s.heading}><div><h2>Thông tin tài khoản</h2><p>Thông tin liên hệ và định danh của bạn.</p></div><UserRound size={22} /></div>
@@ -144,10 +144,10 @@ export default function AccountWorkspace() {
     <InfoRow icon={<Mail size={19} />} title="Email" value={profile.email} verified={profile.isEmailVerified === true}><button className={s.textButton} disabled={busy} onClick={() => setAction("email")}>{!profile.email ? "Bổ sung" : profile.isEmailVerified ? "Thay đổi" : "Xác minh"}</button></InfoRow>
     <InfoRow icon={<Globe size={19} />} title="Ngôn ngữ" value={profile.language === "en" ? "English" : profile.language === "zh" ? "中文" : "Tiếng Việt"}><select aria-label="Ngôn ngữ tài khoản" disabled={busy} value={profile.language || language} onChange={event => void saveLanguage(event.target.value as "vi" | "en" | "zh")}><option value="vi">Tiếng Việt</option><option value="en">English</option><option value="zh">中文</option></select></InfoRow>
    </section>
-   {!admin && <section className={s.card}><div className={s.heading}><div><h2>Xác minh danh tính</h2><p>{driver ? 'Tài xế xác minh danh tính trên ứng dụng TXE PRO.' : 'Hồ sơ xác minh dùng chung với ứng dụng.'}</p></div><ShieldCheck size={23} /></div><div className={s.verification}><div><span className={s.rowIcon}><FileCheck2 size={22} /></span><div><strong>{accountKycLabel(profile.kycStatus)}</strong><p>Giấy tờ và kết quả xét duyệt được cập nhật từ hệ thống.</p></div></div><Link className={s.secondary} href="/user/ekyc">{profile.kycStatus === "verified" ? "Xem trạng thái" : driver ? "Hướng dẫn xác minh trên app" : "Hoàn thiện hồ sơ"}<ArrowRight size={16} /></Link></div></section>}
+   {!admin && !partnerOnly && <section className={s.card}><div className={s.heading}><div><h2>Xác minh danh tính</h2><p>{driver ? 'Tài xế xác minh danh tính trên ứng dụng TXE PRO.' : 'Hồ sơ xác minh dùng chung với ứng dụng.'}</p></div><ShieldCheck size={23} /></div><div className={s.verification}><div><span className={s.rowIcon}><FileCheck2 size={22} /></span><div><strong>{accountKycLabel(profile.kycStatus)}</strong><p>Giấy tờ và kết quả xét duyệt được cập nhật từ hệ thống.</p></div></div><Link className={s.secondary} href="/user/ekyc">{profile.kycStatus === "verified" ? "Xem trạng thái" : driver ? "Hướng dẫn xác minh trên app" : "Hoàn thiện hồ sơ"}<ArrowRight size={16} /></Link></div></section>}
    <section className={s.card}><div className={s.details}><div><span>Ngày tham gia</span><strong>{accountDate(profile.createdAt)}</strong></div><div><span>Chương trình đối tác</span><Link href="/doi-tac" className={s.secondary}>Trở thành đối tác / Quản lý đối tác<ArrowRight size={16} /></Link></div></div></section>
   </>}
-  {tab === "benefits" && !admin && <>
+  {tab === "benefits" && !admin && !partnerOnly && <>
    <section className={s.card}><div className={s.heading}><div><h2>Ví TXE PRO</h2><p>Số dư và các khoản bảo đảm của tài khoản.</p></div><button className={s.textButton} disabled={voucherBusy} onClick={() => setFinanceRetry(value => value + 1)}><RefreshCw size={16} />Cập nhật</button></div>
     {walletError ? <p className={s.error} role="alert">{walletError}</p> : !wallet ? <div className={s.miniSkeleton} role="status" aria-label="Đang tải ví" /> : <><div className={s.balance}><span>Số dư tiền khả dụng</span><strong>{accountMoney(wallet.availableBalance)}</strong><small>Tiền bảo đảm có thể dùng: {accountMoney(wallet.guaranteeAvailableBalance)}</small></div><div className={s.moneyGrid}><div><span>Đang khóa ký quỹ</span><strong>{accountMoney(wallet.lockedBalance)}</strong></div><div><span>Quyền lợi có thể rút</span><strong>{accountMoney(wallet.promoAvailableBalance)}</strong></div><div><span>Quyền lợi chờ đủ điều kiện</span><strong>{accountMoney(wallet.promoPendingBalance)}</strong></div></div>{typeof wallet.promoReleaseDays === "number" && <p className={s.inset}>Khoản quyền lợi chờ đủ điều kiện áp dụng thời hạn {wallet.promoReleaseDays} ngày.{wallet.promoNextReleaseAt ? " Mốc tiếp theo: " + accountDate(wallet.promoNextReleaseAt) + "." : ""} Số tiền dùng ký quỹ và số tiền rút được có thể khác nhau.</p>}</>}
     <p className={s.muted}>Nạp/rút tiền và lịch sử giao dịch hiện được quản lý trong ứng dụng TXE PRO.</p>

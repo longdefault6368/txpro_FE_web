@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { fetchWithAuth, API_BASE } from "@/utils/api";
 import { getServerMediaUrl, normalizePersistedImagePath } from "@/utils/media";
+import { extractNewsSeoStats } from "@/lib/news-html";
 
 interface NewsContentEditorProps {
   value: string;
@@ -39,9 +40,9 @@ interface NewsContentEditorProps {
 const TEMPLATES = [
   {
     name: "Mẫu Thông báo Ưu đãi & Thưởng",
-    content: `<h3>CHƯƠNG TRÌNH ƯU ĐÃI ĐẶC BIỆT</h3>
-<p>TXEPRO trân trọng gửi tới quý đối tác chương trình ưu đãi áp dụng trên toàn quốc:</p>
-<h4>1. Quyền lợi ưu đãi</h4>
+    content: `<h2>Chương trình ưu đãi dành cho đối tác TXE PRO</h2>
+<p>TXE PRO trân trọng gửi tới quý đối tác chương trình ưu đãi áp dụng trên toàn quốc:</p>
+<h3>1. Quyền lợi ưu đãi</h3>
 <ul>
   <li>Miễn 100% phí kết nối cuốc xe trong 30 ngày đầu tiên kích hoạt tài khoản.</li>
   <li>Mốc 1: Hoàn thành 5 chuyến nhận thưởng <strong>100.000đ</strong></li>
@@ -49,49 +50,49 @@ const TEMPLATES = [
   <li>Mốc 3: Hoàn thành 30 chuyến nhận thưởng <strong>500.000đ</strong></li>
 </ul>
 <div class="card-highlight"><strong>Ưu đãi đặc biệt:</strong> Đối tác hoàn thành từ 30 chuyến trở lên trong tháng được ưu tiên gắn huy hiệu Tài xế PRO và nhận đơn hàng độc quyền.</div>
-<h4>2. Điều kiện tham gia</h4>
+<h3>2. Điều kiện tham gia</h3>
 <ol>
   <li>Tài khoản đã hoàn tất xác thực thông tin (KYC) hợp lệ.</li>
   <li>Tỷ lệ nhận chuyến đạt tối thiểu 85% và tỷ lệ hoàn thành cuốc từ 90% trở lên.</li>
   <li>Không phát sinh vi phạm quy tắc ứng xử và an toàn vận tải.</li>
 </ol>
 <hr>
-<p>Xem thông tin liên hệ hiện hành trên website hoặc gửi yêu cầu tại mục Hỗ trợ trên ứng dụng.</p>`,
+<p>Xem thông tin liên hệ hiện hành tại <a href="/thong-tin/lien-he">trang Liên hệ</a> hoặc gửi yêu cầu tại mục Hỗ trợ trên ứng dụng.</p>`,
   },
   {
     name: "Mẫu Cẩm nang Hướng dẫn Vận hành",
-    content: `<h3>HƯỚNG DẪN QUY TRÌNH GIAO NHẬN VẬN TẢI</h3>
+    content: `<h2>Hướng dẫn quy trình giao nhận vận tải</h2>
 <p>Để tối ưu hiệu suất và đảm bảo an toàn tuyệt đối cho từng kiện hàng, quý đối tác vui lòng thực hiện theo quy trình 4 bước chuẩn hóa sau:</p>
-<h4>Bước 1: Tiếp nhận và xác nhận thông tin đơn hàng</h4>
+<h3>Bước 1: Tiếp nhận và xác nhận thông tin đơn hàng</h3>
 <p>Kiểm tra kỹ thông tin chủng loại hàng hóa, tải trọng, quy cách đóng gói và địa chỉ giao nhận. Chủ động liên hệ trước với người gửi và người nhận ít nhất 20 phút trước khi đến.</p>
-<h4>Bước 2: Kiểm tra hiện trạng và lập biên bản đối soát</h4>
+<h3>Bước 2: Kiểm tra hiện trạng và lập biên bản đối soát</h3>
 <ul>
   <li>Chụp ảnh ngoại quan kiện hàng trước khi bốc xếp lên thùng xe.</li>
   <li>Kiểm tra niêm phong tem kẹp chì (nếu có) để xác nhận tình trạng nguyên vẹn.</li>
 </ul>
 <div class="card-note"><strong>Lưu ý quan trọng:</strong> Luôn lưu giữ ảnh chụp biên bản bàn giao có chữ ký xác nhận của bên nhận để hệ thống giải ngân tiền cước tự động qua Ví Escrow.</div>
-<h4>Bước 3: Vận chuyển an toàn và cập nhật lộ trình</h4>
-<p>Duy trì kết nối mạng và bật định vị GPS trong suốt chuyến đi. Trường hợp phát sinh sự cố giao thông hoặc thời tiết xấu, cập nhật trạng thái ngay trên app để chủ hàng theo dõi.</p>
-<h4>Bước 4: Nghiệm thu và giải ngân cuốc xe</h4>
+<h3>Bước 3: Vận chuyển an toàn và cập nhật lộ trình</h3>
+<p>Duy trì kết nối mạng và bật định vị GPS trong suốt chuyến đi. Trường hợp phát sinh sự cố giao thông hoặc thời tiết xấu, cập nhật trạng thái ngay trên app để chủ hàng theo dõi tại <a href="/tracking">trang Tra cứu đơn hàng</a>.</p>
+<h3>Bước 4: Nghiệm thu và giải ngân cuốc xe</h3>
 <p>Bàn giao hàng tận nơi, đối soát số lượng và hoàn tất đơn hàng trên ứng dụng để nhận tiền cước về ví tức thì.</p>`,
   },
   {
     name: "Mẫu Hướng dẫn Chủ hàng Đặt xe tiết kiệm",
-    content: `<h3>GIẢI PHÁP VẬN TẢI TIẾT KIỆM CHI PHÍ</h3>
-<p>TXEPRO kết nối mạng lưới hàng nghìn xe tải rỗng chiều về, mang đến giải pháp vận chuyển tối ưu chi phí cho cá nhân và doanh nghiệp:</p>
-<h4>3 Phương pháp tối ưu cước phí vận chuyển:</h4>
+    content: `<h2>Giải pháp vận tải tiết kiệm chi phí trên TXE PRO</h2>
+<p>TXE PRO kết nối mạng lưới xe tải, xe van rỗng chiều về, mang đến giải pháp vận chuyển tối ưu chi phí cho cá nhân và doanh nghiệp:</p>
+<h3>3 phương pháp tối ưu cước phí vận chuyển</h3>
 <ul>
   <li><strong>Chọn đơn ghép tiện chuyến:</strong> Tiết kiệm từ 20% đến 30% cước phí đối với các kiện hàng linh hoạt thời gian.</li>
   <li><strong>Đặt xe trước từ 2 đến 4 tiếng:</strong> Tạo điều kiện cho các tài xế tiện chuyến nhận đơn với mức cước tốt nhất.</li>
   <li><strong>Khai báo chính xác tải trọng:</strong> Tránh phát sinh chi phí đổi xe hoặc phạt quá tải.</li>
 </ul>
-<div class="card-highlight"><strong>Cam kết bảo vệ quyền lợi Chủ hàng:</strong><br>Bảo hiểm hàng hóa toàn diện trong suốt hành trình.<br>Tiền cước được bảo chứng an toàn qua Ví Ký quỹ Escrow, chỉ thanh toán khi hàng đã đến nơi.<br>Xuất hóa đơn VAT điện tử hợp lệ phục vụ quyết toán thuế doanh nghiệp.</div>
+<div class="card-highlight"><strong>Cam kết bảo vệ quyền lợi Chủ hàng:</strong><br>Quy trình ký quỹ minh bạch theo điều kiện từng chuyến.<br>Theo dõi trạng thái hành trình và GPS rõ ràng theo mã đơn.<br>Hỗ trợ đối soát và xử lý sự cố theo quy định hiện hành.</div>
 <hr>
-<p>Liên hệ bộ phận khách hàng doanh nghiệp qua trang Liên hệ để trao đổi nhu cầu.</p>`,
+<p>Bắt đầu tạo yêu cầu tại <a href="/chu-hang/form-tao-don">trang Tìm xe ngay</a> hoặc liên hệ qua <a href="/thong-tin/lien-he">trang Liên hệ</a>.</p>`,
   },
 ];
 
-const BLOCK_TAGS = new Set(["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "hr", "img"]);
+const BLOCK_TAGS = new Set(["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "hr", "img", "figure", "table"]);
 
 function escapeText(text: string) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -103,6 +104,22 @@ function escapeAttr(text: string) {
 
 function plainText(node: Node) {
   return (node.textContent || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function normalizeEditorHref(raw: string): { href: string; external: boolean } | null {
+  const value = raw.trim();
+  if (!value) return null;
+  if (/^\/(?!\/)/.test(value)) return { href: value, external: false };
+  try {
+    const url = new URL(value);
+    if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) return null;
+    if (/^(?:www\.)?txepro\.vn$/i.test(url.hostname)) {
+      return { href: (url.pathname || "/") + url.search + url.hash, external: false };
+    }
+    return { href: url.href, external: true };
+  } catch {
+    return null;
+  }
 }
 
 function inlineHtml(node: Node): string {
@@ -120,9 +137,10 @@ function inlineHtml(node: Node): string {
   if (tag === "em" || tag === "i") return `<em>${inner}</em>`;
   if (tag === "del" || tag === "s" || tag === "strike") return `<del>${inner}</del>`;
   if (tag === "a") {
-    const href = el.getAttribute("href") || "";
-    if (!/^https?:\/\//i.test(href)) return inner;
-    return `<a href="${escapeAttr(href)}" target="_blank">${inner}</a>`;
+    const normalized = normalizeEditorHref(el.getAttribute("href") || "");
+    if (!normalized) return inner;
+    if (!normalized.external) return `<a href="${escapeAttr(normalized.href)}">${inner}</a>`;
+    return `<a href="${escapeAttr(normalized.href)}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
   }
   return inner;
 }
@@ -158,7 +176,34 @@ function cardInner(el: HTMLElement) {
 function imageHtml(el: HTMLElement) {
   const stored = el.dataset.path || normalizePersistedImagePath(el.getAttribute("src") || "");
   if (!stored || stored.startsWith("blob:") || stored.startsWith("data:")) return "";
-  return `<img src="${escapeAttr(stored)}">`;
+  const alt = (el.getAttribute("alt") || "").replace(/\s+/g, " ").trim();
+  return `<img src="${escapeAttr(stored)}" alt="${escapeAttr(alt)}">`;
+}
+
+function figureHtml(el: HTMLElement) {
+  const img = el.querySelector("img");
+  if (!img) return "";
+  const renderedImg = imageHtml(img);
+  if (!renderedImg) return "";
+  const captionEl = el.querySelector("figcaption");
+  const caption = captionEl ? inlineHtml(captionEl).trim() : "";
+  return caption ? `<figure>\n  ${renderedImg}\n  <figcaption>${caption}</figcaption>\n</figure>` : renderedImg;
+}
+
+function tableHtml(el: HTMLElement) {
+  const rows = Array.from(el.querySelectorAll("tr"))
+    .map((tr) => {
+      const cells = Array.from(tr.children)
+        .filter((cell) => ["th", "td"].includes(cell.tagName.toLowerCase()))
+        .map((cell) => {
+          const cellTag = cell.tagName.toLowerCase() === "th" ? "th" : "td";
+          return `<${cellTag}>${inlineHtml(cell).trim()}</${cellTag}>`;
+        });
+      return cells.length ? `  <tr>${cells.join("")}</tr>` : "";
+    })
+    .filter(Boolean);
+  if (!rows.length) return "";
+  return `<table>\n${rows.join("\n")}\n</table>`;
 }
 
 function listHtml(el: HTMLElement, ordered: boolean) {
@@ -182,6 +227,8 @@ function blockHtml(node: Node): string {
   const tag = el.tagName.toLowerCase();
   if (tag === "script" || tag === "style" || tag === "iframe") return "";
   if (tag === "img") return imageHtml(el);
+  if (tag === "figure") return figureHtml(el);
+  if (tag === "table") return tableHtml(el);
   if (tag === "hr") return "<hr>";
   const card = cardClass(el);
   if (card) {
@@ -230,9 +277,9 @@ function toEditorHtml(stored: string) {
 function legacyToHtml(raw: string) {
   if (/<[a-z][\s\S]*>/i.test(raw)) return raw;
   return raw
-    .replace(/^###\s+(.+)$/gm, "<h4>$1</h4>")
-    .replace(/^##\s+(.+)$/gm, "<h3>$1</h3>")
-    .replace(/^#\s+(.+)$/gm, "<h2>$1</h2>")
+    .replace(/^####\s+(.+)$/gm, "<h4>$1</h4>")
+    .replace(/^###\s+(.+)$/gm, "<h3>$1</h3>")
+    .replace(/^#{1,2}\s+(.+)$/gm, "<h2>$1</h2>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .split(/\n{2,}/)
     .map((part) => part.trim())
@@ -325,17 +372,27 @@ export function NewsContentEditor({
   };
 
   const addLink = () => {
-    const href = window.prompt("Dán địa chỉ liên kết (https://...)", "https://txepro.vn");
-    if (!href || !/^https?:\/\//i.test(href.trim())) return;
-    runCommand("createLink", href.trim());
+    const href = window.prompt(
+      "Nhập liên kết nội bộ (/tin-tuc/..., /chu-hang/form-tao-don) hoặc đường dẫn đầy đủ (https://...)",
+      "/tin-tuc/",
+    );
+    if (!href) return;
+    const normalized = normalizeEditorHref(href);
+    if (!normalized) {
+      setNotice("Liên kết không hợp lệ. Dùng đường dẫn bắt đầu bằng / hoặc https://");
+      return;
+    }
+    setNotice("");
+    runCommand("createLink", normalized.href);
   };
 
   const addImageUrl = () => {
-    const src = window.prompt("Dán địa chỉ ảnh", "https://");
+    const src = window.prompt("Dán địa chỉ ảnh (https://... hoặc /images/news/...)", "https://");
     if (!src?.trim()) return;
+    const alt = window.prompt("Nhập mô tả ảnh (Alt text – giúp chuẩn SEO và hỗ trợ người đọc)", title || "") ?? "";
     const path = normalizePersistedImagePath(src.trim());
     const display = getServerMediaUrl(path) || path;
-    insertHtml(`<img src="${escapeAttr(display)}" data-path="${escapeAttr(path)}" alt="">`);
+    insertHtml(`<img src="${escapeAttr(display)}" data-path="${escapeAttr(path)}" alt="${escapeAttr(alt.trim())}">`);
   };
 
   const uploadImage = async (file: File) => {
@@ -359,11 +416,25 @@ export function NewsContentEditor({
       if (!url) throw new Error("Không nhận được đường dẫn ảnh.");
       const path = normalizePersistedImagePath(url);
       const display = getServerMediaUrl(path) || path;
-      insertHtml(`<img src="${escapeAttr(display)}" data-path="${escapeAttr(path)}" alt="">`);
+      const defaultAlt = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
+      const alt = window.prompt("Nhập mô tả ảnh (Alt text – chuẩn SEO)", defaultAlt) ?? defaultAlt;
+      insertHtml(`<img src="${escapeAttr(display)}" data-path="${escapeAttr(path)}" alt="${escapeAttr(alt.trim())}">`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Tải ảnh thất bại.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const onEditorClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.tagName.toLowerCase() === "img") {
+      const currentAlt = target.getAttribute("alt") || "";
+      const nextAlt = window.prompt("Sửa mô tả ảnh (Alt text cho SEO):", currentAlt);
+      if (nextAlt !== null) {
+        target.setAttribute("alt", nextAlt.trim());
+        emitVisual();
+      }
     }
   };
 
@@ -378,7 +449,8 @@ export function NewsContentEditor({
   };
 
   const charCount = value.length;
-  const wordCount = value.replace(/<[^>]+>/g, " ").trim() ? value.replace(/<[^>]+>/g, " ").trim().split(/\s+/).length : 0;
+  const seoStats = extractNewsSeoStats(value);
+  const wordCount = seoStats.wordCount;
   const readTimeMin = Math.max(1, Math.ceil(wordCount / 180));
 
   return (
@@ -471,10 +543,11 @@ export function NewsContentEditor({
             role="textbox"
             aria-multiline="true"
             aria-label="Nội dung chi tiết bài viết"
-            data-placeholder="Viết nội dung bài tại đây. Chọn chữ rồi bấm Đậm, tiêu đề, danh sách, lưu ý hoặc ưu đãi."
+            data-placeholder="Viết nội dung bài tại đây. Dùng H2 cho mục chính, bấm vào ảnh để sửa Alt text SEO."
             suppressContentEditableWarning
             onInput={emitVisual}
             onPaste={onPaste}
+            onClick={onEditorClick}
           />
         )}
         {viewMode === "source" && (
@@ -511,14 +584,21 @@ export function NewsContentEditor({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-4 py-2 rounded-b-2xl text-xs text-slate-500">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="font-semibold text-slate-700">{wordCount} từ</span>
-          <span className={charCount > 7800 ? "font-bold text-red-600" : ""}>{charCount.toLocaleString("vi-VN")} / 8.000 ký tự</span>
+          <span className={charCount > 19000 ? "font-bold text-red-600" : ""}>{charCount.toLocaleString("vi-VN")} / 20.000 ký tự</span>
           <span>Đọc khoảng {readTimeMin} phút</span>
+          <span className={seoStats.h2Count > 0 ? "text-emerald-700 font-semibold" : "text-amber-700"}>H2: {seoStats.h2Count}</span>
+          <span className={seoStats.imagesMissingAlt > 0 ? "text-amber-700 font-semibold" : "text-slate-600"}>
+            Ảnh: {seoStats.imageCount}{seoStats.imagesMissingAlt > 0 ? ` (${seoStats.imagesMissingAlt} thiếu Alt)` : ""}
+          </span>
+          <span className={seoStats.internalLinkCount > 0 ? "text-emerald-700 font-semibold" : "text-slate-600"}>
+            Link nội bộ: {seoStats.internalLinkCount}
+          </span>
           {uploading ? <span>Đang tải ảnh...</span> : null}
           {notice ? <span className="text-red-600">{notice}</span> : null}
         </div>
-        <span>Bài trên app nhận tiêu đề, đoạn văn, danh sách, ảnh, khung lưu ý và khung ưu đãi.</span>
+        <span>Nhấp vào ảnh trong bài để sửa Alt text. Hỗ trợ link nội bộ (/tin-tuc/...) và mục lục tự động từ H2.</span>
       </div>
     </div>
   );

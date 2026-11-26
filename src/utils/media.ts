@@ -22,14 +22,14 @@ export const normalizePersistedImagePath = (path?: string | null): string => {
 
   try {
     const url = new URL(trimmed);
-    if (url.pathname.startsWith("/uploads/")) {
+    if (url.pathname.startsWith("/uploads/") || url.pathname.startsWith("/marketing/")) {
       return url.pathname;
     }
   } catch {
-    if (trimmed.startsWith("/uploads/")) {
+    if (trimmed.startsWith("/uploads/") || trimmed.startsWith("/marketing/")) {
       return trimmed;
     }
-    if (trimmed.startsWith("uploads/")) {
+    if (trimmed.startsWith("uploads/") || trimmed.startsWith("marketing/")) {
       return `/${trimmed}`;
     }
   }
@@ -44,6 +44,11 @@ export const getServerMediaUrl = (path?: string | null) => {
   if (!value) return null;
 
   if (value.startsWith("data:") || value.startsWith("blob:")) {
+    return value;
+  }
+
+  // Local Next.js public assets (e.g. /images/news/...) are served from the frontend origin
+  if (value.startsWith("/images/") || value === "/splash1.png") {
     return value;
   }
 

@@ -67,6 +67,14 @@ function toHtml(article) {
   for (const section of guide.sections) {
     parts.push("<h2>" + escapeHtml(section.heading) + "</h2>");
     for (const paragraph of section.paragraphs) parts.push("<p>" + withLinks(paragraph) + "</p>");
+    if (section.image?.source) {
+      const imgTag = '<img src="' + escapeHtml(section.image.source) + '" alt="' + escapeHtml(section.image.alt || section.heading) + '">';
+      parts.push(
+        section.image.caption
+          ? "<figure>" + imgTag + "<figcaption>" + escapeHtml(section.image.caption) + "</figcaption></figure>"
+          : imgTag,
+      );
+    }
     if (section.checklist?.length) {
       parts.push("<ul>" + section.checklist.map((item) => "<li>" + escapeHtml(item) + "</li>").join("") + "</ul>");
     }
@@ -95,7 +103,7 @@ function payloads(articles) {
       summary: article.summary.slice(0, 500),
       content,
       category: article.category || "guide",
-      audience: "all",
+      audience: article.audience || "all",
       channel: "web",
       slug: article.id.slice(0, 80),
       imageUrl: article.imageUrl || "",
@@ -130,12 +138,14 @@ async function run() {
         upsert: true,
       },
     })), { ordered: false });
-    const channel = await news.updateMany(
-      { campaignKey: { $regex: "^editorial:" } },
-      { $set: { channel: "web", audience: "all" } },
-    );
+    const channel = await news.bulkWrite(articles.map((article) => ({
+      updateOne: {
+        filter: { campaignKey: article.campaignKey },
+        update: { $set: { channel: "web", audience: article.audience } },
+      },
+    })), { ordered: false });
     console.log("Inserted " + (result.upsertedCount || 0) + ", already present " + (result.matchedCount || 0)
-      + ", website " + channel.modifiedCount + ".");
+      + ", website " + (channel.modifiedCount || 0) + ".");
   } finally {
     await client.close();
   }

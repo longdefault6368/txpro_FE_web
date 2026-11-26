@@ -33,6 +33,8 @@ export default function ScrollToTop() {
 
   return (
     <button
+      type="button"
+      aria-label="Lên đầu trang"
       onClick={scrollToTop}
       className={`fixed bottom-20 md:bottom-6 right-20 md:right-24 z-30 bg-primary-600 hover:bg-primary-700 text-white p-2.5 sm:p-3 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 flex items-center justify-center ${
         isVisible
@@ -40,7 +42,7 @@ export default function ScrollToTop() {
           : "opacity-0 translate-y-10 pointer-events-none"
       }`}
     >
-      <ArrowUp className="w-6 h-6" />
+      <ArrowUp className="w-6 h-6" aria-hidden="true" />
     </button>
   );
 }

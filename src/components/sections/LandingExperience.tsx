@@ -10,6 +10,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import styles from "./LandingExperience.module.css";
 import HeroBanner from "./HeroBanner";
 import NewsFeed from "@/components/news/NewsFeed";
+import type { NewsPage } from "@/lib/news-public";
 import useLandingMotion from "@/hooks/useLandingMotion";
 import HomePostingForm from "./HomePostingForm";
 import AppStoreLinks from "@/components/common/AppStoreLinks";
@@ -18,7 +19,7 @@ import HomeQuickActions from "./HomeQuickActions";
 import AppFeaturePreview from "./AppFeaturePreview";
 import ReviewsCarousel from "./ReviewsCarousel";
 
-export default function LandingExperience() {
+export default function LandingExperience({ initialNews = null }: { initialNews?: NewsPage | null }) {
   const landingRef = useRef<HTMLElement>(null);
   useLandingMotion(landingRef);
   const { language } = useLanguage();
@@ -57,7 +58,7 @@ export default function LandingExperience() {
         {icon:CalendarDays,title:c("Chủ động lịch xe trống","Plan your availability","安排空车时间"),text:c("Tìm hiểu đăng tin và lịch đăng tin tự động.","Learn about listings and automatic schedules.","了解发布信息及自动发布安排。")},
         {icon:CircleHelp,title:c("Cần hỗ trợ trên hành trình?","Need help on your trip?","行程中需要帮助？"),text:c("Tìm hướng dẫn và kênh liên hệ phù hợp.","Find guidance and the right support channel.","寻找使用指南及合适的支持渠道。")},
       ].map(item => <Link href="/tro-giup" key={item.title}><item.icon size={26} /><h3>{item.title}</h3><p>{item.text}</p><span>{c("Xem hướng dẫn", "Read the guide", "查看指南")}<ArrowRight size={17} /></span></Link>)}</div></section>
-      <NewsFeed compact />
+      <NewsFeed compact initialData={initialNews} />
       <ReviewsCarousel />
       <section data-reveal id="download" className={styles.appDownload} aria-labelledby="app-download-heading">
         <div className={styles.appDownloadCopy}><span className={styles.downloadEyebrow}><Smartphone size={16} />{c("TXE PRO trên điện thoại", "TXE PRO on your phone", "手机上的 TXE PRO")}</span>
